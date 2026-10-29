@@ -1,0 +1,266 @@
+extends Node2D
+## Everything on the field that moves, drawn every frame from the battle's
+## state and the screen's selection. Owns only short-lived effects.
+
+const K := UnitTypes.Kind
+const S := Regiment.State
+
+## Banner radius in screen pixels.
+const BANNER_PX := 10.0
+
+## The battle screen; untyped to keep the scripts free of a load cycle.
+var screen
+var _fx: Array[Dictionary] = []
+var _font: Font
+
+
+func _ready() -> void:
+	_font = ThemeDB.fallback_font
+
+
+func add_fx(kind: String, pos: Vector2, life: float, extra := {}) -> void:
+	var e := {"kind": kind, "pos": pos, "age": 0.0, "life": life}
+	e.merge(extra)
+	_fx.append(e)
+
+
+func _process(delta: float) -> void:
+	var live: Array[Dictionary] = []
+	for e in _fx:
+		e.age += delta
+		if e.age < e.life:
+			live.append(e)
+	_fx = live
+	queue_redraw()
+
+
+## World units per screen pixel.
+func px() -> float:
+	return 1.0 / maxf(screen.world.scale.x, 0.001)
+
+
+## The angle that undoes the world's rotation, so marks stand upright.
+func upright() -> float:
+	return -screen.world.rotation
+
+
+func screen_up() -> Vector2:
+	return Vector2(0, -1).rotated(upright())
+
+
+func banner_pos(r: Regiment) -> Vector2:
+	return r.pos + screen_up() * (BANNER_PX * px() + 4.0)
+
+
+func _draw() -> void:
+	var b: Battle = screen.battle
+	if b == null:
+		return
+	var p := px()
+	if b.phase == "deploy":
+		_deploy_zones()
+	for f in b.flags:
+		_flag_zone(f, p)
+	for id in screen.selected:
+		var r := b.get_regiment(id)
+		if r != null and r.alive():
+			_footprint(r)
+	for r in b.regiments:
+		if r.alive():
+			_soldiers(r)
+	_projectiles(b)
+	_effects(p)
+	for f in b.flags:
+		_flag(f, p)
+	for r in b.regiments:
+		if r.alive():
+			_banner(r, p)
+	if not screen.demo:
+		_orders(b, p)
+		_preview(p)
+
+
+func _deploy_zones() -> void:
+	var size := Terrain.SIZE
+	var e := Terrain.EDGE
+	var mine := Rect2(e, size.y - Terrain.DEPLOY_DEPTH, size.x - e * 2.0, Terrain.DEPLOY_DEPTH - e * 0.6)
+	var theirs := Rect2(e, e * 0.6, size.x - e * 2.0, Terrain.DEPLOY_DEPTH - e * 0.6)
+	draw_rect(mine, Color(Palette.TEAM[0], 0.10))
+	draw_rect(mine, Color(Palette.TEAM_LIGHT[0], 0.7), false, 2.0)
+	draw_rect(theirs, Color(Palette.TEAM[1], 0.07))
+
+
+func _flag_zone(f: Dictionary, p: float) -> void:
+	var c: Vector2 = f.pos
+	draw_circle(c, Battle.FLAG_RADIUS, Color(1, 1, 1, 0.06))
+	draw_arc(c, Battle.FLAG_RADIUS, 0, TAU, 48, Color(1, 1, 1, 0.35), 1.5 * p)
+	var prog: float = f.progress
+	if absf(prog) > 0.01:
+		var color: Color = Palette.TEAM_LIGHT[0] if prog > 0.0 else Palette.TEAM_LIGHT[1]
+		draw_arc(c, Battle.FLAG_RADIUS, -PI * 0.5, -PI * 0.5 + TAU * absf(prog), 48, color, 3.0 * p)
+
+
+func _flag(f: Dictionary, p: float) -> void:
+	var owner: int = f.owner
+	var color: Color = Palette.NEUTRAL if owner < 0 else Palette.TEAM[owner]
+	draw_set_transform(f.pos, upright())
+	var h := 26.0 * p
+	draw_line(Vector2(0, 0), Vector2(0, -h), Color(0.2, 0.15, 0.1), 2.0 * p)
+	var wave := sin(Time.get_ticks_msec() / 260.0) * 2.0 * p
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(0, -h), Vector2(16.0 * p, -h + 5.0 * p + wave), Vector2(0, -h + 10.0 * p),
+	]), color)
+	draw_polyline(PackedVector2Array([
+		Vector2(0, -h), Vector2(16.0 * p, -h + 5.0 * p + wave), Vector2(0, -h + 10.0 * p),
+	]), Color(0, 0, 0, 0.5), 1.0 * p)
+	draw_circle(Vector2.ZERO, 2.5 * p, Color(0.2, 0.15, 0.1))
+	draw_set_transform(Vector2.ZERO)
+
+
+func _footprint(r: Regiment) -> void:
+	draw_set_transform(r.pos, r.facing)
+	var d := r.depth() + 10.0
+	var w := r.width() + 10.0
+	draw_rect(Rect2(-d * 0.5, -w * 0.5, d, w), Color(Palette.GOLD, 0.18))
+	draw_rect(Rect2(-d * 0.5, -w * 0.5, d, w), Color(Palette.GOLD, 0.8), false, 1.5)
+	draw_set_transform(Vector2.ZERO)
+
+
+func _soldiers(r: Regiment) -> void:
+	var team := r.team
+	var body: Color = Palette.TEAM[team]
+	var dark: Color = Palette.TEAM_DARK[team]
+	if r.kind == K.ARCHERS:
+		body = body.lerp(Palette.TEAM_LIGHT[team], 0.35)
+	if r.state == S.ROUTING:
+		body = body.lerp(Color(0.8, 0.8, 0.8), 0.35)
+	var fwd := r.forward()
+	match r.kind:
+		K.CAVALRY, K.GENERAL:
+			for s in r.soldiers:
+				draw_line(s - fwd * 4.4, s + fwd * 4.4, Palette.HORSE, 4.4)
+				draw_rect(Rect2(s - Vector2(2.1, 2.1), Vector2(4.2, 4.2)), body if r.kind == K.CAVALRY else Palette.GOLD)
+		K.CANNONS:
+			var right := fwd.orthogonal()
+			for g in (2 if r.men() >= 5 else 1):
+				var base := r.pos + right * (g - 0.5) * 18.0 + fwd * 4.0
+				draw_circle(base, 3.4, Palette.HORSE)
+				draw_line(base - fwd * 2.0, base + fwd * 9.0, Palette.GUN, 3.4)
+			for s in r.soldiers:
+				draw_rect(Rect2(s - Vector2(2.2, 2.2), Vector2(4.4, 4.4)), dark)
+				draw_rect(Rect2(s - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), body)
+		_:
+			var pikes := r.kind == K.PIKES and r.state != S.ROUTING
+			var front := r.formation_cols(r.men()) * 2
+			for i in r.men():
+				var s := r.soldiers[i]
+				if pikes and i < front:
+					draw_line(s, s + fwd * 9.0, Color(0.25, 0.2, 0.15, 0.8), 1.2)
+				draw_rect(Rect2(s - Vector2(2.4, 2.4), Vector2(4.8, 4.8)), dark)
+				draw_rect(Rect2(s - Vector2(1.6, 1.6), Vector2(3.2, 3.2)), body)
+
+
+func _banner(r: Regiment, p: float) -> void:
+	var c := banner_pos(r)
+	var selected: bool = r.id in screen.selected
+	var wavering := r.fighting() and r.morale < r.morale_max * 0.3
+	draw_set_transform(c, upright())
+	Glyphs.banner(self, r.kind, r.team, Vector2.ZERO, BANNER_PX * p, r.strength(), wavering, r.state == S.ROUTING, selected)
+	for i in r.stars:
+		draw_circle(Vector2((i - (r.stars - 1) * 0.5) * 5.0 * p, (BANNER_PX + 8.0) * p), 1.8 * p, Palette.GOLD)
+	draw_set_transform(Vector2.ZERO)
+
+
+func _projectiles(b: Battle) -> void:
+	var up := screen_up()
+	for pr in b.projectiles:
+		var from: Vector2 = pr.from
+		var to: Vector2 = pr.to
+		var t: float = pr.t
+		var dist := from.distance_to(to)
+		var dir := (to - from) / maxf(dist, 0.001)
+		if pr.kind == "arrows":
+			var rng := RandomNumberGenerator.new()
+			rng.seed = pr.seed
+			var lift := up * sin(PI * t) * dist * 0.14
+			var slope := dir + up * cos(PI * t) * 0.6
+			for i in pr.count:
+				var spread := Vector2(rng.randf_range(-14, 14), rng.randf_range(-14, 14))
+				var at := from.lerp(to, clampf(t + rng.randf_range(-0.05, 0.05), 0.0, 1.0)) + spread * t + lift
+				draw_line(at - slope.normalized() * 3.0, at + slope.normalized() * 3.0, Color(0.12, 0.1, 0.08, 0.85), 1.0)
+		else:
+			var at := from.lerp(to, t)
+			draw_circle(at, 1.8, Color(0, 0, 0, 0.25))
+			draw_circle(at + up * sin(PI * t) * dist * 0.08, 2.3, Palette.GUN)
+	for s in b.shells:
+		var r: float = 6.0 + s.t * 18.0
+		draw_arc(s.pos, r, 0, TAU, 20, Color(1, 0.3, 0.2, 0.7), 1.5)
+
+
+func _effects(p: float) -> void:
+	for e in _fx:
+		var k: float = e.age / e.life
+		var pos: Vector2 = e.pos
+		match e.kind:
+			"smoke":
+				var drift := screen_up() * k * 10.0 + Vector2(e.get("dx", 0.0), 0) * k
+				draw_circle(pos + drift, lerpf(4.0, e.get("size", 18.0), sqrt(k)), Color(Palette.SMOKE, 0.65 * (1.0 - k)))
+			"dust":
+				draw_circle(pos, lerpf(3.0, e.get("size", 12.0), sqrt(k)), Color(Palette.DUST, 0.55 * (1.0 - k)))
+			"flash":
+				draw_circle(pos, lerpf(e.get("size", 6.0), 1.0, k), Color(1.0, 0.85, 0.45, 1.0 - k))
+			"ring":
+				draw_arc(pos, lerpf(12.0, e.get("size", 200.0), k), 0, TAU, 48, Color(Palette.GOLD, 1.0 - k), 3.0 * p)
+			"mark":
+				draw_arc(pos, lerpf(26.0, 12.0, k), 0, TAU, 24, Color(1, 0.35, 0.25, 1.0 - k), 2.5 * p)
+			"text":
+				draw_set_transform(pos, upright())
+				var color: Color = e.get("color", Color.WHITE)
+				color.a = 1.0 - k * k
+				var size := int(13.0 * p)
+				var lift := -k * 18.0 * p - 22.0 * p
+				draw_string_outline(_font, Vector2(-60.0 * p, lift), e.text, HORIZONTAL_ALIGNMENT_CENTER, 120.0 * p, size, int(4.0 * p), Color(0, 0, 0, color.a * 0.7))
+				draw_string(_font, Vector2(-60.0 * p, lift), e.text, HORIZONTAL_ALIGNMENT_CENTER, 120.0 * p, size, color)
+				draw_set_transform(Vector2.ZERO)
+
+
+func _orders(b: Battle, p: float) -> void:
+	for id in screen.selected:
+		var r := b.get_regiment(id)
+		if r == null or not r.fighting():
+			continue
+		if r.target_id >= 0:
+			var t := b.get_regiment(r.target_id)
+			if t != null and t.alive():
+				_dashed(r.pos, t.pos, Color(1, 0.4, 0.3, 0.85), p)
+				draw_arc(t.pos, 14.0 * p, 0, TAU, 20, Color(1, 0.4, 0.3, 0.85), 2.0 * p)
+		elif not r.waypoints.is_empty():
+			var last := r.pos
+			for w in r.waypoints:
+				_dashed(last, w, Color(Palette.GOLD, 0.85), p)
+				last = w
+			draw_circle(last, 3.0 * p, Palette.GOLD)
+			if not is_nan(r.final_facing):
+				var f := Vector2.from_angle(r.final_facing)
+				draw_line(last, last + f * 14.0 * p, Palette.GOLD, 2.0 * p)
+
+
+func _dashed(a: Vector2, b: Vector2, color: Color, p: float) -> void:
+	draw_dashed_line(a, b, color, 1.6 * p, 6.0 * p)
+
+
+## Ghost positions while the player drags out a line.
+func _preview(p: float) -> void:
+	var slots: Array = screen.preview_slots()
+	if slots.is_empty():
+		return
+	var b: Battle = screen.battle
+	for s in slots:
+		var r := b.get_regiment(s[0])
+		draw_set_transform(s[1], s[2])
+		var d := r.depth() + 4.0
+		var w := r.width() + 4.0
+		draw_rect(Rect2(-d * 0.5, -w * 0.5, d, w), Color(Palette.GOLD, 0.25))
+		draw_rect(Rect2(-d * 0.5, -w * 0.5, d, w), Palette.GOLD, false, 1.5 * p)
+		draw_line(Vector2.ZERO, Vector2(d * 0.5 + 8.0 * p, 0), Palette.GOLD, 2.0 * p)
+		draw_set_transform(Vector2.ZERO)
