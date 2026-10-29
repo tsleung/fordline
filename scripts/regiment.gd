@@ -43,6 +43,8 @@ var routed_once := false
 var fled := false
 ## Distance covered last step, per second; a fast hit is a charge.
 var last_speed := 0.0
+## 1 fresh, 0 spent. Fighting wears it down; standing clear restores it.
+var stamina := 1.0
 ## Ids of enemies in contact this step, nearest first.
 var contacts: Array[int] = []
 

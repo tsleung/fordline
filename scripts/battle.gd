@@ -28,6 +28,14 @@ const PANIC_RADIUS := 140.0
 const PANIC_SHOCK := 3.0
 const ENGAGE_RADIUS := 70.0
 
+## Stamina per second: lost in melee, on the march and in flight; regained
+## standing clear of the fight.
+const FIGHT_TIRE := 0.018
+const MARCH_TIRE := 0.003
+const RIDE_TIRE := 0.008
+const FLIGHT_TIRE := 0.02
+const REST := 0.03
+
 const ABILITY_COOLDOWN := {"rally": 40.0, "barrage": 55.0, "march": 35.0}
 
 var terrain: Terrain
@@ -241,6 +249,7 @@ func step(dt: float) -> void:
 			_think(r, dt)
 	_separate()
 	_melee(dt)
+	_tire(dt)
 	_ranged(dt)
 	_fly(dt)
 	_shells(dt)
@@ -363,7 +372,7 @@ func _on_impact(r: Regiment, enemy: Regiment) -> void:
 	var z := Combat.zone(enemy.pos, enemy.facing, r.pos)
 	if z != Combat.Zone.FRONT and enemy.fighting():
 		_emit({"type": "flank", "zone": z, "pos": enemy.pos, "team": r.team, "kind": enemy.kind})
-	if not UnitTypes.is_mounted(r.kind) or r.last_speed < r.speed * 0.6:
+	if not UnitTypes.is_mounted(r.kind) or r.last_speed < r.speed * 0.6 or r.stamina < Combat.CHARGE_STAMINA:
 		return
 	if not Combat.charge_lands(enemy.kind, z):
 		_emit({"type": "braced", "pos": enemy.pos})
@@ -395,7 +404,7 @@ func _advance(r: Regiment, goal: Vector2, pace: float, dt: float) -> void:
 	var dist := to_goal.length()
 	if dist < 0.01:
 		return
-	var mult := terrain.speed_mult(r.pos) * pace * (1.6 if r.march_t > 0.0 else 1.0)
+	var mult := terrain.speed_mult(r.pos) * pace * (1.6 if r.march_t > 0.0 else 1.0) * Combat.fatigue_pace(r.stamina)
 	var stride := minf(dist, r.speed * mult * dt)
 	var dir := to_goal / dist
 	var next := r.pos + dir * stride
@@ -462,10 +471,26 @@ func _melee(dt: float) -> void:
 			var dps := Combat.melee_dps(
 				r.kind, r.men(), r.formation_cols(r.men()), r.atk,
 				e.kind, e.def + terrain.defence_bonus(e.pos), z, r.charge_t > 0.0
-			) * share
+			) * share * Combat.fatigue_hit(r.stamina)
 			if e.fighting():
-				e.morale -= Combat.MELEE_STRAIN * Combat.ZONE_MORALE[z] * share * dt
+				e.morale -= Combat.MELEE_STRAIN * Combat.ZONE_MORALE[z] * share * dt * Combat.fatigue_nerve(e.stamina)
 			_wound(e, dps * dt, r.pos, r, Combat.ZONE_MORALE[z])
+
+
+func _tire(dt: float) -> void:
+	for r in regiments:
+		if not r.alive():
+			continue
+		var change := REST
+		if r.state == S.ROUTING:
+			change = -FLIGHT_TIRE
+		elif not r.contacts.is_empty():
+			change = -FIGHT_TIRE
+		elif r.last_speed > r.speed * 0.6 and UnitTypes.is_mounted(r.kind):
+			change = -RIDE_TIRE
+		elif r.last_speed > 1.0:
+			change = -MARCH_TIRE
+		r.stamina = clampf(r.stamina + change * dt, 0.0, 1.0)
 
 
 func _range_of(r: Regiment) -> float:
@@ -622,7 +647,7 @@ func _kill(e: Regiment, indices: Array, src: Regiment, morale_mult: float) -> vo
 		src.kills += n
 	if e.fighting():
 		var aura := 0.7 if _in_aura(e) else 1.0
-		e.morale -= Combat.loss_morale(n, e.men_max) * morale_mult * aura
+		e.morale -= Combat.loss_morale(n, e.men_max) * morale_mult * aura * Combat.fatigue_nerve(e.stamina)
 	if e.men() == 0:
 		_destroy(e)
 

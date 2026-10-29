@@ -194,14 +194,18 @@ func _banner(r: Regiment, p: float, threatened: bool) -> void:
 	draw_set_transform(Vector2.ZERO)
 
 
-## A bar under the banner: how much nerve the regiment has left.
+## Two bars under the banner: nerve (coloured) and, once the regiment has
+## started to tire, its stamina (pale) beneath.
 func _morale_bar(r: Regiment, p: float) -> void:
 	var m := clampf(r.morale / r.morale_max, 0.0, 1.0)
 	var color := MORALE_GOOD if m > 0.66 else (MORALE_SHAKEN if m > 0.33 else MORALE_BAD)
 	var w := 22.0 * p
 	var top := (BANNER_PX + 6.0) * p
-	draw_rect(Rect2(-w * 0.5 - p, top - p, w + 2.0 * p, 5.0 * p), Color(0, 0, 0, 0.55))
+	var tired := r.stamina < 0.95
+	draw_rect(Rect2(-w * 0.5 - p, top - p, w + 2.0 * p, (8.0 if tired else 5.0) * p), Color(0, 0, 0, 0.55))
 	draw_rect(Rect2(-w * 0.5, top, w * m, 3.0 * p), color)
+	if tired:
+		draw_rect(Rect2(-w * 0.5, top + 4.0 * p, w * r.stamina, 2.0 * p), Color(Palette.NEUTRAL, 0.9))
 
 
 ## Where the enemy is going: a red arrow from each enemy regiment closing

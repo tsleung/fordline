@@ -172,7 +172,15 @@ func _selection_text(b: Battle) -> String:
 		return "%d regiments · %d men" % [regs.size(), men]
 	var r := regs[0]
 	var stars := " " + "★".repeat(r.stars) if r.stars > 0 else ""
-	return "%s%s · %d of %d men · %s" % [UnitTypes.label(r.kind), stars, r.men(), r.men_max, _morale_word(r)]
+	return "%s%s · %d of %d men · %s · %s" % [UnitTypes.label(r.kind), stars, r.men(), r.men_max, _morale_word(r), _stamina_word(r)]
+
+
+func _stamina_word(r: Regiment) -> String:
+	if r.stamina > 0.7:
+		return "fresh"
+	if r.stamina > 0.35:
+		return "tiring"
+	return "spent"
 
 
 func _morale_word(r: Regiment) -> String:

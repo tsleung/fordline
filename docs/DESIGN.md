@@ -51,6 +51,12 @@ once and the run is over; your score goes on the board.
 - **Terrain.** The river can only be crossed at fords (slow) and bridges.
   Woods slow movement and halve arrow damage. Hills extend range and
   harden defence.
+- **Fatigue.** Melee wears a regiment out in about a minute; marching
+  tires it a little; standing clear of the fight restores it in about
+  thirty seconds. A spent regiment strikes at half strength, loses nerve
+  half as fast again, moves at three-quarters pace and its horse cannot
+  charge. So the side that wins the first clash is tired when the second
+  comes: a fresh reserve sent in where the line bends turns fights.
 - **Charge.** Cavalry that hits at speed deals heavy damage and a morale
   shock for two seconds, except against pikes from the front.
 
@@ -105,33 +111,58 @@ under three minutes. Best score is kept on the device.
 
 ## Luck and skill (measured)
 
-`tests/luck_skill.gd` fights each campaign battle 96 times: four player
-commanders of rising skill (idle; slow; standard; sharp, which also blows
-the Rally horn) × 8 draws (map and enemy roster) × 3 dice (the battle's own
-random numbers). `tests/luck_skill.py` splits the spread of the final
-resolve margin between them. Measured 2026-10-30, among the three
-commanders who give orders:
+`tests/luck_skill.gd` fights each campaign battle under a ladder of player
+commanders of rising skill (idle; slow; standard; sharp, which thinks
+faster and blows the Rally horn) and two variants of sharp (reserve: holds
+one foot regiment back and sends it onto the flank of whoever a friend is
+fighting; hills: puts archers on high ground), × 8 draws (map and enemy
+roster) × 3 dice (the battle's own random numbers). `tests/luck_skill.py`
+splits the spread of the final resolve margin between them. Among slow,
+standard and sharp, measured 2026-10-30:
 
-| | first build (0cab6d9) | slower fights, softer panic | + no reload luck |
+| | first build (0cab6d9) | slower fights, softer panic, no reload luck (3eb5e33) | + line fix, fatigue |
 |---|---|---|---|
-| commander (same edge everywhere) | 5% | 5% | 7% |
-| fit to the map | 31% | 38% | 39% |
-| the draw | 48% | 40% | 42% |
-| the dice | 15% | 17% | 12% |
-| **skill in all** | **36%** | **43%** | **46%** |
-| one step up in skill ends ahead | 55–56% | 57–62% | 57–62% |
+| commander (same edge everywhere) | 5% | 7% | 21% |
+| fit to the map | 31% | 39% | 34% |
+| the draw | 48% | 42% | 39% |
+| the dice | 15% | 12% | 6% |
+| **skill in all** | **36%** | **46%** | **56%** |
+| wins: slow / standard / sharp | – | 38% / 46% / 57% | 29% / 34% / 49% |
+| lead changes per battle, sharp | – | 0.26 | 0.58 |
+
+What each change bought, from runs that changed one thing at a time:
+
+- **The line fix** (each regiment takes the crossing on its own part of the
+  front, instead of crossing paths) took skill from 46% to 55%.
+- **Fatigue** left skill's share about where it was (55% → 56%) but doubled
+  how often the lead changes hands for the sharp commander (0.34 → 0.58)
+  and widened the gap between slow and sharp play (38% → 29% for slow).
+- **A reserve pays on some maps and costs on others.** Held back and sent
+  in as soon as a friend is pinned, it lifts Two Bridges from 50% to 83%
+  and Saltmarsh Road from 8% to 17%, and drops Ashwood, where their horse
+  comes early through open woods, from 75% to 38%. Overall it draws level
+  with no reserve (49% each). Whether to hold one is a call to make from
+  the briefing. Committed late, when a friend is about to break, it
+  measured worse everywhere and was removed.
+- Tried and dropped: throwing the whole line at one crossing (loses the
+  flag race), and a morale shock when fresh troops hit worn ones (no
+  measurable gain).
 
 Giving orders at all is decisive: an idle army never wins. Past that, the
 draw weighs most, but it is luck you can see: the briefing shows their army
 and deployment shows the map before you commit, and the study's commanders
-are the same map-blind AI at different speeds, so they cannot use it. The
-dice are luck after you commit; they are now only cannon scatter. Volleys
-fall out of step by a fixed stagger per regiment rather than a random
-reload.
+are map-blind AI, so they cannot use it. The dice are luck after you
+commit; they are now only cannon scatter. Volleys fall out of step by a
+fixed stagger per regiment rather than a random reload.
+
+The last two battles are hard: no AI commander wins Saltmarsh Road or
+Marshal's Ridge more than 17% of the time. A player has rewards and the
+abilities the study does not use; whether that is enough is for play to
+show.
 
 Rerun after any balance change:
 
 ```bash
-for i in 0 1 2 3 4; do Godot --headless --path . -s tests/luck_skill.gd -- --battle=$i > build/luck/b$i.txt & done; wait
+for i in 0 1 2 3 4; do /Applications/Godot.app/Contents/MacOS/Godot --headless --path . -s tests/luck_skill.gd -- --battle=$i > build/luck/b$i.txt & done; wait
 python3 tests/luck_skill.py build/luck/b*.txt
 ```

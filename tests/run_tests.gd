@@ -43,6 +43,36 @@ func _test_combat() -> void:
 	_check(is_equal_approx(rear / front, 2.2), "rear hits 2.2x")
 	_check(Combat.fighting_men(32, 8) == 16, "two ranks fight")
 	_check(Combat.stars_for_kills(0) == 0 and Combat.stars_for_kills(60) == 3, "stars from kills")
+	_check(Combat.fatigue_hit(1.0) == 1.0 and Combat.fatigue_hit(0.0) == Combat.SPENT_HIT, "spent regiments hit softer")
+	_check(Combat.fatigue_nerve(0.0) > Combat.fatigue_nerve(1.0), "spent regiments break sooner")
+	_check(_duel(1.0, 1.0) == "even", "fresh against fresh is even")
+	_check(_duel(1.0, 0.2) == "first", "fresh swords beat tired swords")
+
+
+## Two sword regiments meet head on, the first with stamina a, the second
+## with stamina b, on open ground; which breaks first?
+func _duel(a: float, b: float) -> String:
+	var t := Terrain.generate("woods", 1)
+	t.forests.clear()
+	t.hills.clear()
+	var battle := Battle.new(t, 1)
+	var mid := Terrain.SIZE * 0.5
+	var first := battle.add_regiment(0, K.SWORDS, 48, mid + Vector2(0, 30), -PI * 0.5, 0, {})
+	var second := battle.add_regiment(1, K.SWORDS, 48, mid - Vector2(0, 30), PI * 0.5, 0, {})
+	first.stamina = a
+	second.stamina = b
+	battle.begin()
+	while battle.time < 120.0:
+		battle.step(1.0 / 15.0)
+		var first_broke := not first.fighting()
+		var second_broke := not second.fighting()
+		if first_broke and second_broke:
+			return "even"
+		if second_broke:
+			return "first"
+		if first_broke:
+			return "second"
+	return "even"
 
 
 func _test_terrain() -> void:

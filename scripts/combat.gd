@@ -23,6 +23,13 @@ const FIGHTING_RANKS := 2
 const MELEE_STRAIN := 1.0
 ## Morale lost per soldier lost, as a share of the regiment's full strength.
 const LOSS_SHOCK := 65.0
+## A spent regiment (stamina 0) strikes at this share of its strength and
+## loses morale this many times as fast; a fresh one is at full.
+const SPENT_HIT := 0.5
+const SPENT_NERVE := 1.5
+## Stamina a cavalry charge needs.
+const CHARGE_STAMINA := 0.35
+
 ## Each veterancy star.
 const STAR_BONUS := 0.08
 
@@ -84,6 +91,18 @@ static func melee_dps(
 	if charging and charge_lands(defender_kind, hit_zone):
 		dps *= CHARGE_DAMAGE
 	return dps * (1.0 - clampf(defender_def, 0.0, 0.9))
+
+
+static func fatigue_hit(stamina: float) -> float:
+	return lerpf(SPENT_HIT, 1.0, clampf(stamina, 0.0, 1.0))
+
+
+static func fatigue_nerve(stamina: float) -> float:
+	return lerpf(SPENT_NERVE, 1.0, clampf(stamina, 0.0, 1.0))
+
+
+static func fatigue_pace(stamina: float) -> float:
+	return lerpf(0.75, 1.0, clampf(stamina, 0.0, 1.0))
 
 
 ## Morale lost when `lost` soldiers die out of a full strength of `men_max`.
