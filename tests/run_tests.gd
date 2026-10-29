@@ -6,6 +6,8 @@ extends SceneTree
 const K := UnitTypes.Kind
 
 var _failures := 0
+## Lead changes in the last battle _fight fought.
+var _lead_changes := 0
 var _checks := 0
 
 
@@ -127,9 +129,9 @@ func _test_battles(quick: bool) -> void:
 			var b := Campaign.make_battle(run)
 			var outcome := _fight(b, true, Campaign.BATTLES[i].persona)
 			var name: String = Campaign.BATTLES[i].name
-			print("  seed %d  %-16s  winner %s  %3ds  kills %d/%d  resolve %d/%d" % [
+			print("  seed %d  %-16s  winner %s  %3ds  kills %d/%d  resolve %d/%d  lead changes %d" % [
 				s, name, "player" if b.winner == 0 else "enemy", int(b.time),
-				b.killed[0], b.killed[1], int(b.resolve[0]), int(b.resolve[1])])
+				b.killed[0], b.killed[1], int(b.resolve[0]), int(b.resolve[1]), _lead_changes])
 			_check(outcome, "seed %d %s ends within the time limit" % [s, name])
 			if b.winner == 0:
 				wins += 1
@@ -145,6 +147,9 @@ func _fight(b: Battle, player_acts: bool, persona: String) -> bool:
 	var dt := 1.0 / 15.0
 	var think := 0.0
 	var enemy: Dictionary = AI.PERSONAS[persona]
+	var fielded := [Telemetry.fielded(b, 0), Telemetry.fielded(b, 1)]
+	var tracker := Telemetry.LeadTracker.new()
+	var sample := 0.0
 	while b.phase == "battle" and b.time < 600.0:
 		think -= dt
 		if think <= 0.0:
@@ -154,4 +159,9 @@ func _fight(b: Battle, player_acts: bool, persona: String) -> bool:
 				b.apply_orders(AI.decide(b, 0, AI.PERSONAS["balanced"]))
 		b.step(dt)
 		b.take_events()
+		sample -= dt
+		if sample <= 0.0:
+			sample = 1.0
+			tracker.sample(Telemetry.lead(b, fielded))
+	_lead_changes = tracker.changes
 	return b.phase == "over" and b.time < 420.0

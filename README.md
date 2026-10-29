@@ -52,6 +52,10 @@ Runs the rules, map and campaign checks, then fights all five campaign
 battles AI against AI on three seeds; fails if any battle runs past seven
 minutes or any script fails to compile. `./test.sh --quick` fights one seed.
 
+`tests/luck_skill.gd` and `tests/luck_skill.py` measure how much of a
+battle's outcome is the commander and how much is the draw and the dice;
+see the end of [docs/DESIGN.md](docs/DESIGN.md).
+
 `tests/shot.tscn` plays a battle on autopilot in a real window and saves
 screenshots to `build/shots/` (see the header of `tests/shot.gd`); keep the
 window visible while it runs.

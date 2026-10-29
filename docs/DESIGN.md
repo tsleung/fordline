@@ -24,11 +24,16 @@ once and the run is over; your score goes on the board.
    each block, lines grinding together at a ford. Soldiers die one by one,
    the front rank refills from the back, and a broken regiment scatters.
 2. **Read the board in a glance.** Each banner shows the regiment's type,
-   strength (the ring) and morale (the fill blinks when wavering). The flags
-   and the two resolve bars say who is winning.
-3. **Every battle is short.** Resolve drains a little faster after four
+   strength (the ring) and morale (the bar beneath it; the banner blinks
+   when wavering). A line marks each block's front, so its flanks show.
+   The flags and the two resolve bars say who is winning.
+3. **See it coming.** A red arrow shows each enemy regiment closing on one
+   of yours, and a red ring pulses on the banner it is coming for; enemy
+   horse on the move trails a faint arrow. Flank and rear hits are called
+   out. The fun is reading the move and answering it in time.
+4. **Every battle is short.** Resolve drains a little faster after four
    minutes. A battle is two to four minutes, a run is about twenty.
-4. **One more run.** Losses carry over, regiments earn stars, rewards stack
+5. **One more run.** Losses carry over, regiments earn stars, rewards stack
    into a build, and a run ends on the first defeat with a score.
 
 ## Rules
@@ -36,12 +41,13 @@ once and the run is over; your score goes on the board.
 - **Counters.** Pikes stop cavalry. Swords beat pikes. Cavalry rides down
   archers and cannons. Archers and cannons wear everyone down from range.
 - **Flanks.** A regiment fights the enemy in front of it. Hit it from the
-  side and it takes 1.5× damage and twice the morale loss; from behind,
-  2.2× and three times. So pin with infantry, then hit with cavalry.
+  side and it takes 1.5× damage and 1.7× the morale loss; from behind,
+  2.2× and 2.5×. So pin with infantry, then hit with cavalry.
 - **Morale.** Casualties, flanks, cannon fire and nearby routs drain
   morale. At zero the regiment routs: it runs for its own edge and can't be
-  ordered. If it gets clear of the enemy it rallies. Your general's aura
-  slows the bleed; the Rally horn brings broken regiments back.
+  ordered. If it gets clear of the enemy it rallies, and its side wins back
+  a little resolve. Your general's aura slows the bleed; the Rally horn
+  brings broken regiments back.
 - **Terrain.** The river can only be crossed at fords (slow) and bridges.
   Woods slow movement and halve arrow damage. Hills extend range and
   harden defence.
@@ -96,3 +102,36 @@ under three minutes. Best score is kept on the device.
   events into effects and sound; they never write battle state.
 - `tests/run_tests.gd` runs headless: rules, pathing, campaign, and
   AI-vs-AI battles that must finish in time.
+
+## Luck and skill (measured)
+
+`tests/luck_skill.gd` fights each campaign battle 96 times: four player
+commanders of rising skill (idle; slow; standard; sharp, which also blows
+the Rally horn) × 8 draws (map and enemy roster) × 3 dice (the battle's own
+random numbers). `tests/luck_skill.py` splits the spread of the final
+resolve margin between them. Measured 2026-10-30, among the three
+commanders who give orders:
+
+| | first build (0cab6d9) | slower fights, softer panic | + no reload luck |
+|---|---|---|---|
+| commander (same edge everywhere) | 5% | 5% | 7% |
+| fit to the map | 31% | 38% | 39% |
+| the draw | 48% | 40% | 42% |
+| the dice | 15% | 17% | 12% |
+| **skill in all** | **36%** | **43%** | **46%** |
+| one step up in skill ends ahead | 55–56% | 57–62% | 57–62% |
+
+Giving orders at all is decisive: an idle army never wins. Past that, the
+draw weighs most, but it is luck you can see: the briefing shows their army
+and deployment shows the map before you commit, and the study's commanders
+are the same map-blind AI at different speeds, so they cannot use it. The
+dice are luck after you commit; they are now only cannon scatter. Volleys
+fall out of step by a fixed stagger per regiment rather than a random
+reload.
+
+Rerun after any balance change:
+
+```bash
+for i in 0 1 2 3 4; do Godot --headless --path . -s tests/luck_skill.gd -- --battle=$i > build/luck/b$i.txt & done; wait
+python3 tests/luck_skill.py build/luck/b*.txt
+```

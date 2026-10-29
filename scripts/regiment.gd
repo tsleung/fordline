@@ -84,7 +84,9 @@ static func create(
 		r.reload_time = s.reload * doctrine.get("reload_" + str(new_kind), 1.0)
 		r.shot = s.shot * star
 		r.accuracy = s.get("accuracy", 1.0)
-		r.reload = r.reload_time * 0.5
+		# Stagger the first shot by id, so volleys fall out of step without
+		# a random reload deciding who wins.
+		r.reload = r.reload_time * (0.3 + 0.12 * (new_id % 5))
 	r.pos = at
 	r.facing = face
 	r.final_facing = face

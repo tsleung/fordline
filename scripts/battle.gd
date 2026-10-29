@@ -15,6 +15,8 @@ const FLAG_DRAIN := 0.5
 const DUSK_TIME := 240.0
 const DUSK_DRAIN := 0.25
 const ROUT_COST := 5.0
+## Resolve won back when a broken regiment rallies.
+const RALLY_REFUND := 3.0
 const DESTROYED_COST := 4.0
 const GENERAL_COST := 20.0
 const BREAK_DELAY := 2.5
@@ -22,6 +24,8 @@ const BREAK_DELAY := 2.5
 const AURA_RADIUS := 170.0
 const RALLY_RADIUS := 280.0
 const PANIC_RADIUS := 140.0
+## Morale a regiment loses when a friend nearby breaks.
+const PANIC_SHOCK := 3.0
 const ENGAGE_RADIUS := 70.0
 
 const ABILITY_COOLDOWN := {"rally": 40.0, "barrage": 55.0, "march": 35.0}
@@ -356,9 +360,11 @@ func _hold_contact(r: Regiment, dt: float) -> void:
 
 
 func _on_impact(r: Regiment, enemy: Regiment) -> void:
+	var z := Combat.zone(enemy.pos, enemy.facing, r.pos)
+	if z != Combat.Zone.FRONT and enemy.fighting():
+		_emit({"type": "flank", "zone": z, "pos": enemy.pos, "team": r.team, "kind": enemy.kind})
 	if not UnitTypes.is_mounted(r.kind) or r.last_speed < r.speed * 0.6:
 		return
-	var z := Combat.zone(enemy.pos, enemy.facing, r.pos)
 	if not Combat.charge_lands(enemy.kind, z):
 		_emit({"type": "braced", "pos": enemy.pos})
 		return
@@ -480,7 +486,7 @@ func _ranged(dt: float) -> void:
 			_turn(r, (t.pos - r.pos).angle(), dt)
 		if r.reload > 0.0:
 			continue
-		r.reload = r.reload_time * rng.randf_range(0.9, 1.1)
+		r.reload = r.reload_time
 		if r.kind == K.ARCHERS:
 			_loose_volley(r, t)
 		else:
@@ -679,7 +685,7 @@ func _rout(r: Regiment) -> void:
 			_lose_general(r.team)
 	for f in team_regiments(r.team):
 		if f != r and f.fighting() and f.pos.distance_to(r.pos) < PANIC_RADIUS:
-			f.morale -= 5.0
+			f.morale -= PANIC_SHOCK
 	_emit({"type": "rout", "pos": r.pos, "team": r.team, "kind": r.kind, "id": r.id})
 
 
@@ -689,6 +695,7 @@ func _rally(r: Regiment) -> void:
 	r.state = S.IDLE
 	r.waypoints = PackedVector2Array()
 	r.final_facing = PI * 1.5 if r.team == 0 else PI * 0.5
+	resolve[r.team] = minf(100.0, resolve[r.team] + RALLY_REFUND)
 	_emit({"type": "rally", "pos": r.pos, "team": r.team, "id": r.id})
 
 

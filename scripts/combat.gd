@@ -7,14 +7,14 @@ const K := UnitTypes.Kind
 enum Zone { FRONT, SIDE, REAR }
 
 const ZONE_DAMAGE := [1.0, 1.5, 2.2]
-const ZONE_MORALE := [1.0, 2.0, 3.0]
+const ZONE_MORALE := [1.0, 1.7, 2.5]
 
 const CHARGE_TIME := 2.0
 const CHARGE_DAMAGE := 2.5
 const CHARGE_SHOCK := 14.0
 
 ## Every melee blow is scaled by this; it sets how long a fight lasts.
-const MELEE_PACE := 0.5
+const MELEE_PACE := 0.42
 
 ## Only the first two ranks fight in melee.
 const FIGHTING_RANKS := 2
@@ -22,7 +22,7 @@ const FIGHTING_RANKS := 2
 ## Morale lost per second simply from being in melee.
 const MELEE_STRAIN := 1.0
 ## Morale lost per soldier lost, as a share of the regiment's full strength.
-const LOSS_SHOCK := 75.0
+const LOSS_SHOCK := 65.0
 ## Each veterancy star.
 const STAR_BONUS := 0.08
 

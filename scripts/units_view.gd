@@ -7,6 +7,11 @@ const S := Regiment.State
 
 ## Banner radius in screen pixels.
 const BANNER_PX := 10.0
+## An enemy closing on one of yours is shown once it is this near.
+const THREAT_RANGE := 320.0
+const MORALE_GOOD := Color("7bd88f")
+const MORALE_SHAKEN := Color("f2c94c")
+const MORALE_BAD := Color("ff6b5b")
 
 ## The battle screen; untyped to keep the scripts free of a load cycle.
 var screen
@@ -70,11 +75,12 @@ func _draw() -> void:
 			_soldiers(r)
 	_projectiles(b)
 	_effects(p)
+	var threats := {} if screen.demo else _intents(b, p)
 	for f in b.flags:
 		_flag(f, p)
 	for r in b.regiments:
 		if r.alive():
-			_banner(r, p)
+			_banner(r, p, threats.has(r.id))
 	if not screen.demo:
 		_orders(b, p)
 		_preview(p)
@@ -151,6 +157,8 @@ func _soldiers(r: Regiment) -> void:
 				draw_rect(Rect2(s - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), body)
 		_:
 			var pikes := r.kind == K.PIKES and r.state != S.ROUTING
+			if r.fighting():
+				_front_edge(r, dark)
 			var front := r.formation_cols(r.men()) * 2
 			for i in r.men():
 				var s := r.soldiers[i]
@@ -160,15 +168,71 @@ func _soldiers(r: Regiment) -> void:
 				draw_rect(Rect2(s - Vector2(1.6, 1.6), Vector2(3.2, 3.2)), body)
 
 
-func _banner(r: Regiment, p: float) -> void:
+## A line along the front rank, so which way a block faces (and where its
+## flanks are) reads at a glance.
+func _front_edge(r: Regiment, color: Color) -> void:
+	var rank := mini(r.formation_cols(r.men()), r.men())
+	if rank < 2:
+		return
+	var ahead := r.forward() * 3.5
+	draw_line(r.soldiers[0] + ahead, r.soldiers[rank - 1] + ahead, Color(color, 0.85), 1.6)
+
+
+func _banner(r: Regiment, p: float, threatened: bool) -> void:
 	var c := banner_pos(r)
 	var selected: bool = r.id in screen.selected
 	var wavering := r.fighting() and r.morale < r.morale_max * 0.3
 	draw_set_transform(c, upright())
+	if threatened:
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 110.0)
+		draw_arc(Vector2.ZERO, (BANNER_PX + 8.0 + 2.0 * pulse) * p, 0, TAU, 24, Color(MORALE_BAD, 0.5 + 0.5 * pulse), 2.5 * p)
 	Glyphs.banner(self, r.kind, r.team, Vector2.ZERO, BANNER_PX * p, r.strength(), wavering, r.state == S.ROUTING, selected)
+	if r.fighting():
+		_morale_bar(r, p)
 	for i in r.stars:
-		draw_circle(Vector2((i - (r.stars - 1) * 0.5) * 5.0 * p, (BANNER_PX + 8.0) * p), 1.8 * p, Palette.GOLD)
+		draw_circle(Vector2((i - (r.stars - 1) * 0.5) * 5.0 * p, (BANNER_PX + 12.0) * p), 1.8 * p, Palette.GOLD)
 	draw_set_transform(Vector2.ZERO)
+
+
+## A bar under the banner: how much nerve the regiment has left.
+func _morale_bar(r: Regiment, p: float) -> void:
+	var m := clampf(r.morale / r.morale_max, 0.0, 1.0)
+	var color := MORALE_GOOD if m > 0.66 else (MORALE_SHAKEN if m > 0.33 else MORALE_BAD)
+	var w := 22.0 * p
+	var top := (BANNER_PX + 6.0) * p
+	draw_rect(Rect2(-w * 0.5 - p, top - p, w + 2.0 * p, 5.0 * p), Color(0, 0, 0, 0.55))
+	draw_rect(Rect2(-w * 0.5, top, w * m, 3.0 * p), color)
+
+
+## Where the enemy is going: a red arrow from each enemy regiment closing
+## on one of yours, and from enemy horse on the move. Returns the ids of
+## your regiments under threat.
+func _intents(b: Battle, p: float) -> Dictionary:
+	var threats := {}
+	for e in b.regiments:
+		if e.team != 1 or not e.fighting() or UnitTypes.is_ranged(e.kind) or not e.contacts.is_empty():
+			continue
+		var t := b.get_regiment(e.target_id) if e.target_id >= 0 else null
+		if t != null and t.alive() and t.team == 0:
+			var d := e.pos.distance_to(t.pos)
+			if d > THREAT_RANGE:
+				continue
+			threats[t.id] = true
+			var via: Vector2 = e.via if not is_nan(e.via.x) else t.pos
+			_arrow(e.pos, via, Color(MORALE_BAD, 0.75), p)
+			if via != t.pos:
+				_arrow(via, t.pos, Color(MORALE_BAD, 0.75), p)
+		elif UnitTypes.is_mounted(e.kind) and not e.waypoints.is_empty():
+			_arrow(e.pos, e.waypoints[e.waypoints.size() - 1], Color(MORALE_BAD, 0.35), p)
+	return threats
+
+
+func _arrow(a: Vector2, b: Vector2, color: Color, p: float) -> void:
+	var dir := (b - a).normalized()
+	var tip := b - dir * 10.0 * p
+	draw_dashed_line(a, tip, color, 2.0 * p, 7.0 * p)
+	var side := dir.orthogonal() * 5.0 * p
+	draw_colored_polygon(PackedVector2Array([tip + dir * 8.0 * p, tip + side, tip - side]), color)
 
 
 func _projectiles(b: Battle) -> void:

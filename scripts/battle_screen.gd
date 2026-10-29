@@ -43,6 +43,8 @@ var _think := 0.0
 var _last_tap := {"id": -1, "at": -10.0}
 var _clash_wait := 0.0
 var _reported := false
+## Enemy horse already called out, and at whom: enemy id -> target id.
+var _warned := {}
 
 
 func setup(b: Battle, persona_name: String, battle_title: String, is_demo := false) -> void:
@@ -106,6 +108,7 @@ func _process(delta: float) -> void:
 		if steps == MAX_STEPS_PER_FRAME:
 			_acc = 0.0
 	_react(battle.take_events())
+	_warn_of_horse()
 	_ambient(delta)
 	selected.assign(selected.filter(func(id): return battle.get_regiment(id) != null and battle.get_regiment(id).fighting()))
 	if battle.phase == "over" and not _reported:
@@ -423,6 +426,14 @@ func _react(events: Array[Dictionary]) -> void:
 			"charge":
 				units_view.add_fx("dust", e.pos, 0.8, {"size": 24.0})
 				_sound("charge", -4.0)
+			"flank":
+				var rear: bool = e.zone == Combat.Zone.REAR
+				var ours: bool = e.team == 0
+				var word := "Rear!" if rear else "Flank!"
+				units_view.add_fx("text", e.pos, 1.4, {"text": word, "color": Palette.GOLD if ours else Palette.TEAM_LIGHT[1]})
+				_sound("clash", -4.0, 0.7)
+				if not ours:
+					_toast("They're in behind your " + UnitTypes.label(e.kind).to_lower() if rear else "Your " + UnitTypes.label(e.kind).to_lower() + " are flanked", 1)
 			"braced":
 				units_view.add_fx("text", e.pos, 1.2, {"text": "Braced!", "color": Palette.GOLD})
 			"rout":
@@ -453,6 +464,23 @@ func _react(events: Array[Dictionary]) -> void:
 				_sound("lose" if e.team == 0 else "win", 0.0)
 			"begin":
 				_sound("horn", -2.0, 0.9)
+
+
+## Say so once when enemy horse picks one of your regiments to ride at.
+func _warn_of_horse() -> void:
+	if demo or battle.phase != "battle":
+		return
+	for e in battle.team_regiments(1):
+		if e.kind != K.CAVALRY or not e.fighting() or e.target_id < 0:
+			continue
+		var t := battle.get_regiment(e.target_id)
+		if t == null or t.team != 0 or _warned.get(e.id, -1) == t.id:
+			continue
+		if e.pos.distance_to(t.pos) > units_view.THREAT_RANGE:
+			continue
+		_warned[e.id] = t.id
+		_toast("Their cavalry rides for your " + UnitTypes.label(t.kind).to_lower(), 1)
+		_sound("charge", -10.0, 0.8)
 
 
 func _ambient(delta: float) -> void:
