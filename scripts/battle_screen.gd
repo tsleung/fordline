@@ -524,6 +524,16 @@ func _react(events: Array[Dictionary]) -> void:
 				_corpses.add(e.pos, e.team)
 			"volley":
 				_sound("volley", -10.0, randf_range(0.9, 1.15))
+			"musket":
+				var facing: float = e.facing
+				var width: float = e.width
+				var fwd := Vector2.from_angle(facing)
+				var along := fwd.orthogonal()
+				for i in 5:
+					var at: Vector2 = e.pos + fwd * 10.0 + along * (i - 2) * width * 0.22
+					units_view.add_fx("flash", at, 0.1, {"size": 4.0})
+					units_view.add_fx("smoke", at, 2.4, {"size": 16.0, "dx": randf_range(-6, 6)})
+				_sound("musket", -7.0, randf_range(0.9, 1.1))
 			"boom":
 				units_view.add_fx("flash", e.pos, 0.15, {"size": 7.0})
 				units_view.add_fx("smoke", e.pos, 1.8, {"size": 20.0, "dx": randf_range(-8, 8)})

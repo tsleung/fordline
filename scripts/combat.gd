@@ -48,9 +48,11 @@ static func type_mult(attacker: int, defender: int) -> float:
 				return 1.8
 			if defender == K.CANNONS:
 				return 2.0
+			if defender == K.MUSKETS:
+				return 1.8
 			if defender == K.PIKES:
 				return 0.6
-	if defender == K.ARCHERS:
+	if defender == K.ARCHERS or defender == K.MUSKETS:
 		return 1.2
 	if defender == K.CANNONS:
 		return 1.5
@@ -110,7 +112,13 @@ static func loss_morale(lost: int, men_max: int) -> float:
 	return LOSS_SHOCK * float(lost) / float(maxi(men_max, 1))
 
 
-## Expected ranged damage of one archer volley before terrain cover.
+## The armour left of `def` once a shot that goes through `pierce` of it
+## has struck.
+static func pierced(def: float, pierce: float) -> float:
+	return def * (1.0 - clampf(pierce, 0.0, 1.0))
+
+
+## Expected ranged damage of one volley, arrows or shot, before cover.
 static func volley_damage(shooters: int, shot: float, accuracy: float, defender_def: float) -> float:
 	return shooters * shot * accuracy * (1.0 - clampf(defender_def, 0.0, 0.9))
 

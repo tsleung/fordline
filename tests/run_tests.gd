@@ -56,6 +56,27 @@ func _test_combat() -> void:
 	_check(Combat.fatigue_nerve(0.0) > Combat.fatigue_nerve(1.0), "spent regiments break sooner")
 	_check(_duel(1.0, 1.0) == "even", "fresh against fresh is even")
 	_check(_duel(1.0, 0.2) == "first", "fresh swords beat tired swords")
+	_test_muskets()
+
+
+## A volley of shot goes through armour, drops men all at once, and costs
+## its target more nerve than the men alone.
+func _test_muskets() -> void:
+	_check(is_equal_approx(Combat.pierced(0.3, 0.7), 0.09), "shot goes through most armour")
+	_check(Combat.type_mult(K.CAVALRY, K.MUSKETS) > 1.0, "cavalry rides down muskets")
+	var t := Terrain.generate("woods", 1)
+	t.forests.clear()
+	t.hills.clear()
+	var battle := Battle.new(t, 1)
+	var mid := Terrain.SIZE * 0.5
+	battle.add_regiment(0, K.MUSKETS, 40, mid + Vector2(0, 75), -PI * 0.5, 0, {})
+	var block := battle.add_regiment(1, K.PIKES, 48, mid - Vector2(0, 75), PI * 0.5, 0, {})
+	battle.begin()
+	while block.men() == block.men_max and battle.time < 20.0:
+		battle.step(1.0 / 15.0)
+	var lost := block.men_max - block.men()
+	_check(lost >= 3, "one volley drops several pikemen at once")
+	_check(block.morale_max - block.morale > Combat.loss_morale(lost, block.men_max) + 4.0, "a volley shakes more than its losses")
 
 
 ## Two sword regiments meet head on, the first with stamina a, the second
@@ -208,9 +229,14 @@ func _tap(screen, world_pos: Vector2) -> void:
 ## fails the suite through test.sh.
 func _test_screens() -> void:
 	var main: Node = load("res://scenes/main.tscn").instantiate()
+	main.save_path = "user://test_screens.cfg"
+	DirAccess.remove_absolute(main.save_path)
 	root.add_child(main)
 	await process_frame
 	for step in [
+		func(): main.show_scenarios(),
+		func(): main.show_scenarios("pike_shot"),
+		func(): main.show_scenario("skirmish_shot"),
 		func(): main.show_scenarios(),
 		func(): main.show_scenario("skirmish"),
 		func(): main.show_scenario("bridges", 3),
@@ -221,7 +247,9 @@ func _test_screens() -> void:
 		await process_frame
 		await process_frame
 	_check(main.get_child_count() == 1, "one screen on stage after walking the screens")
+	_check(main._load("ui", "era", "") == "pike_shot", "the scenario list remembers its era")
 	main.free()
+	DirAccess.remove_absolute("user://test_screens.cfg")
 
 
 ## Every scenario builds, deploys on dry ground and finishes in time with

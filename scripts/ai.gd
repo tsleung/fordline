@@ -35,11 +35,15 @@ const RESERVE_REACH := 450.0
 ## they cover.
 const HOLD_SHORT := 50.0
 const BATTERY_BACK := 170.0
+## Archers step back from foot this close; muskets only from foot about to
+## strike, since a musket on the move doesn't fire and its range is short.
+const ARCHERS_SHY := 110.0
+const MUSKETS_SHY := 60.0
 
 
 ## Place orders that set out a team's regiments in its deployment zone:
-## foot in front, archers then cannons behind, horse on the wings, the
-## general at the back.
+## foot in front, archers and muskets then cannons behind, horse on the
+## wings, the general at the back.
 static func deploy_orders(b: Battle, team: int) -> Array:
 	var foot: Array[Regiment] = []
 	var archers: Array[Regiment] = []
@@ -50,7 +54,7 @@ static func deploy_orders(b: Battle, team: int) -> Array:
 		match r.kind:
 			K.SWORDS, K.PIKES:
 				foot.append(r)
-			K.ARCHERS:
+			K.ARCHERS, K.MUSKETS:
 				archers.append(r)
 			K.CANNONS:
 				guns.append(r)
@@ -122,7 +126,7 @@ static func decide(b: Battle, team: int, persona: Dictionary) -> Array:
 					o = _reserve_foot(b, r, line, foes, home_y)
 				else:
 					o = _foot(r, foes, advancing, _line_spot(line, line.find(r), goals), home)
-			K.ARCHERS:
+			K.ARCHERS, K.MUSKETS:
 				o = _archer(b, r, mine, foes, home_y, advancing, persona.get("terrain", false))
 			K.CANNONS:
 				o = _gun(b, r, foes, _flag_goals(b, team), home)
@@ -260,11 +264,14 @@ static func _reserve_foot(b: Battle, r: Regiment, line: Array[Regiment], foes: A
 	return _move(r, centre + Vector2(0.0, 110.0 * back))
 
 
+## Archers and muskets: step back from foot closing on them, else shoot
+## at the nearest in reach, else keep behind the line.
 static func _archer(b: Battle, r: Regiment, mine: Array[Regiment], foes: Array[Regiment], home_y: float, advancing: bool, use_hills: bool) -> Variant:
+	var shy := ARCHERS_SHY if r.kind == K.ARCHERS else MUSKETS_SHY
 	for f in foes:
 		if UnitTypes.is_ranged(f.kind) or not f.contacts.is_empty():
 			continue
-		if r.pos.distance_to(f.pos) < 110.0:
+		if r.pos.distance_to(f.pos) < shy:
 			var away := (r.pos - f.pos).normalized() * 100.0
 			away.y += 40.0 if home_y > 0.0 else -40.0
 			return _move(r, r.pos + away)

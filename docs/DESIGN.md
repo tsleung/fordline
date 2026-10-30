@@ -11,7 +11,8 @@ played and argued with.
 ## The thirty-second version
 
 You command a small army: swords, pikes, archers, cavalry, cannons and your
-general. Each battle is on a new map with a river, woods and hills, and
+general (in the Pike and Shot scenarios, muskets take the place of swords
+and bows). Each battle is on a new map with a river, woods and hills, and
 three flags at the crossings. Holding more flags than the enemy drains their
 **resolve**; routing their regiments drains it faster. When one side's
 resolve hits zero, its whole army breaks and runs. After a win you keep your
@@ -39,7 +40,14 @@ once and the run is over; your score goes on the board.
 ## Rules
 
 - **Counters.** Pikes stop cavalry. Swords beat pikes. Cavalry rides down
-  archers and cannons. Archers and cannons wear everyone down from range.
+  archers, muskets and cannons. Archers and cannons wear everyone down from
+  range; muskets break blocks of pikes.
+- **Muskets.** Range 170 (archers 230), one volley every 7.5 s that lands
+  at once. Shot goes through 70% of armour, but woods still halve it, and a
+  volley costs its target 6 morale on top of the men it kills (arrows: 1.5).
+  Weak in melee and soft to horse (1.8×), so they stand behind pikes. A
+  musket on the move doesn't fire, so the AI's muskets only step back from
+  foot within 60 (archers: 110).
 - **Flanks.** A regiment fights the enemy in front of it. Hit it from the
   side and it takes 1.5× damage and 1.7× the morale loss; from behind,
   2.2× and 2.5×. So pin with infantry, then hit with cavalry.
@@ -111,6 +119,40 @@ losses, crossings held at the end), and the best is kept on the device.
 | Hammer and Anvil | open woods | break them | pin with foot, ride round with horse |
 | Two Narrow Bridges | bridges | hold both bridges at 5:00 | forcing a crossing with guns and a barrage |
 | Riders at Dawn | the ridge | break them | pikes against a cavalry army |
+
+Scenarios are grouped by era, oldest first, with a tab for each above the
+list (the list remembers the last one). An era is data: a name, the kinds a
+Skirmish of that era draws from, and its scenarios. Medieval is the five
+above; Pike and Shot fights with pikes, muskets, horse and guns:
+
+| Scenario | Ground | Goal | Teaches |
+|---|---|---|---|
+| Skirmish | a new field each time | break them | the same, drawn from pike, shot, horse and guns |
+| Push of Pike | roads | break them | let the shot thin their blocks before the pikes meet |
+| Shot at the Fords | fords, deploy at the river | hold one ford at 3:00 | muskets on ground that makes the enemy wade |
+| The Cuirassiers | roads | break them | ride round the pikes into the shot behind them |
+| The Great Battery | the ridge | break them | cross open ground under three batteries |
+
+A range slider is the next step once there are four or more eras.
+
+Measured 2026-10-31, AI players of the luck study, wins (stars):
+
+| Scenario | idle | slow | standard | sharp |
+|---|---|---|---|---|
+| Skirmish (36 battles each) | 0% | 42% | 28% | 61% (1.2) |
+| Push of Pike | 0% | 0% | 17% | 100% (2.0) |
+| Shot at the Fords | 0% | 100% | 0% | 100% (2.0) |
+| The Cuirassiers | 0% | 100% (2.0) | 100% (2.0) | 100% (3.0) |
+| The Great Battery | 0% | 0% | 67% | 100% (2.3) |
+
+Open: in the Pike and Shot Skirmish the slow AI player beats the standard
+one (in Medieval it doesn't: 50% and 53%). The first musket design made a
+volley more accurate close in; the slow player's muskets walked in further
+before firing, so slow won 64% to standard's 31%. Auto-fire always shoots
+at the edge of range, so the falloff punished holding ground; it was
+removed, which narrowed the gap but did not close it. Separately, pikes in
+the line take the enemy general as a target whenever he is within reach
+(pikes hit horse 2.5×), in both eras.
 
 Every briefing (and each card in the scenario list) shows the field as it
 will be fought, both armies deployed: the battle's own map, drawn small.

@@ -5,7 +5,8 @@ extends Node
 ## Saves <out>-deploy.png, then <out>-<seconds>s.png at each time in SHOTS.
 ## With --menus it instead saves the title and the first briefing; with
 ## --routes, a paused battle with one regiment given a two-stop route;
-## with --scenarios, the scenario list and one scenario's briefing.
+## with --scenarios, the Pike and Shot scenario list and one briefing.
+## --scenario=<id> plays that quick battle instead of a campaign battle.
 
 const BattleScreen := preload("res://scripts/battle_screen.gd")
 const Main := preload("res://scenes/main.tscn")
@@ -20,20 +21,30 @@ var _main: Node
 
 func _ready() -> void:
 	var battle_index := 0
+	var scenario := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--battle="):
 			battle_index = int(arg.get_slice("=", 1))
+		elif arg.begins_with("--scenario="):
+			scenario = arg.get_slice("=", 1)
 		elif arg.begins_with("--out="):
 			_out = arg.get_slice("=", 1)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://" + _out.get_base_dir()))
 	if "--menus" in OS.get_cmdline_user_args() or "--scenarios" in OS.get_cmdline_user_args():
 		_main = Main.instantiate()
+		_main.save_path = "user://shot.cfg"
 		add_child(_main)
+		return
+	_screen = BattleScreen.new()
+	if scenario != "":
+		var resolved := Scenarios.resolve(scenario, 7)
+		_screen.setup(Scenarios.make_battle(resolved, 7), resolved.persona, resolved.name)
+		_screen.autopilot = true
+		add_child(_screen)
 		return
 	var run := Campaign.new_run(7)
 	run.battle = battle_index
 	var spec: Dictionary = Campaign.BATTLES[battle_index]
-	_screen = BattleScreen.new()
 	_screen.setup(Campaign.make_battle(run), spec.persona, spec.name)
 	_screen.autopilot = true
 	add_child(_screen)
@@ -43,10 +54,10 @@ func _process(_delta: float) -> void:
 	_frames += 1
 	if _main != null and "--scenarios" in OS.get_cmdline_user_args():
 		if _frames == 60:
-			_main.show_scenarios()
+			_main.show_scenarios("pike_shot")
 		elif _frames == 80:
 			_save(_out + "-scenarios.png")
-			_main.show_scenario("hold")
+			_main.show_scenario("fords_shot")
 		elif _frames == 100:
 			set_process(false)
 			_save(_out + "-scenario.png")

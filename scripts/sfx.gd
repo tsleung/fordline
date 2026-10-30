@@ -5,7 +5,7 @@ extends Node
 const RATE := 22050
 const VOICES := 10
 ## Shortest gap between two plays of the same sound, in seconds.
-const MIN_GAP := {"clash": 0.09, "volley": 0.12, "boom": 0.08, "death": 0.05}
+const MIN_GAP := {"clash": 0.09, "volley": 0.12, "boom": 0.08, "death": 0.05, "musket": 0.1}
 
 var muted := false
 var _streams := {}
@@ -22,6 +22,7 @@ func _ready() -> void:
 	_streams = {
 		"boom": _boom(),
 		"volley": _volley(),
+		"musket": _musket(),
 		"clash": _clash(),
 		"horn": _horn(220.0, 1.3),
 		"rout": _horn(147.0, 0.7),
@@ -89,6 +90,21 @@ func _volley() -> AudioStreamWAV:
 		prev = n
 		var env := sin(PI * clampf(t / 0.45, 0.0, 1.0))
 		s[i] = hi * env * 0.25
+	return _wav(s)
+
+
+## A ragged crackle: a dozen shots a few hundredths of a second apart.
+func _musket() -> AudioStreamWAV:
+	var s := _buffer(0.6)
+	for k in 12:
+		var start := int(randf_range(0.0, 0.3) * RATE)
+		var low := 0.0
+		for i in range(start, s.size()):
+			var t := float(i - start) / RATE
+			if t > 0.15:
+				break
+			low = lerpf(low, randf_range(-1.0, 1.0), 0.3)
+			s[i] += low * exp(-t * 45.0) * 0.22
 	return _wav(s)
 
 

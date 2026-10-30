@@ -6,7 +6,8 @@ extends Node
 const K := UnitTypes.Kind
 const BattleScreen := preload("res://scripts/battle_screen.gd")
 const MapPreview := preload("res://scripts/map_preview.gd")
-const SAVE_PATH := "user://fordline.cfg"
+## Where progress is kept; tests point it at a file of their own.
+var save_path := "user://fordline.cfg"
 
 var run: Dictionary = {}
 var best := 0
@@ -52,14 +53,28 @@ func show_title() -> void:
 		col.add_child(_text("Best score  %d" % best, 18, Palette.BRASS))
 
 
-func show_scenarios() -> void:
+## The scenarios of one era, picked by the tabs along the top; with no
+## era given, the one last looked at.
+func show_scenarios(era_id := "") -> void:
 	Sfx.play("click")
+	if Scenarios.era(era_id).is_empty():
+		era_id = _load("ui", "era", Scenarios.ERAS[0].id)
+		if Scenarios.era(era_id).is_empty():
+			era_id = Scenarios.ERAS[0].id
+	_save("ui", "era", era_id)
 	var col := _page()
 	col.add_child(_inline("QUICK BATTLE", 15, Palette.BRASS))
 	col.add_child(_text("Scenarios", 40, Palette.INK, false))
 	col.add_child(_text("One battle each, three to five minutes. Earn up to three stars.", 18, Palette.INK_DIM, false))
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 10)
+	for e in Scenarios.ERAS:
+		var tab := _button(e.name, show_scenarios.bind(e.id), e.id == era_id)
+		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tabs.add_child(tab)
+	col.add_child(tabs)
 	var thumb_w := 150.0 if get_viewport().get_visible_rect().size.x > 760 else 110.0
-	for spec in Scenarios.LIST:
+	for spec in Scenarios.of_era(era_id):
 		# Skirmish's field is drawn now, so the thumbnail is the field you get.
 		var seed_value := randi()
 		var card := Button.new()
@@ -511,7 +526,7 @@ func _how_to_play() -> String:
 		"Tap the field to move. Drag to set a line. Tap an enemy to attack.",
 		"To add a stop, tap the gold marker at the end of a route, then tap where to go next (or shift-click on a computer).",
 		"",
-		"Pikes stop cavalry. Swords beat pikes. Cavalry rides down archers and guns. Flanks and rears take more damage and break faster.",
+		"Pikes stop cavalry. Swords beat pikes. Cavalry rides down archers, muskets and guns. Muskets go through armour and shake whoever they hit. Flanks and rears take more damage and break faster.",
 		"Pause any time; orders still work. Rally brings broken regiments back near your general.",
 	])
 
@@ -558,7 +573,7 @@ func _make_theme() -> Theme:
 
 func _load(section: String, key: String, default: Variant) -> Variant:
 	var cfg := ConfigFile.new()
-	if cfg.load(SAVE_PATH) != OK:
+	if cfg.load(save_path) != OK:
 		return default
 	return cfg.get_value(section, key, default)
 
@@ -567,9 +582,9 @@ func _load(section: String, key: String, default: Variant) -> Variant:
 ## score and every scenario's stars together.
 func _save(section: String, key: String, value: Variant) -> void:
 	var cfg := ConfigFile.new()
-	cfg.load(SAVE_PATH)
+	cfg.load(save_path)
 	cfg.set_value(section, key, value)
-	cfg.save(SAVE_PATH)
+	cfg.save(save_path)
 
 
 ## Stars drawn rather than typed, so they show whatever the font has.

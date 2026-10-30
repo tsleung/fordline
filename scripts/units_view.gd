@@ -157,13 +157,16 @@ func _soldiers(r: Regiment) -> void:
 				draw_rect(Rect2(s - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), body)
 		_:
 			var pikes := r.kind == K.PIKES and r.state != S.ROUTING
+			var muskets := r.kind == K.MUSKETS and r.state != S.ROUTING
 			if r.fighting():
 				_front_edge(r, dark)
-			var front := r.formation_cols(r.men()) * 2
+			var rank := r.formation_cols(r.men())
 			for i in r.men():
 				var s := r.soldiers[i]
-				if pikes and i < front:
+				if pikes and i < rank * 2:
 					draw_line(s, s + fwd * 9.0, Color(0.25, 0.2, 0.15, 0.8), 1.2)
+				elif muskets and i < rank:
+					draw_line(s, s + fwd * 5.5, Palette.GUN, 1.4)
 				draw_rect(Rect2(s - Vector2(2.4, 2.4), Vector2(4.8, 4.8)), dark)
 				draw_rect(Rect2(s - Vector2(1.6, 1.6), Vector2(3.2, 3.2)), body)
 
@@ -247,7 +250,14 @@ func _projectiles(b: Battle) -> void:
 		var t: float = pr.t
 		var dist := from.distance_to(to)
 		var dir := (to - from) / maxf(dist, 0.001)
-		if pr.kind == "arrows":
+		if pr.kind == "shot":
+			var rng := RandomNumberGenerator.new()
+			rng.seed = pr.seed
+			for i in pr.count:
+				var spread := Vector2(rng.randf_range(-16, 16), rng.randf_range(-16, 16))
+				var at := from.lerp(to + spread, t)
+				draw_line(at - dir * 5.0, at, Color(1.0, 0.9, 0.6, 0.7), 1.0)
+		elif pr.kind == "arrows":
 			var rng := RandomNumberGenerator.new()
 			rng.seed = pr.seed
 			var lift := up * sin(PI * t) * dist * 0.14

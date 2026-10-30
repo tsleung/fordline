@@ -532,10 +532,13 @@ func _ranged(dt: float) -> void:
 		if r.reload > 0.0:
 			continue
 		r.reload = r.reload_time
-		if r.kind == K.ARCHERS:
-			_loose_volley(r, t)
-		else:
-			_fire_guns(r, t)
+		match r.kind:
+			K.ARCHERS:
+				_loose_volley(r, t)
+			K.MUSKETS:
+				_fire_muskets(r, t)
+			_:
+				_fire_guns(r, t)
 
 
 func _shot_target(r: Regiment) -> Regiment:
@@ -570,10 +573,26 @@ func _loose_volley(r: Regiment, t: Regiment) -> void:
 	var d := r.pos.distance_to(t.pos)
 	projectiles.append({
 		"kind": "arrows", "from": r.pos, "to": t.pos, "t": 0.0, "dur": 0.5 + d / 420.0,
-		"target": t.id, "src": r.id, "team": r.team, "dmg": dmg, "count": mini(r.men(), 12),
-		"seed": rng.randi(),
+		"target": t.id, "src": r.id, "team": r.team, "dmg": dmg, "shock": r.shock,
+		"count": mini(r.men(), 12), "seed": rng.randi(),
 	})
 	_emit({"type": "volley", "pos": r.pos, "team": r.team})
+
+
+## A volley of shot lands at once. It goes through most armour but not
+## through trees, and it shakes whoever it hits.
+func _fire_muskets(r: Regiment, t: Regiment) -> void:
+	var d := r.pos.distance_to(t.pos)
+	var armour := Combat.pierced(t.def, r.pierce) + terrain.defence_bonus(t.pos)
+	var dmg := Combat.volley_damage(r.men(), r.shot, r.accuracy, armour) * terrain.cover(t.pos)
+	if not t.contacts.is_empty():
+		dmg *= 0.6
+	projectiles.append({
+		"kind": "shot", "from": r.pos, "to": t.pos, "t": 0.0, "dur": 0.08 + d / 2000.0,
+		"target": t.id, "src": r.id, "team": r.team, "dmg": dmg, "shock": r.shock,
+		"count": mini(r.men(), 14), "seed": rng.randi(),
+	})
+	_emit({"type": "musket", "pos": r.pos, "facing": r.facing, "width": r.width(), "team": r.team})
 
 
 func _fire_guns(r: Regiment, t: Regiment) -> void:
@@ -599,11 +618,11 @@ func _fly(dt: float) -> void:
 	for p in landed:
 		projectiles.erase(p)
 		var src := get_regiment(p.src)
-		if p.kind == "arrows":
+		if p.kind == "arrows" or p.kind == "shot":
 			var t := get_regiment(p.target)
 			if t != null and t.alive():
 				if t.fighting():
-					t.morale -= 1.5
+					t.morale -= p.shock
 				_wound(t, p.dmg, p.from, src, 1.0)
 		else:
 			_blast(p.to, 1 - p.team, 13.0, 3, 6.0, src)

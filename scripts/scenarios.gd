@@ -5,7 +5,22 @@ extends RefCounted
 
 const K := UnitTypes.Kind
 
+## Scenarios are grouped by era, oldest first; each era fights with its
+## own weapons. draw: the kinds a Skirmish of that era picks its army from;
+## a kind listed twice comes up twice as often.
+const ERAS := [
+	{
+		"id": "medieval", "name": "Medieval",
+		"draw": [K.SWORDS, K.PIKES, K.ARCHERS, K.CAVALRY, K.CANNONS],
+	},
+	{
+		"id": "pike_shot", "name": "Pike and Shot",
+		"draw": [K.PIKES, K.PIKES, K.MUSKETS, K.MUSKETS, K.CAVALRY, K.CANNONS],
+	},
+]
+
 ## Each scenario:
+##   era: an id from ERAS
 ##   map / map_seed: the ground ("random" with no seed: Skirmish)
 ##   player / enemy: [kind, stars] for each regiment beside the general
 ##   persona: how the enemy fights
@@ -18,13 +33,13 @@ const K := UnitTypes.Kind
 ##     share of your men; {"flags": n} hold at least n flags at the end
 const LIST := [
 	{
-		"id": "skirmish", "name": "Skirmish",
+		"id": "skirmish", "name": "Skirmish", "era": "medieval",
 		"brief": "A new field each time and two armies made the same. Only how you fight is different.",
 		"map": "random", "persona": "balanced",
 		"stars": [{"time": 150.0}, {"losses": 0.35}],
 	},
 	{
-		"id": "hold", "name": "Hold the Fords",
+		"id": "hold", "era": "medieval", "name": "Hold the Fords",
 		"brief": "The three fords are yours and an army is coming for them. Still hold one when the clock runs out.",
 		"map": "fords", "map_seed": 41, "persona": "aggressive",
 		"player": [[K.SWORDS, 1], [K.SWORDS, 0], [K.PIKES, 1], [K.ARCHERS, 0], [K.ARCHERS, 0]],
@@ -33,7 +48,7 @@ const LIST := [
 		"stars": [{"flags": 2}, {"losses": 0.4}],
 	},
 	{
-		"id": "hammer", "name": "Hammer and Anvil",
+		"id": "hammer", "era": "medieval", "name": "Hammer and Anvil",
 		"brief": "Open woods. They have dug in with bows and a gun; you have horse. Pin them with the foot, then ride round.",
 		"map": "woods", "map_seed": 7, "persona": "dug_in",
 		"player": [[K.SWORDS, 0], [K.PIKES, 0], [K.CAVALRY, 0], [K.CAVALRY, 0], [K.CAVALRY, 1]],
@@ -41,7 +56,7 @@ const LIST := [
 		"stars": [{"time": 120.0}, {"losses": 0.3}],
 	},
 	{
-		"id": "bridges", "name": "Two Narrow Bridges",
+		"id": "bridges", "era": "medieval", "name": "Two Narrow Bridges",
 		"brief": "Take both bridges before dusk. They hold the far bank with guns; so do you, and you can call a barrage.",
 		"map": "bridges", "map_seed": 23, "persona": "dug_in", "abilities": ["rally", "barrage"],
 		"player": [[K.SWORDS, 1], [K.SWORDS, 0], [K.SWORDS, 0], [K.PIKES, 0], [K.ARCHERS, 0], [K.ARCHERS, 0], [K.CANNONS, 0], [K.CANNONS, 0]],
@@ -50,17 +65,68 @@ const LIST := [
 		"stars": [{"time": 200.0}, {"losses": 0.35}],
 	},
 	{
-		"id": "riders", "name": "Riders at Dawn",
+		"id": "riders", "era": "medieval", "name": "Riders at Dawn",
 		"brief": "Their horse will come early and from everywhere. Keep your pikes facing it and your bows behind them.",
 		"map": "ridge", "map_seed": 5, "persona": "aggressive",
 		"player": [[K.PIKES, 0], [K.PIKES, 0], [K.PIKES, 1], [K.PIKES, 0], [K.SWORDS, 0], [K.ARCHERS, 0], [K.ARCHERS, 0]],
 		"enemy": [[K.CAVALRY, 0], [K.CAVALRY, 0], [K.CAVALRY, 0], [K.SWORDS, 0]],
 		"stars": [{"time": 150.0}, {"losses": 0.35}],
 	},
+	{
+		"id": "skirmish_shot", "era": "pike_shot", "name": "Skirmish",
+		"brief": "Pike, shot, horse and guns, the same on both sides, on a new field each time.",
+		"map": "random", "persona": "balanced",
+		"stars": [{"time": 180.0}, {"losses": 0.35}],
+	},
+	{
+		"id": "push", "era": "pike_shot", "name": "Push of Pike",
+		"brief": "Two armies of pike and shot. Let your muskets thin their blocks before the pikes meet.",
+		"map": "roads", "map_seed": 13, "persona": "balanced",
+		"player": [[K.PIKES, 1], [K.PIKES, 0], [K.PIKES, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.CAVALRY, 0], [K.CANNONS, 0]],
+		"enemy": [[K.PIKES, 0], [K.PIKES, 0], [K.PIKES, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.CAVALRY, 0]],
+		"stars": [{"time": 180.0}, {"losses": 0.35}],
+	},
+	{
+		"id": "fords_shot", "era": "pike_shot", "name": "Shot at the Fords",
+		"brief": "Your muskets hold the fords. Their pikes must wade to reach you, and every volley shakes them.",
+		"map": "fords", "map_seed": 17, "persona": "aggressive",
+		"player": [[K.MUSKETS, 1], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.PIKES, 0], [K.PIKES, 0], [K.PIKES, 0]],
+		"enemy": [[K.PIKES, 0], [K.PIKES, 0], [K.PIKES, 0], [K.MUSKETS, 0], [K.CAVALRY, 0]],
+		"deadline": 180.0, "hold_needed": 1, "own_flags": true, "deploy_depth": 370.0,
+		"stars": [{"flags": 2}, {"losses": 0.4}],
+	},
+	{
+		"id": "cuirassiers", "era": "pike_shot", "name": "The Cuirassiers",
+		"brief": "Their shot stands behind their pikes. Ride round the pikes and the shot cannot stop you.",
+		"map": "roads", "map_seed": 31, "persona": "dug_in",
+		"player": [[K.CAVALRY, 1], [K.CAVALRY, 0], [K.CAVALRY, 0], [K.CAVALRY, 0], [K.PIKES, 0], [K.PIKES, 0], [K.MUSKETS, 0]],
+		"enemy": [[K.PIKES, 0], [K.PIKES, 0], [K.PIKES, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.CANNONS, 0], [K.CANNONS, 0], [K.CAVALRY, 0]],
+		"stars": [{"time": 150.0}, {"losses": 0.35}],
+	},
+	{
+		"id": "battery", "era": "pike_shot", "name": "The Great Battery",
+		"brief": "Three batteries hold the ridge. Cross the open ground quickly and take the guns from the side.",
+		"map": "ridge", "map_seed": 9, "persona": "dug_in", "abilities": ["rally", "barrage"],
+		"player": [[K.PIKES, 1], [K.PIKES, 0], [K.PIKES, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.CAVALRY, 0]],
+		"enemy": [[K.PIKES, 0], [K.PIKES, 0], [K.PIKES, 1], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.CANNONS, 0], [K.CANNONS, 0], [K.CANNONS, 1], [K.CAVALRY, 0]],
+		"stars": [{"time": 240.0}, {"losses": 0.4}],
+	},
 ]
 
 const MAP_KINDS := ["fords", "woods", "bridges", "roads", "ridge"]
 const SKIRMISH_SIZE := 6
+
+
+static func era(id: String) -> Dictionary:
+	for e in ERAS:
+		if e.id == id:
+			return e
+	return {}
+
+
+## The scenarios of era `era_id`, in list order.
+static func of_era(era_id: String) -> Array:
+	return LIST.filter(func(s): return s.era == era_id)
 
 
 static func get_spec(id: String) -> Dictionary:
@@ -70,8 +136,9 @@ static func get_spec(id: String) -> Dictionary:
 	return {}
 
 
-## The scenario as it will be fought with `seed_value`: Skirmish draws its
-## map kind and its (shared) army from the seed; the rest are fixed.
+## The scenario as it will be fought with `seed_value`: a Skirmish draws
+## its map kind and its (shared) army, from its era's kinds, from the seed;
+## the rest are fixed.
 static func resolve(id: String, seed_value: int) -> Dictionary:
 	var spec := get_spec(id).duplicate(true)
 	if spec.map != "random":
@@ -80,9 +147,10 @@ static func resolve(id: String, seed_value: int) -> Dictionary:
 	rng.seed = seed_value
 	spec.map = MAP_KINDS[rng.randi() % MAP_KINDS.size()]
 	spec.map_seed = seed_value
+	var kinds: Array = era(spec.era).draw
 	var army: Array = []
 	for i in SKIRMISH_SIZE:
-		army.append([UnitTypes.RECRUITABLE[rng.randi() % UnitTypes.RECRUITABLE.size()], 0])
+		army.append([kinds[rng.randi() % kinds.size()], 0])
 	army.sort()
 	spec.player = army
 	spec.enemy = army.duplicate(true)
