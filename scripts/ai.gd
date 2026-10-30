@@ -9,7 +9,8 @@ const S := Regiment.State
 
 const THINK_EVERY := 0.75
 
-## hold: seconds to stay in the deployment line before advancing.
+## hold: seconds to hold the near side of the objectives before advancing
+## past them.
 ## flank: whether cavalry looks for rears and soft targets.
 ## reserve: foot regiments kept behind the line and sent onto the flank of
 ## whoever a friend is fighting, as soon as that friend is pinned.
@@ -29,6 +30,11 @@ const PERSONAS := {
 const RESERVE_CALL_MORALE := 0.75
 const RESERVE_CALL_STAMINA := 0.9
 const RESERVE_REACH := 450.0
+## While holding, foot stand this far short of each flag on their own side
+## (inside its capture ring), and guns stand this far back from the flag
+## they cover.
+const HOLD_SHORT := 50.0
+const BATTERY_BACK := 170.0
 
 
 ## Place orders that set out a team's regiments in its deployment zone:
@@ -98,6 +104,8 @@ static func decide(b: Battle, team: int, persona: Dictionary) -> Array:
 	if mine.is_empty() or foes.is_empty():
 		return orders
 	var home_y := Terrain.SIZE.y if team == 0 else 0.0
+	## Toward this team's own edge.
+	var home := Vector2(0.0, 1.0 if team == 0 else -1.0)
 	var advancing: bool = b.time >= persona.hold or _foe_near_line(mine, foes, 260.0)
 	var goals := _flags_left_to_right(b)
 	var reserve := _reserve(mine, persona.get("reserve", 0))
@@ -113,11 +121,11 @@ static func decide(b: Battle, team: int, persona: Dictionary) -> Array:
 				if r.id in reserve:
 					o = _reserve_foot(b, r, line, foes, home_y)
 				else:
-					o = _foot(r, foes, advancing, _line_spot(line, line.find(r), goals))
+					o = _foot(r, foes, advancing, _line_spot(line, line.find(r), goals), home)
 			K.ARCHERS:
 				o = _archer(b, r, mine, foes, home_y, advancing, persona.get("terrain", false))
 			K.CANNONS:
-				o = _gun(b, r, foes, _flag_goals(b, team), advancing, persona)
+				o = _gun(b, r, foes, _flag_goals(b, team), home)
 			K.CAVALRY:
 				o = _horse(b, r, foes, advancing, persona)
 			K.GENERAL:
@@ -180,7 +188,9 @@ static func _flag_goals(b: Battle, team: int) -> Array[Vector2]:
 	return out
 
 
-static func _foot(r: Regiment, foes: Array[Regiment], advancing: bool, goal: Vector2) -> Variant:
+## Fight what comes within reach; otherwise take the goal, or while
+## holding, stand just short of it on our own side.
+static func _foot(r: Regiment, foes: Array[Regiment], advancing: bool, goal: Vector2, home: Vector2) -> Variant:
 	var reach := 220.0 if r.kind == K.PIKES else 170.0
 	var best: Regiment = null
 	var best_score := INF
@@ -198,7 +208,7 @@ static func _foot(r: Regiment, foes: Array[Regiment], advancing: bool, goal: Vec
 	if best != null:
 		return _attack(r, best)
 	if not advancing:
-		return null
+		return _move(r, goal + home * HOLD_SHORT)
 	return _move(r, goal)
 
 
@@ -290,14 +300,13 @@ static func _hill_near(t: Terrain, spot: Vector2, front: Vector2) -> Vector2:
 	return best
 
 
-static func _gun(b: Battle, r: Regiment, foes: Array[Regiment], goals: Array[Vector2], advancing: bool, persona: Dictionary) -> Variant:
+## Guns keep firing at whatever is in range; otherwise they stand behind
+## the most wanted flag, close enough to cover it.
+static func _gun(b: Battle, r: Regiment, foes: Array[Regiment], goals: Array[Vector2], home: Vector2) -> Variant:
 	var reach := r.fire_range * b.terrain.range_mult(r.pos)
 	if _nearest(r, foes, reach) != null:
 		return null
-	if not advancing or b.time < persona.hold + 15.0:
-		return null
-	var toward := goals[0]
-	return _move(r, r.pos + (toward - r.pos).limit_length(120.0))
+	return _move(r, b.terrain.clamp_to_field(goals[0] + home * BATTERY_BACK))
 
 
 static func _horse(b: Battle, r: Regiment, foes: Array[Regiment], advancing: bool, persona: Dictionary) -> Variant:

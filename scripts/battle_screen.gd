@@ -5,6 +5,10 @@ extends Node
 ## sees it.
 
 signal finished(battle: Battle)
+## The player chose to leave the battle, or to fight it again from the
+## start; what that means is up to whoever started it.
+signal left
+signal restarted
 
 const K := UnitTypes.Kind
 const S := Regiment.State
@@ -22,6 +26,10 @@ var battle: Battle
 var demo := false
 ## The scenario's goal, shown as the battle opens; empty in the campaign.
 var goal := ""
+## A quick battle: the menu offers Restart, and leaving costs nothing.
+var quick := false
+var menu_open := false
+var _paused_before_menu := false
 ## Both sides commanded by the AI, with the HUD up: for watching and for
 ## the screenshot capture in tests/shot.gd.
 var autopilot := false
@@ -145,8 +153,48 @@ func begin_battle() -> void:
 
 
 func toggle_pause() -> void:
-	if battle.phase == "battle":
+	if battle.phase == "battle" and not menu_open:
 		paused = not paused
+
+
+## The menu stops the battle while it is open and leaves the pause as it
+## was when it closes.
+func open_menu() -> void:
+	if menu_open:
+		return
+	menu_open = true
+	_paused_before_menu = paused
+	paused = true
+	drag = {}
+
+
+func close_menu() -> void:
+	menu_open = false
+	paused = _paused_before_menu
+
+
+## Leaving a campaign battle once the fighting has started is a retreat,
+## and ends the run; the menu asks twice for it.
+func leaving_costs() -> bool:
+	return not quick and battle.phase == "battle"
+
+
+func leave_label() -> String:
+	if quick:
+		return "Back to scenarios"
+	if battle.phase == "deploy":
+		return "Back to the briefing"
+	return "Retreat (ends the campaign)"
+
+
+func leave() -> void:
+	menu_open = false
+	left.emit()
+
+
+func restart() -> void:
+	menu_open = false
+	restarted.emit()
 
 
 func toggle_speed() -> void:
@@ -216,7 +264,7 @@ func to_screen(world_pos: Vector2) -> Vector2:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if demo:
+	if demo or (menu_open and not event is InputEventKey):
 		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -235,7 +283,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_SPACE:
 				toggle_pause()
 			KEY_ESCAPE:
-				clear_selection()
+				if menu_open:
+					close_menu()
+				elif selected.is_empty() and targeting == "":
+					open_menu()
+				else:
+					clear_selection()
 			KEY_A:
 				select_all()
 			KEY_F:

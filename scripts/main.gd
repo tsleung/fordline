@@ -5,6 +5,7 @@ extends Node
 
 const K := UnitTypes.Kind
 const BattleScreen := preload("res://scripts/battle_screen.gd")
+const MapPreview := preload("res://scripts/map_preview.gd")
 const SAVE_PATH := "user://fordline.cfg"
 
 var run: Dictionary = {}
@@ -57,11 +58,14 @@ func show_scenarios() -> void:
 	col.add_child(_inline("QUICK BATTLE", 15, Palette.BRASS))
 	col.add_child(_text("Scenarios", 40, Palette.INK, false))
 	col.add_child(_text("One battle each, three to five minutes. Earn up to three stars.", 18, Palette.INK_DIM, false))
+	var thumb_w := 150.0 if get_viewport().get_visible_rect().size.x > 760 else 110.0
 	for spec in Scenarios.LIST:
+		# Skirmish's field is drawn now, so the thumbnail is the field you get.
+		var seed_value := randi()
 		var card := Button.new()
 		card.focus_mode = Control.FOCUS_NONE
-		card.custom_minimum_size = Vector2(0, 96)
-		card.pressed.connect(show_scenario.bind(spec.id))
+		card.custom_minimum_size = Vector2(0, thumb_w * Terrain.SIZE.y / Terrain.SIZE.x + 28.0)
+		card.pressed.connect(show_scenario.bind(spec.id, seed_value))
 		var row := HBoxContainer.new()
 		row.set_anchors_preset(Control.PRESET_FULL_RECT)
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -75,6 +79,13 @@ func show_scenarios() -> void:
 		var brief := _text(spec.brief, 15, Palette.INK_DIM, false)
 		brief.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		words.add_child(brief)
+		var thumb := MapPreview.new()
+		thumb.custom_minimum_size = Vector2(thumb_w, thumb_w * Terrain.SIZE.y / Terrain.SIZE.x)
+		thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		thumb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var resolved := Scenarios.resolve(spec.id, seed_value)
+		thumb.show_battle(Scenarios.make_battle(resolved, seed_value), hash(resolved.name))
+		row.add_child(thumb)
 		row.add_child(words)
 		row.add_child(StarRow.make(int(_load("stars", spec.id, 0)), 22))
 		var pad := MarginContainer.new()
@@ -88,14 +99,20 @@ func show_scenarios() -> void:
 	col.add_child(_button("Back", show_title))
 
 
-func show_scenario(id: String) -> void:
+## `seed_value` picks Skirmish's field (and every scenario's dice); a new
+## one is drawn when none is given.
+func show_scenario(id: String, seed_value := -1) -> void:
 	Sfx.play("click")
-	var seed_value := randi()
+	if seed_value < 0:
+		seed_value = randi()
 	var spec := Scenarios.resolve(id, seed_value)
 	var col := _page()
 	col.add_child(_inline("QUICK BATTLE", 15, Palette.BRASS))
 	col.add_child(_text(spec.name, 40, Palette.INK, false))
 	col.add_child(_text(spec.brief, 18, Palette.INK_DIM, false))
+	col.add_child(_map(Scenarios.make_battle(spec, seed_value), spec.name))
+	if id == "skirmish":
+		col.add_child(_button("New field", show_scenario.bind(id)))
 	col.add_child(_inline("GOAL", 14, Palette.BRASS))
 	col.add_child(_text(Scenarios.goal_text(spec), 18, Palette.INK, false))
 	col.add_child(_inline("STARS", 14, Palette.BRASS))
@@ -117,6 +134,18 @@ func show_scenario(id: String) -> void:
 	col.add_child(_button("Back", show_scenarios))
 
 
+## The field `b` will be fought on, both armies deployed, as wide as the
+## page and no taller than a third of the screen.
+func _map(b: Battle, title: String) -> Control:
+	var vp := get_viewport().get_visible_rect().size
+	var map := MapPreview.new()
+	var h := minf((vp.x - 40.0) * Terrain.SIZE.y / Terrain.SIZE.x, vp.y * 0.36)
+	map.custom_minimum_size = Vector2(0, h)
+	map.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	map.show_battle(b, hash(title))
+	return map
+
+
 ## A scenario's [kind, stars] list as the roster entries the strips draw,
 ## with the general that every army has.
 func _army(list: Array) -> Array:
@@ -131,7 +160,10 @@ func _start_scenario(spec: Dictionary, seed_value: int) -> void:
 	var screen := BattleScreen.new()
 	screen.setup(Scenarios.make_battle(spec, seed_value), spec.persona, spec.name)
 	screen.goal = Scenarios.goal_text(spec)
+	screen.quick = true
 	screen.finished.connect(_scenario_over.bind(spec))
+	screen.left.connect(show_scenarios)
+	screen.restarted.connect(_start_scenario.bind(spec, seed_value))
 	_fresh(screen)
 
 
@@ -168,24 +200,7 @@ func _start_run() -> void:
 
 func show_briefing(rewards: Array) -> void:
 	var spec := Campaign.current(run)
-	var ui := _fresh(null)
-	var bg := ColorRect.new()
-	bg.color = Palette.DESK
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	ui.add_child(bg)
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	ui.add_child(scroll)
-	var margin := MarginContainer.new()
-	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 20)
-	scroll.add_child(margin)
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 12)
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.add_child(col)
+	var col := _page()
 	var head := HBoxContainer.new()
 	col.add_child(head)
 	var step := _inline("BATTLE %d OF %d" % [run.battle + 1, Campaign.BATTLES.size()], 15, Palette.BRASS)
@@ -195,6 +210,8 @@ func show_briefing(rewards: Array) -> void:
 	col.add_child(_route())
 	col.add_child(_text(spec.name, 40, Palette.INK, false))
 	col.add_child(_text(spec.brief, 18, Palette.INK_DIM, false))
+	var map := _map(Campaign.make_battle(run), spec.name)
+	col.add_child(map)
 	col.add_child(_text("THEY BRING", 14, Palette.BRASS, false))
 	col.add_child(_army_strip(Campaign.enemy_army(run), 1))
 	var choice := {"reward": null}
@@ -218,6 +235,7 @@ func show_briefing(rewards: Array) -> void:
 			card.pressed.connect(func():
 				choice.reward = r
 				march.disabled = false
+				map.show_battle(Campaign.make_battle(Campaign.apply_reward(run, r)), hash(spec.name))
 				Sfx.play("click"))
 			cards.add_child(card)
 		col.add_child(cards)
@@ -235,7 +253,22 @@ func _start_battle(reward: Variant) -> void:
 	var screen := BattleScreen.new()
 	screen.setup(Campaign.make_battle(run), spec.persona, spec.name)
 	screen.finished.connect(_battle_over)
+	screen.left.connect(_leave_campaign_battle.bind(screen))
 	_fresh(screen)
+
+
+## Leaving before the fighting starts goes back to the briefing; once it
+## has started it is a retreat, which the run counts as a defeat.
+func _leave_campaign_battle(screen) -> void:
+	Sfx.play("click")
+	var b: Battle = screen.battle
+	if b.phase == "deploy":
+		show_briefing([])
+		return
+	var result := Campaign.battle_result(b)
+	result.won = false
+	run = Campaign.after_battle(run, result)
+	show_final()
 
 
 func _battle_over(b: Battle) -> void:

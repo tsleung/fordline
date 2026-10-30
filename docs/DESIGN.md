@@ -74,6 +74,10 @@ once and the run is over; your score goes on the board.
   around woods or through a chosen ford is what this is for.
 - Pause any time; orders can be given while paused. 2× speed for the
   quiet parts.
+- **Menu** (top left, or Esc with nothing selected) pauses and offers
+  Resume, Restart (quick battles) and leaving: back to the scenarios, back
+  to the briefing before the fighting starts, or, once it has started, a
+  retreat that ends the campaign (it asks twice).
 - Abilities: **Rally** (from the start), **Barrage** and **Forced March**
   (rewards).
 
@@ -107,6 +111,9 @@ losses, crossings held at the end), and the best is kept on the device.
 | Hammer and Anvil | open woods | break them | pin with foot, ride round with horse |
 | Two Narrow Bridges | bridges | hold both bridges at 5:00 | forcing a crossing with guns and a barrage |
 | Riders at Dawn | the ridge | break them | pikes against a cavalry army |
+
+Every briefing (and each card in the scenario list) shows the field as it
+will be fought, both armies deployed: the battle's own map, drawn small.
 
 A scenario may give the player abilities, start them holding every flag,
 let them deploy further forward, and end on the flags at a deadline. They
@@ -190,6 +197,17 @@ The last two battles are hard: no AI commander wins Saltmarsh Road or
 Marshal's Ridge more than 17% of the time. A player has rewards and the
 abilities the study does not use; whether that is enough is for play to
 show.
+
+**2026-10-31: the AI holds its objectives.** Until it advances, an army
+used to stand in its deployment zone, so a dug-in enemy let the player
+walk onto both bridges unopposed. Now it stands just short of each flag on
+its own side and its guns cover the most wanted flag. Measured on the
+campaign: the sharp AI wins 61% (was 49%), the last two battles became
+winnable for it (Saltmarsh Road 38%, Marshal's Ridge 38%, from 8–12%), and
+skill's share among slow, standard and sharp fell to 47% (the draw rose to
+46%): attacking a held crossing is costly, and which crossings the map
+gives you matters more. Two Narrow Bridges is now lost by every AI player;
+a person has guns and a barrage they use badly.
 
 Rerun after any balance change:
 

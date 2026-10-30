@@ -23,6 +23,7 @@ func _run() -> void:
 	_test_terrain()
 	_test_campaign()
 	await _test_routes()
+	await _test_screens()
 	_test_scenarios()
 	_test_battles(quick)
 	print("\n%d checks, %d failed" % [_checks, _failures])
@@ -181,6 +182,19 @@ func _test_routes() -> void:
 	screen._press(screen.to_screen(second), false, true)
 	screen._release(screen.to_screen(second))
 	_check(screen.route_end(r).distance_to(second) < 1.0 and Array(r.waypoints).any(func(w): return w.distance_to(first) < 1.0), "shift-click adds a stop")
+	# The menu stops the battle, gives the pause back, and leaving is
+	# announced for whoever started the battle to act on.
+	var was: float = screen.battle.time
+	screen.open_menu()
+	screen._process(0.5)
+	_check(screen.battle.time == was, "the menu stops the battle")
+	screen.close_menu()
+	_check(not screen.paused, "closing the menu resumes")
+	_check(screen.leaving_costs(), "leaving a campaign battle in progress is a retreat")
+	var heard := [false]
+	screen.left.connect(func(): heard[0] = true)
+	screen.leave()
+	_check(heard[0], "leaving is announced")
 	screen.free()
 
 
@@ -188,6 +202,26 @@ func _tap(screen, world_pos: Vector2) -> void:
 	var sp: Vector2 = screen.to_screen(world_pos)
 	screen._press(sp, false, false)
 	screen._release(sp)
+
+
+## The real screens, built and shown in turn; any script error in them
+## fails the suite through test.sh.
+func _test_screens() -> void:
+	var main: Node = load("res://scenes/main.tscn").instantiate()
+	root.add_child(main)
+	await process_frame
+	for step in [
+		func(): main.show_scenarios(),
+		func(): main.show_scenario("skirmish"),
+		func(): main.show_scenario("bridges", 3),
+		func(): main._start_run(),
+		func(): main.show_title(),
+	]:
+		step.call()
+		await process_frame
+		await process_frame
+	_check(main.get_child_count() == 1, "one screen on stage after walking the screens")
+	main.free()
 
 
 ## Every scenario builds, deploys on dry ground and finishes in time with

@@ -16,6 +16,12 @@ var _toasts: VBoxContainer
 var _overlay: Control
 var _buttons := {}
 var _portrait := false
+var _menu_button: Button
+var _menu: Control
+var _leave: Button
+var _restart: Button
+## A retreat needs a second tap before this time (seconds since start).
+var _leave_armed_until := 0.0
 
 
 func top_height(portrait: bool) -> float:
@@ -74,6 +80,59 @@ func _ready() -> void:
 	_toasts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_toasts.alignment = BoxContainer.ALIGNMENT_BEGIN
 	add_child(_toasts)
+	_menu_button = Button.new()
+	_menu_button.text = "Menu"
+	_menu_button.focus_mode = Control.FOCUS_NONE
+	_menu_button.pressed.connect(screen.open_menu)
+	add_child(_menu_button)
+	_build_menu()
+
+
+## The menu over a dimmed battle: Resume, Restart (quick battles), Leave.
+func _build_menu() -> void:
+	_menu = Control.new()
+	_menu.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_menu.visible = false
+	add_child(_menu)
+	var shade := ColorRect.new()
+	shade.color = Color(Palette.DESK, 0.7)
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_STOP
+	_menu.add_child(shade)
+	var centre := CenterContainer.new()
+	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_menu.add_child(centre)
+	var col := VBoxContainer.new()
+	col.custom_minimum_size.x = 300
+	col.add_theme_constant_override("separation", 12)
+	centre.add_child(col)
+	var title := _label(30, Palette.INK)
+	title.text = "Paused"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(title)
+	var name := _label(16, Palette.INK_DIM)
+	name.text = screen.title
+	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(name)
+	for entry in [["Resume", screen.close_menu], ["Restart", screen.restart], ["", _on_leave]]:
+		var b := Button.new()
+		b.text = entry[0]
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size.y = 52
+		b.pressed.connect(entry[1])
+		col.add_child(b)
+		if entry[0] == "Restart":
+			_restart = b
+		elif entry[0] == "":
+			_leave = b
+
+
+func _on_leave() -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if screen.leaving_costs() and now > _leave_armed_until:
+		_leave_armed_until = now + 3.0
+		return
+	screen.leave()
 
 
 func _add_button(key: String, text: String, action: Callable) -> void:
@@ -123,10 +182,17 @@ func layout(vp: Vector2, portrait: bool) -> void:
 	_hint.size = Vector2(vp.x - 16, 52)
 	_toasts.position = Vector2(vp.x * 0.5 - 220, top + 40.0)
 	_toasts.size = Vector2(440, 200)
+	_menu_button.position = Vector2(6, 6)
+	_menu_button.size = Vector2(TopBar.INSET - 14.0, top - 12.0)
 
 
 func _process(_delta: float) -> void:
 	var b: Battle = screen.battle
+	_menu.visible = screen.menu_open
+	if _menu.visible:
+		_restart.visible = screen.quick
+		var armed := Time.get_ticks_msec() / 1000.0 <= _leave_armed_until
+		_leave.text = "Tap again to retreat" if armed else screen.leave_label()
 	var deploying := b.phase == "deploy"
 	_buttons.fight.visible = deploying
 	for key in ["pause", "speed", "rally", "barrage", "march"]:
@@ -215,6 +281,8 @@ func toast(text: String, team: int) -> void:
 
 ## Resolve bars, the three flags, and the clock.
 class TopBar extends Control:
+	## Room on the left for the Menu button.
+	const INSET := 84.0
 	var screen
 
 	func _draw() -> void:
@@ -224,11 +292,11 @@ class TopBar extends Control:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(Palette.DESK, 0.92))
 		draw_line(Vector2(0, size.y), Vector2(w, size.y), Color(Palette.BRASS, 0.5), 1.0)
 		var centre_w := 150.0
-		var bar_w := clampf((w - centre_w) * 0.5 - 28.0, 80.0, 420.0)
+		var bar_w := clampf((w - centre_w) * 0.5 - 14.0 - INSET, 60.0, 420.0)
 		var y := size.y * 0.5 + 6.0
-		_bar(Rect2(14.0, y, bar_w, 12.0), b.resolve[0] / 100.0, 0, false)
+		_bar(Rect2(INSET, y, bar_w, 12.0), b.resolve[0] / 100.0, 0, false)
 		_bar(Rect2(w - 14.0 - bar_w, y, bar_w, 12.0), b.resolve[1] / 100.0, 1, true)
-		draw_string(font, Vector2(14.0, y - 7.0), "YOUR RESOLVE  %d" % ceili(b.resolve[0]), HORIZONTAL_ALIGNMENT_LEFT, bar_w, 13, Palette.INK_DIM)
+		draw_string(font, Vector2(INSET, y - 7.0), "YOUR RESOLVE  %d" % ceili(b.resolve[0]), HORIZONTAL_ALIGNMENT_LEFT, bar_w, 13, Palette.INK_DIM)
 		draw_string(font, Vector2(w - 14.0 - bar_w, y - 7.0), "ENEMY  %d" % ceili(b.resolve[1]), HORIZONTAL_ALIGNMENT_RIGHT, bar_w, 13, Palette.INK_DIM)
 		var cx := w * 0.5
 		for i in b.flags.size():
