@@ -20,6 +20,8 @@ const MAX_STEPS_PER_FRAME := 8
 
 var battle: Battle
 var demo := false
+## The scenario's goal, shown as the battle opens; empty in the campaign.
+var goal := ""
 ## Both sides commanded by the AI, with the HUD up: for watching and for
 ## the screenshot capture in tests/shot.gd.
 var autopilot := false
@@ -519,6 +521,9 @@ func _react(events: Array[Dictionary]) -> void:
 			"broken":
 				_toast("Your army breaks..." if e.team == 0 else "The enemy army breaks!", e.team)
 				_sound("lose" if e.team == 0 else "win", 0.0)
+			"deadline":
+				var held: int = e.held
+				_toast("Time! You hold %d %s." % [held, "crossing" if held == 1 else "crossings"], 0 if held >= battle.hold_needed else 1)
 			"begin":
 				_sound("horn", -2.0, 0.9)
 

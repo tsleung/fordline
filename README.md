@@ -34,6 +34,9 @@ Android export templates (neither is on this Mac yet); iOS export needs
 Xcode and the iOS templates. The game already lays itself out for a tall
 screen: the field turns a quarter and your army stands on the left.
 
+**Quick battle** on the title screen opens the scenarios: single battles
+on designed maps with three stars to earn.
+
 ## Controls
 
 Tap a banner to select it (again to deselect; double-tap for every regiment

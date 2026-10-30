@@ -23,6 +23,7 @@ func _run() -> void:
 	_test_terrain()
 	_test_campaign()
 	await _test_routes()
+	_test_scenarios()
 	_test_battles(quick)
 	print("\n%d checks, %d failed" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
@@ -187,6 +188,38 @@ func _tap(screen, world_pos: Vector2) -> void:
 	var sp: Vector2 = screen.to_screen(world_pos)
 	screen._press(sp, false, false)
 	screen._release(sp)
+
+
+## Every scenario builds, deploys on dry ground and finishes in time with
+## the AI as the player; the hold scenario's clock decides on the flags.
+func _test_scenarios() -> void:
+	for spec in Scenarios.LIST:
+		for s in [1, 2]:
+			var resolved := Scenarios.resolve(spec.id, s)
+			var b := Scenarios.make_battle(resolved, s)
+			for r in b.regiments:
+				_check(not b.terrain.is_water(r.pos), "%s deploys on dry ground" % spec.id)
+			var ok := _fight(b, true, resolved.persona)
+			print("  scenario %-9s seed %d  %-14s %3ds  stars %d  lead changes %d" % [
+				spec.id, s, "player won" if b.winner == 0 else "enemy won", int(b.time),
+				Scenarios.stars(resolved, b), _lead_changes])
+			_check(ok, "%s ends within the time limit" % spec.id)
+			if resolved.get("deadline", 0.0) > 0.0:
+				_check(b.time <= resolved.deadline + Battle.BREAK_DELAY + 0.5, "%s ends by its deadline" % spec.id)
+	var sk1 := Scenarios.resolve("skirmish", 1)
+	_check(sk1.player == sk1.enemy, "a skirmish's armies are the same")
+	var held := Scenarios.make_battle(Scenarios.resolve("hold", 1), 1)
+	_check(held.flags_held(0) == 3, "hold starts with every ford ours")
+	var front := INF
+	for r in held.team_regiments(0):
+		front = minf(front, r.pos.y)
+	_check(front < Terrain.SIZE.y - Terrain.DEPLOY_DEPTH, "hold deploys forward of the usual zone")
+	held.begin()
+	while held.phase == "battle":
+		held.step(1.0 / 15.0)
+	# Holding all three drains them, so an enemy that never comes breaks
+	# before the clock does.
+	_check(held.winner == 0 and held.time <= held.deadline + Battle.BREAK_DELAY, "an enemy that never comes loses the fords' race")
 
 
 ## Fight every campaign battle AI against AI, the player's army growing by

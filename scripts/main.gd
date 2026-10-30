@@ -1,6 +1,7 @@
 extends Node
 ## The game's screens and the run that threads through them:
-## title → briefing → battle → result → briefing (with a reward) … → final.
+## title → briefing → battle → result → briefing (with a reward) … → final,
+## and the quick battles: title → scenarios → scenario → battle → result.
 
 const K := UnitTypes.Kind
 const BattleScreen := preload("res://scripts/battle_screen.gd")
@@ -15,7 +16,7 @@ var _stage: Node
 func _ready() -> void:
 	randomize()
 	_theme = _make_theme()
-	best = _load_best()
+	best = int(_load("score", "best", 0))
 	show_title()
 
 
@@ -41,12 +42,122 @@ func show_title() -> void:
 	col.add_child(_text("Hold the crossings. Five battles, one army,\nabout twenty minutes.", 20, Palette.INK))
 	col.add_child(_spacer(12))
 	col.add_child(_button("New campaign", _start_run, true))
+	col.add_child(_button("Quick battle", show_scenarios))
 	var rules := _panel_text(_how_to_play())
 	rules.visible = false
 	col.add_child(_button("How to play", func(): rules.visible = not rules.visible))
 	col.add_child(rules)
 	if best > 0:
 		col.add_child(_text("Best score  %d" % best, 18, Palette.BRASS))
+
+
+func show_scenarios() -> void:
+	Sfx.play("click")
+	var col := _page()
+	col.add_child(_inline("QUICK BATTLE", 15, Palette.BRASS))
+	col.add_child(_text("Scenarios", 40, Palette.INK, false))
+	col.add_child(_text("One battle each, three to five minutes. Earn up to three stars.", 18, Palette.INK_DIM, false))
+	for spec in Scenarios.LIST:
+		var card := Button.new()
+		card.focus_mode = Control.FOCUS_NONE
+		card.custom_minimum_size = Vector2(0, 96)
+		card.pressed.connect(show_scenario.bind(spec.id))
+		var row := HBoxContainer.new()
+		row.set_anchors_preset(Control.PRESET_FULL_RECT)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_theme_constant_override("separation", 14)
+		var words := VBoxContainer.new()
+		words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var title := _inline(spec.name, 22, Palette.INK)
+		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		words.add_child(title)
+		var brief := _text(spec.brief, 15, Palette.INK_DIM, false)
+		brief.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		words.add_child(brief)
+		row.add_child(words)
+		row.add_child(StarRow.make(int(_load("stars", spec.id, 0)), 22))
+		var pad := MarginContainer.new()
+		pad.set_anchors_preset(Control.PRESET_FULL_RECT)
+		pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		for side in ["left", "right", "top", "bottom"]:
+			pad.add_theme_constant_override("margin_" + side, 14)
+		pad.add_child(row)
+		card.add_child(pad)
+		col.add_child(card)
+	col.add_child(_button("Back", show_title))
+
+
+func show_scenario(id: String) -> void:
+	Sfx.play("click")
+	var seed_value := randi()
+	var spec := Scenarios.resolve(id, seed_value)
+	var col := _page()
+	col.add_child(_inline("QUICK BATTLE", 15, Palette.BRASS))
+	col.add_child(_text(spec.name, 40, Palette.INK, false))
+	col.add_child(_text(spec.brief, 18, Palette.INK_DIM, false))
+	col.add_child(_inline("GOAL", 14, Palette.BRASS))
+	col.add_child(_text(Scenarios.goal_text(spec), 18, Palette.INK, false))
+	col.add_child(_inline("STARS", 14, Palette.BRASS))
+	var earned := int(_load("stars", id, 0))
+	var lines := ["Win"]
+	for c in spec.stars:
+		lines.append(Scenarios.condition_text(c))
+	for i in lines.size():
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		row.add_child(StarRow.make(1 if earned > i else 0, 18, 1))
+		row.add_child(_inline(lines[i], 17, Palette.INK))
+		col.add_child(row)
+	col.add_child(_inline("THEY BRING", 14, Palette.BRASS))
+	col.add_child(_army_strip(_army(spec.enemy), 1))
+	col.add_child(_inline("YOU BRING", 14, Palette.BRASS))
+	col.add_child(_army_strip(_army(spec.player), 0))
+	col.add_child(_button("Fight", _start_scenario.bind(spec, seed_value), true))
+	col.add_child(_button("Back", show_scenarios))
+
+
+## A scenario's [kind, stars] list as the roster entries the strips draw,
+## with the general that every army has.
+func _army(list: Array) -> Array:
+	var out: Array = [{"kind": K.GENERAL}]
+	for e in list:
+		out.append({"kind": e[0]})
+	return out
+
+
+func _start_scenario(spec: Dictionary, seed_value: int) -> void:
+	Sfx.play("click")
+	var screen := BattleScreen.new()
+	screen.setup(Scenarios.make_battle(spec, seed_value), spec.persona, spec.name)
+	screen.goal = Scenarios.goal_text(spec)
+	screen.finished.connect(_scenario_over.bind(spec))
+	_fresh(screen)
+
+
+func _scenario_over(b: Battle, spec: Dictionary) -> void:
+	var stars := Scenarios.stars(spec, b)
+	var before := int(_load("stars", spec.id, 0))
+	if stars > before:
+		_save("stars", spec.id, stars)
+	var col := _overlay()
+	var won := b.winner == 0
+	col.add_child(_text("Victory" if won else "Defeat", 60, Palette.GOLD if won else Palette.TEAM_LIGHT[1]))
+	col.add_child(_text(spec.name, 20, Palette.INK_DIM))
+	var stars_row := StarRow.make(stars, 34)
+	stars_row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(stars_row)
+	var met := Scenarios.conditions_met(spec, b)
+	var lines := PackedStringArray(["%s  Win" % ("Done" if won else "Not yet")])
+	for i in spec.stars.size():
+		lines.append("%s  %s" % ["Done" if met[i] else "Not yet", Scenarios.condition_text(spec.stars[i])])
+	var t := int(b.time)
+	lines.append("Time  %d:%02d" % [t / 60, t % 60])
+	if stars > before:
+		lines.append("New best for this scenario")
+	col.add_child(_panel_text("\n".join(lines)))
+	col.add_child(_button("Again" if spec.id != "skirmish" else "Another field", show_scenario.bind(spec.id), true))
+	col.add_child(_button("Scenarios", show_scenarios))
 
 
 func _start_run() -> void:
@@ -168,7 +279,7 @@ func show_final() -> void:
 	var record: bool = run.score > best
 	if record:
 		best = run.score
-		_save_best(best)
+		_save("score", "best", best)
 	var ui := _fresh(null)
 	var bg := ColorRect.new()
 	bg.color = Palette.DESK
@@ -188,6 +299,45 @@ func show_final() -> void:
 
 
 # --- building blocks -------------------------------------------------------
+
+## A full-screen scrolling page on the desk background; returns its column.
+func _page() -> VBoxContainer:
+	var ui := _fresh(null)
+	var bg := ColorRect.new()
+	bg.color = Palette.DESK
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(bg)
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	ui.add_child(scroll)
+	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 20)
+	scroll.add_child(margin)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 12)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(col)
+	return col
+
+
+## A dimmed layer over the battle that just ended; returns its column.
+func _overlay() -> VBoxContainer:
+	var ui := CanvasLayer.new()
+	ui.layer = 5
+	_stage.add_child(ui)
+	var root := Control.new()
+	root.theme = _theme
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(root)
+	var shade := ColorRect.new()
+	shade.color = Color(Palette.DESK, 0.7)
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(shade)
+	return _column(root, 460)
+
 
 ## Replace whatever is on stage with `screen` (or nothing) and a fresh UI
 ## layer; returns the UI root.
@@ -373,17 +523,44 @@ func _make_theme() -> Theme:
 	return t
 
 
-func _load_best() -> int:
+func _load(section: String, key: String, default: Variant) -> Variant:
 	var cfg := ConfigFile.new()
 	if cfg.load(SAVE_PATH) != OK:
-		return 0
-	return int(cfg.get_value("score", "best", 0))
+		return default
+	return cfg.get_value(section, key, default)
 
 
-func _save_best(value: int) -> void:
+## Read, change one value, write back: the file holds the campaign's best
+## score and every scenario's stars together.
+func _save(section: String, key: String, value: Variant) -> void:
 	var cfg := ConfigFile.new()
-	cfg.set_value("score", "best", value)
+	cfg.load(SAVE_PATH)
+	cfg.set_value(section, key, value)
 	cfg.save(SAVE_PATH)
+
+
+## Stars drawn rather than typed, so they show whatever the font has.
+class StarRow extends Control:
+	var earned := 0
+	var out_of := 3
+
+	static func make(n: int, px: float, of := 3) -> StarRow:
+		var row := StarRow.new()
+		row.earned = n
+		row.out_of = of
+		row.custom_minimum_size = Vector2(px * of + 4.0 * (of - 1), px)
+		row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return row
+
+	func _draw() -> void:
+		var r := size.y * 0.5
+		for i in out_of:
+			var c := Vector2(r + i * (size.y + 4.0), r)
+			var pts := PackedVector2Array()
+			for k in 10:
+				pts.append(c + Vector2.from_angle(-PI * 0.5 + k * PI / 5.0) * r * (1.0 if k % 2 == 0 else 0.42))
+			draw_colored_polygon(pts, Palette.GOLD if i < earned else Color(Palette.INK_DIM, 0.35))
 
 
 ## A banner as a UI element, for the roster and the enemy list.

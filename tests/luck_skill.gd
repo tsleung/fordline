@@ -6,7 +6,9 @@ extends SceneTree
 ##   the dice      - the battle's own random numbers (reloads, scatter)
 ## and prints one ROW line of JSON per battle for tests/luck_skill.py.
 ##   Godot --headless --path . -s tests/luck_skill.gd -- --battle=2 --draws=6 --dice=3
-## --policies=sharp,reserve fights only those.
+## --policies=sharp,reserve fights only those. --scenario=hold fights a
+## quick-battle scenario instead of a campaign battle (draws then only
+## change a Skirmish's field and armies).
 
 const K := UnitTypes.Kind
 const DT := 1.0 / 15.0
@@ -31,6 +33,7 @@ func _initialize() -> void:
 	var draws := 6
 	var dice := 3
 	var chosen := PackedStringArray(POLICIES.keys())
+	var scenario := ""
 	for arg in OS.get_cmdline_user_args():
 		var value := int(arg.get_slice("=", 1))
 		if arg.begins_with("--battle="):
@@ -39,25 +42,35 @@ func _initialize() -> void:
 			draws = value
 		elif arg.begins_with("--dice="):
 			dice = value
+		elif arg.begins_with("--scenario="):
+			scenario = arg.get_slice("=", 1)
 		elif arg.begins_with("--policies="):
 			chosen = arg.get_slice("=", 1).split(",")
 	for draw in draws:
 		for die in dice:
 			for policy in chosen:
-				print("ROW ", JSON.stringify(_fight(battle_index, draw, die, policy)))
+				print("ROW ", JSON.stringify(_fight(battle_index, draw, die, policy, scenario)))
 	quit()
 
 
-func _fight(battle_index: int, draw: int, die: int, policy_name: String) -> Dictionary:
-	var run := Campaign.new_run(1000 + draw)
-	run.battle = battle_index
-	for i in battle_index:
-		run = Campaign.apply_reward(run, {"id": "recruit", "kind": UnitTypes.RECRUITABLE[(i + draw) % 5]})
-	var b := Campaign.make_battle(run)
-	b.rng.seed = 7919 * (die + 1)
+func _fight(battle_index: int, draw: int, die: int, policy_name: String, scenario: String) -> Dictionary:
+	var b: Battle
+	var enemy: Dictionary
+	var spec := {}
+	if scenario != "":
+		spec = Scenarios.resolve(scenario, 1000 + draw)
+		b = Scenarios.make_battle(spec, 7919 * (die + 1))
+		enemy = AI.PERSONAS[spec.persona]
+	else:
+		var run := Campaign.new_run(1000 + draw)
+		run.battle = battle_index
+		for i in battle_index:
+			run = Campaign.apply_reward(run, {"id": "recruit", "kind": UnitTypes.RECRUITABLE[(i + draw) % 5]})
+		b = Campaign.make_battle(run)
+		b.rng.seed = 7919 * (die + 1)
+		enemy = AI.PERSONAS[Campaign.BATTLES[battle_index].persona]
 	var policy: Dictionary = POLICIES[policy_name]
 	var persona: Dictionary = policy.persona
-	var enemy: Dictionary = AI.PERSONAS[Campaign.BATTLES[battle_index].persona]
 	var fielded := [Telemetry.fielded(b, 0), Telemetry.fielded(b, 1)]
 	var tracker := Telemetry.LeadTracker.new()
 	var enemy_think := 0.0
@@ -82,7 +95,8 @@ func _fight(battle_index: int, draw: int, die: int, policy_name: String) -> Dict
 			sample = 1.0
 			tracker.sample(Telemetry.lead(b, fielded))
 	return {
-		"battle": battle_index, "draw": draw, "dice": die, "policy": policy_name,
+		"battle": scenario if scenario != "" else battle_index, "draw": draw, "dice": die, "policy": policy_name,
+		"stars": Scenarios.stars(spec, b) if scenario != "" else 0,
 		"won": b.winner == 0, "margin": b.resolve[0] - b.resolve[1], "time": snappedf(b.time, 0.1),
 		"lead_changes": tracker.changes, "killed": b.killed,
 	}

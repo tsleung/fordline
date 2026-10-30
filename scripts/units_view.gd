@@ -63,7 +63,7 @@ func _draw() -> void:
 		return
 	var p := px()
 	if b.phase == "deploy":
-		_deploy_zones()
+		_deploy_zones(b.terrain.deploy_depth)
 	for f in b.flags:
 		_flag_zone(f, p)
 	for id in screen.selected:
@@ -86,11 +86,11 @@ func _draw() -> void:
 		_preview(p)
 
 
-func _deploy_zones() -> void:
+func _deploy_zones(depth: Array) -> void:
 	var size := Terrain.SIZE
 	var e := Terrain.EDGE
-	var mine := Rect2(e, size.y - Terrain.DEPLOY_DEPTH, size.x - e * 2.0, Terrain.DEPLOY_DEPTH - e * 0.6)
-	var theirs := Rect2(e, e * 0.6, size.x - e * 2.0, Terrain.DEPLOY_DEPTH - e * 0.6)
+	var mine := Rect2(e, size.y - depth[0], size.x - e * 2.0, depth[0] - e * 0.6)
+	var theirs := Rect2(e, e * 0.6, size.x - e * 2.0, depth[1] - e * 0.6)
 	draw_rect(mine, Color(Palette.TEAM[0], 0.10))
 	draw_rect(mine, Color(Palette.TEAM_LIGHT[0], 0.7), false, 2.0)
 	draw_rect(theirs, Color(Palette.TEAM[1], 0.07))

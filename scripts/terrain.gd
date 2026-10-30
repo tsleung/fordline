@@ -21,6 +21,9 @@ var forests: Array[Dictionary] = []
 var hills: Array[Dictionary] = []
 var roads: Array[PackedVector2Array] = []
 var flags := PackedVector2Array()
+## How far each side's deployment zone reaches in from its edge. The map is
+## generated around DEPLOY_DEPTH; a scenario may push a side forward.
+var deploy_depth := [DEPLOY_DEPTH, DEPLOY_DEPTH]
 
 
 static func generate(map_kind: String, seed_value: int) -> Terrain:
@@ -137,15 +140,15 @@ func in_deploy(team: int, p: Vector2) -> bool:
 	if p.x < EDGE or p.x > SIZE.x - EDGE:
 		return false
 	if team == 0:
-		return p.y > SIZE.y - DEPLOY_DEPTH and p.y < SIZE.y - EDGE * 0.6
-	return p.y < DEPLOY_DEPTH and p.y > EDGE * 0.6
+		return p.y > SIZE.y - deploy_depth[0] and p.y < SIZE.y - EDGE * 0.6
+	return p.y < deploy_depth[1] and p.y > EDGE * 0.6
 
 
 func clamp_deploy(team: int, p: Vector2) -> Vector2:
 	var x := clampf(p.x, EDGE, SIZE.x - EDGE)
 	if team == 0:
-		return Vector2(x, clampf(p.y, SIZE.y - DEPLOY_DEPTH + 10.0, SIZE.y - EDGE))
-	return Vector2(x, clampf(p.y, EDGE, DEPLOY_DEPTH - 10.0))
+		return Vector2(x, clampf(p.y, SIZE.y - deploy_depth[0] + 10.0, SIZE.y - EDGE))
+	return Vector2(x, clampf(p.y, EDGE, deploy_depth[1] - 10.0))
 
 
 func clamp_to_field(p: Vector2) -> Vector2:

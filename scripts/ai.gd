@@ -54,7 +54,8 @@ static func deploy_orders(b: Battle, team: int) -> Array:
 				general.append(r)
 	foot.sort_custom(func(a, c): return a.kind < c.kind)
 	var sign := -1.0 if team == 0 else 1.0
-	var front_y := Terrain.SIZE.y - Terrain.DEPLOY_DEPTH + 40.0 if team == 0 else Terrain.DEPLOY_DEPTH - 40.0
+	var depth: float = b.terrain.deploy_depth[team]
+	var front_y := Terrain.SIZE.y - depth + 40.0 if team == 0 else depth - 40.0
 	var face := -PI * 0.5 if team == 0 else PI * 0.5
 	var cx := Terrain.SIZE.x * 0.5
 	var orders: Array = []

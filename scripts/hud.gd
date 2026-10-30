@@ -151,6 +151,8 @@ func _process(_delta: float) -> void:
 		_hint.text = "Tap where to go next."
 	elif screen.paused:
 		_hint.text = "Paused. Orders still work."
+	elif b.time < 10.0 and screen.goal != "":
+		_hint.text = screen.goal
 	elif b.time < 12.0 and screen.selected.is_empty():
 		_hint.text = "Tap a banner to select. Tap the field to move, drag to form a line, tap an enemy to attack."
 	else:
@@ -242,11 +244,16 @@ class TopBar extends Control:
 				draw_arc(c, 12.5, -PI * 0.5, -PI * 0.5 + TAU * absf(prog), 20, pc, 2.5, true)
 		var t := int(b.time)
 		var clock := "%d:%02d" % [t / 60, t % 60]
-		if b.time > Battle.DUSK_TIME:
-			clock += "  dusk"
-		elif b.phase == "deploy":
+		var warn := b.time > Battle.DUSK_TIME
+		if b.phase == "deploy":
 			clock = screen.title
-		draw_string(font, Vector2(cx - 100.0, size.y - 8.0), clock, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 14, Palette.BRASS if b.time > Battle.DUSK_TIME else Palette.INK)
+		elif b.deadline > 0.0:
+			var left := maxi(0, ceili(b.deadline - b.time))
+			clock = "%d:%02d left" % [left / 60, left % 60]
+			warn = left <= 30
+		elif warn:
+			clock += "  dusk"
+		draw_string(font, Vector2(cx - 100.0, size.y - 8.0), clock, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 14, Palette.BRASS if warn else Palette.INK)
 
 	func _bar(rect: Rect2, value: float, team: int, from_right: bool) -> void:
 		draw_rect(rect, Palette.DESK_RAISED)

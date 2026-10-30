@@ -93,6 +93,33 @@ After a win, every regiment gets back 40% of its missing men, and you pick
 one of three rewards: a new regiment, a full muster, an ability, or a
 doctrine (longbows, iron shot, steel, warhorses, old banners).
 
+## Quick battle
+
+Scenarios for when there isn't time for a campaign: one battle each, on a
+map fixed by design so it can be learned, three to five minutes. A win is
+one star; each scenario names two more conditions (a fast win, light
+losses, crossings held at the end), and the best is kept on the device.
+
+| Scenario | Ground | Goal | Teaches |
+|---|---|---|---|
+| Skirmish | a new field each time | break them | two armies made the same; only play differs |
+| Hold the Fords | fords, deploy at the river | hold one ford at 3:00 | standing on ground you already own |
+| Hammer and Anvil | open woods | break them | pin with foot, ride round with horse |
+| Two Narrow Bridges | bridges | hold both bridges at 5:00 | forcing a crossing with guns and a barrage |
+| Riders at Dawn | the ridge | break them | pikes against a cavalry army |
+
+A scenario may give the player abilities, start them holding every flag,
+let them deploy further forward, and end on the flags at a deadline. They
+are data in `scripts/scenarios.gd`.
+
+Measured 2026-10-30 against the AI players of the luck study: every
+scenario is won by some ways of playing and lost by others (Hold the Fords
+is won by the patient players and lost by the ones that throw the line
+forward; Riders at Dawn the other way round), and no AI player averages
+three stars. On a fixed map the AI players' results barely vary with the
+dice, so an army composition tends to be all or nothing for them; the
+stars, not the win rate, carry the difficulty.
+
 ## Score
 
 1000 per victory, plus 2 per enemy soldier killed, plus 1 per surviving

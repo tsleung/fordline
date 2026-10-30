@@ -77,12 +77,12 @@ def main(paths):
 
     print("\nWin rate by battle and commander")
     print(f"  {'':16} " + " ".join(f"{p:>10}" for p in ORDER))
-    for b in sorted({r["battle"] for r in rows}):
+    for b in sorted({r["battle"] for r in rows}, key=str):
         cells = []
         for p in ORDER:
             rs = [r for r in rows if r["battle"] == b and r["policy"] == p]
             cells.append(f"{mean(r['won'] for r in rs):10.0%}" if rs else f"{'-':>10}")
-        print(f"  {NAMES[b]:16} " + " ".join(cells))
+        print(f"  {NAMES[b] if isinstance(b, int) else b:16} " + " ".join(cells))
 
     # With the idle commander in, "does giving orders matter" swamps
     # everything; without it, the split is about playing well.

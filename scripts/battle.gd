@@ -51,6 +51,11 @@ var break_timer := 0.0
 var flags: Array[Dictionary] = []
 var resolve := [100.0, 100.0]
 var killed := [0, 0]
+## Seconds into the battle at which it ends on the flags, or 0 for no
+## deadline: then the player wins holding at least hold_needed flags and
+## loses otherwise.
+var deadline := 0.0
+var hold_needed := 1
 ## Abilities the player (team 0) has, and their cooldowns.
 var abilities: Array[String] = []
 var cooldowns := {"rally": 0.0, "barrage": 0.0, "march": 0.0}
@@ -98,6 +103,14 @@ func general_of(team: int) -> Regiment:
 		if r.team == team and r.kind == K.GENERAL and r.fighting():
 			return r
 	return null
+
+
+## Set a flag's owner before the battle begins (a scenario's start).
+func claim_flag(index: int, team: int) -> void:
+	if phase != "deploy":
+		return
+	flags[index].owner = team
+	flags[index].progress = 1.0 if team == 0 else -1.0
 
 
 func flags_held(team: int) -> int:
@@ -152,7 +165,10 @@ func _order_place(o: Dictionary) -> void:
 	var r := _commandable(o.id)
 	if r == null or phase != "deploy":
 		return
-	r.pos = terrain.clamp_deploy(r.team, o.to)
+	var to := terrain.clamp_deploy(r.team, o.to)
+	if terrain.is_water(to):
+		return
+	r.pos = to
 	if o.has("facing"):
 		r.facing = o.facing
 	r.final_facing = r.facing
@@ -789,6 +805,10 @@ func _check_end(dt: float) -> void:
 			phase = "over"
 			winner = 1 - broken_team
 			_emit({"type": "end", "winner": winner})
+		return
+	if deadline > 0.0 and time >= deadline:
+		_emit({"type": "deadline", "held": flags_held(0)})
+		_break(1 if flags_held(0) >= hold_needed else 0)
 		return
 	for team in 2:
 		var standing := false

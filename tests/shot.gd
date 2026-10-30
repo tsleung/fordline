@@ -4,7 +4,8 @@ extends Node
 ##   Godot --path . --resolution 1280x720 res://tests/shot.tscn -- --battle=0 --out=build/shots/land
 ## Saves <out>-deploy.png, then <out>-<seconds>s.png at each time in SHOTS.
 ## With --menus it instead saves the title and the first briefing; with
-## --routes, a paused battle with one regiment given a two-stop route.
+## --routes, a paused battle with one regiment given a two-stop route;
+## with --scenarios, the scenario list and one scenario's briefing.
 
 const BattleScreen := preload("res://scripts/battle_screen.gd")
 const Main := preload("res://scenes/main.tscn")
@@ -25,7 +26,7 @@ func _ready() -> void:
 		elif arg.begins_with("--out="):
 			_out = arg.get_slice("=", 1)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://" + _out.get_base_dir()))
-	if "--menus" in OS.get_cmdline_user_args():
+	if "--menus" in OS.get_cmdline_user_args() or "--scenarios" in OS.get_cmdline_user_args():
 		_main = Main.instantiate()
 		add_child(_main)
 		return
@@ -40,6 +41,17 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_frames += 1
+	if _main != null and "--scenarios" in OS.get_cmdline_user_args():
+		if _frames == 60:
+			_main.show_scenarios()
+		elif _frames == 80:
+			_save(_out + "-scenarios.png")
+			_main.show_scenario("hold")
+		elif _frames == 100:
+			set_process(false)
+			_save(_out + "-scenario.png")
+			get_tree().quit()
+		return
 	if _main != null:
 		if _frames == 90:
 			_save(_out + "-title.png")
