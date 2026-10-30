@@ -164,7 +164,11 @@ func _order_move(o: Dictionary) -> void:
 	var r := _commandable(o.id)
 	if r == null or phase != "battle":
 		return
-	r.waypoints = terrain.path(r.pos, o.to)
+	if o.get("append", false) and r.target_id < 0 and not r.waypoints.is_empty():
+		# Another leg after the route it already has.
+		r.waypoints.append_array(terrain.path(r.waypoints[r.waypoints.size() - 1], o.to))
+	else:
+		r.waypoints = terrain.path(r.pos, o.to)
 	r.final_facing = o.get("facing", NAN)
 	r.target_id = -1
 	r.via = Vector2(NAN, NAN)

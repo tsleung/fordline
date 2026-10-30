@@ -34,6 +34,11 @@ var speed := 1.0
 var targeting := ""
 ## The press in progress: mode, where it started and where it is now.
 var drag := {}
+## The selection's route end has been tapped: the next tap on the field adds
+## a leg after it instead of replacing the route.
+var pinned := false
+## Screen pixels from a route's end marker that still count as tapping it.
+const END_REACH_PX := 20.0
 
 var _persona: Dictionary
 var _terrain_view
@@ -111,6 +116,8 @@ func _process(delta: float) -> void:
 	_warn_of_horse()
 	_ambient(delta)
 	selected.assign(selected.filter(func(id): return battle.get_regiment(id) != null and battle.get_regiment(id).fighting()))
+	if pinned and _route_ends().is_empty():
+		pinned = false
 	if battle.phase == "over" and not _reported:
 		_reported = true
 		finished.emit(battle)
@@ -132,7 +139,7 @@ func begin_battle() -> void:
 	if battle.phase != "deploy":
 		return
 	battle.begin()
-	selected.clear()
+	_select([])
 
 
 func toggle_pause() -> void:
@@ -145,16 +152,41 @@ func toggle_speed() -> void:
 
 
 func select_all() -> void:
-	selected.clear()
+	var ids: Array[int] = []
 	for r in battle.team_regiments(0):
 		if r.fighting():
-			selected.append(r.id)
+			ids.append(r.id)
+	_select(ids)
 	_click()
 
 
 func clear_selection() -> void:
-	selected.clear()
+	_select([])
 	targeting = ""
+
+
+## Every change of selection goes through here, so a pinned route end
+## never carries over to regiments it wasn't pinned for.
+func _select(ids: Array[int]) -> void:
+	selected = ids
+	pinned = false
+
+
+## Where a regiment's route ends, or NAN when it has no route of its own
+## (standing, or closing on a target).
+func route_end(r: Regiment) -> Vector2:
+	if r.target_id >= 0 or r.waypoints.is_empty():
+		return Vector2(NAN, NAN)
+	return r.waypoints[r.waypoints.size() - 1]
+
+
+func _route_ends() -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for r in _selected_regiments():
+		var end := route_end(r)
+		if not is_nan(end.x):
+			out.append(end)
+	return out
 
 
 func use_ability(name: String) -> void:
@@ -218,7 +250,9 @@ func _press(sp: Vector2, right: bool, shift: bool) -> void:
 	var foe := _pick(wp, 1)
 	var mode := "order"
 	if not right:
-		if own != null:
+		if battle.phase == "battle" and _on_route_end(sp):
+			mode = "end"
+		elif own != null:
 			mode = "unit"
 		elif foe != null:
 			mode = "enemy"
@@ -239,16 +273,20 @@ func _release(sp: Vector2) -> void:
 	var moved: bool = d.start_screen.distance_to(sp) > TAP_SLOP
 	var deploying := battle.phase == "deploy"
 	match d.mode:
+		"end":
+			if not moved:
+				pinned = not pinned
+				_click()
 		"unit":
 			if not moved:
 				_tap_unit(d.unit, d.shift)
 			elif deploying:
 				battle.apply_orders([{"type": "place", "id": d.unit, "to": wp}])
 				if not d.unit in selected:
-					selected = [d.unit]
+					_select([d.unit])
 			else:
 				if not d.unit in selected:
-					selected = [d.unit]
+					_select([d.unit])
 				_order_line(d.start_world, wp)
 		"enemy":
 			if not moved and not selected.is_empty() and not deploying:
@@ -267,26 +305,29 @@ func _release(sp: Vector2) -> void:
 			if moved:
 				_order_line(d.start_world, wp)
 			else:
-				_order_point(wp)
+				_order_point(wp, d.shift or pinned)
+				pinned = false
 
 
 func _tap_unit(id: int, shift: bool) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	var r := battle.get_regiment(id)
+	var ids: Array[int] = selected.duplicate()
 	if _last_tap.id == id and now - _last_tap.at < DOUBLE_TAP:
-		selected.clear()
+		ids.clear()
 		for o in battle.team_regiments(0):
 			if o.kind == r.kind and o.fighting():
-				selected.append(o.id)
+				ids.append(o.id)
 	elif shift:
-		if id in selected:
-			selected.erase(id)
+		if id in ids:
+			ids.erase(id)
 		else:
-			selected.append(id)
-	elif selected.size() == 1 and selected[0] == id:
-		selected.clear()
+			ids.append(id)
+	elif ids.size() == 1 and ids[0] == id:
+		ids.clear()
 	else:
-		selected = [id]
+		ids = [id]
+	_select(ids)
 	_last_tap = {"id": id, "at": now}
 	_click()
 
@@ -307,11 +348,21 @@ func _pick(wp: Vector2, team: int) -> Regiment:
 
 func _box_select(a: Vector2, b: Vector2) -> void:
 	var rect := Rect2(a, Vector2.ZERO).expand(b)
-	selected.clear()
+	var ids: Array[int] = []
 	for r in battle.team_regiments(0):
 		if r.fighting() and rect.has_point(to_screen(r.pos)):
-			selected.append(r.id)
+			ids.append(r.id)
+	_select(ids)
 	_click()
+
+
+func _on_route_end(sp: Vector2) -> bool:
+	if selected.is_empty():
+		return false
+	for end in _route_ends():
+		if to_screen(end).distance_to(sp) < END_REACH_PX:
+			return true
+	return false
 
 
 func _selected_regiments() -> Array[Regiment]:
@@ -323,23 +374,29 @@ func _selected_regiments() -> Array[Regiment]:
 	return out
 
 
-## Tap on the field: the selection moves there, keeping its shape.
-func _order_point(wp: Vector2) -> void:
+## Tap on the field: the selection moves there, keeping its shape. With
+## `append`, it goes on from where its route ends instead.
+func _order_point(wp: Vector2, append := false) -> void:
 	var regs := _selected_regiments()
 	if regs.is_empty():
 		return
-	var centre := Vector2.ZERO
+	var starts: Array[Vector2] = []
 	for r in regs:
-		centre += r.pos
-	centre /= regs.size()
+		var end := route_end(r)
+		starts.append(end if append and not is_nan(end.x) else r.pos)
+	var centre := Vector2.ZERO
+	for s in starts:
+		centre += s
+	centre /= starts.size()
 	var travel := wp - centre
 	var orders: Array = []
-	for r in regs:
-		var to := wp + (r.pos - centre)
+	for i in regs.size():
+		var r := regs[i]
+		var to := wp + (starts[i] - centre)
 		if battle.phase == "deploy":
 			orders.append({"type": "place", "id": r.id, "to": to})
 		else:
-			var o := {"type": "move", "id": r.id, "to": to}
+			var o := {"type": "move", "id": r.id, "to": to, "append": append}
 			if travel.length() > 80.0:
 				o.facing = travel.angle()
 			orders.append(o)
@@ -501,9 +558,12 @@ func _ambient(delta: float) -> void:
 	_sound("clash", -16.0, randf_range(0.8, 1.3))
 
 
+## Sound is looked up rather than named, so a battle runs where the Sfx
+## autoload isn't loaded (the headless tests).
 func _sound(name: String, db := 0.0, pitch := 1.0) -> void:
-	if not demo:
-		Sfx.play(name, db, pitch)
+	var sfx := get_node_or_null("/root/Sfx")
+	if sfx != null and not demo:
+		sfx.play(name, db, pitch)
 
 
 func _click() -> void:

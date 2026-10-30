@@ -304,13 +304,30 @@ func _orders(b: Battle, p: float) -> void:
 				draw_arc(t.pos, 14.0 * p, 0, TAU, 20, Color(1, 0.4, 0.3, 0.85), 2.0 * p)
 		elif not r.waypoints.is_empty():
 			var last := r.pos
-			for w in r.waypoints:
+			for i in r.waypoints.size():
+				var w := r.waypoints[i]
 				_dashed(last, w, Color(Palette.GOLD, 0.85), p)
+				if i < r.waypoints.size() - 1:
+					draw_circle(w, 2.5 * p, Color(Palette.GOLD, 0.85))
 				last = w
-			draw_circle(last, 3.0 * p, Palette.GOLD)
 			if not is_nan(r.final_facing):
 				var f := Vector2.from_angle(r.final_facing)
-				draw_line(last, last + f * 14.0 * p, Palette.GOLD, 2.0 * p)
+				draw_line(last, last + f * 16.0 * p, Palette.GOLD, 2.0 * p)
+			_route_end(last, p)
+
+
+## The end of a selected route, big enough to tap. Tapped, it is pinned:
+## a ring with a plus, waiting for the next leg.
+func _route_end(at: Vector2, p: float) -> void:
+	draw_circle(at, 6.0 * p, Color(0, 0, 0, 0.45))
+	if screen.pinned:
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 140.0)
+		draw_arc(at, (9.0 + 2.0 * pulse) * p, 0, TAU, 24, Palette.GOLD, 2.0 * p)
+		draw_circle(at, 5.0 * p, Palette.GOLD)
+		draw_line(at - Vector2(3.0, 0) * p, at + Vector2(3.0, 0) * p, Palette.DESK, 1.6 * p)
+		draw_line(at - Vector2(0, 3.0) * p, at + Vector2(0, 3.0) * p, Palette.DESK, 1.6 * p)
+	else:
+		draw_circle(at, 5.0 * p, Palette.GOLD)
 
 
 func _dashed(a: Vector2, b: Vector2, color: Color, p: float) -> void:

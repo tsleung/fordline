@@ -147,6 +147,8 @@ func _process(_delta: float) -> void:
 		_hint.text = "Drag your regiments to set the line. Tap Fight when ready."
 	elif screen.targeting == "barrage":
 		_hint.text = "Tap the field to aim the barrage."
+	elif screen.pinned:
+		_hint.text = "Tap where to go next."
 	elif screen.paused:
 		_hint.text = "Paused. Orders still work."
 	elif b.time < 12.0 and screen.selected.is_empty():

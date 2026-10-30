@@ -3,7 +3,8 @@ extends Node
 ## screenshots, so the look can be checked without a browser.
 ##   Godot --path . --resolution 1280x720 res://tests/shot.tscn -- --battle=0 --out=build/shots/land
 ## Saves <out>-deploy.png, then <out>-<seconds>s.png at each time in SHOTS.
-## With --menus it instead saves the title and the first briefing.
+## With --menus it instead saves the title and the first briefing; with
+## --routes, a paused battle with one regiment given a two-stop route.
 
 const BattleScreen := preload("res://scripts/battle_screen.gd")
 const Main := preload("res://scenes/main.tscn")
@@ -49,6 +50,9 @@ func _process(_delta: float) -> void:
 			get_tree().quit()
 		return
 	var b: Battle = _screen.battle
+	if "--routes" in OS.get_cmdline_user_args():
+		_routes()
+		return
 	if b.phase == "deploy":
 		if _frames == 20:
 			await _save(_out + "-deploy.png")
@@ -65,6 +69,26 @@ func _process(_delta: float) -> void:
 		set_process(false)
 		if b.phase == "over":
 			await _save(_out + "-end.png")
+		get_tree().quit()
+
+
+func _routes() -> void:
+	if _frames == 10:
+		_screen.autopilot = false
+		_screen.begin_battle()
+		_screen.paused = true
+		var r: Regiment = _screen.battle.team_regiments(0).filter(func(x): return x.kind == UnitTypes.Kind.SWORDS)[0]
+		for at in [r.pos, r.pos + Vector2(-160, -60), r.pos + Vector2(-160, -60), r.pos + Vector2(-330, -40)]:
+			var sp: Vector2 = _screen.to_screen(at)
+			_screen._press(sp, false, false)
+			_screen._release(sp)
+		# Pin the new end again, to show the pinned marker.
+		var end: Vector2 = _screen.to_screen(_screen.route_end(r))
+		_screen._press(end, false, false)
+		_screen._release(end)
+	elif _frames == 30:
+		set_process(false)
+		_save(_out + "-routes.png")
 		get_tree().quit()
 
 

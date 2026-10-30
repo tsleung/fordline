@@ -12,10 +12,17 @@ var _checks := 0
 
 
 func _initialize() -> void:
+	_run()
+
+
+## A coroutine, because the screen test needs a frame for its nodes to
+## enter the tree.
+func _run() -> void:
 	var quick := "--quick" in OS.get_cmdline_user_args()
 	_test_combat()
 	_test_terrain()
 	_test_campaign()
+	await _test_routes()
 	_test_battles(quick)
 	print("\n%d checks, %d failed" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
@@ -143,6 +150,43 @@ func _test_campaign() -> void:
 	_check(not after.doctrine.has("atk_0"), "apply_reward leaves the old run alone")
 	var lost := Campaign.after_battle(run, {"won": false, "time": 200.0, "kills": 5, "units": units})
 	_check(lost.over and not lost.won, "a defeat ends the run")
+
+
+## Waypoints through the real battle screen: tap a regiment, tap the
+## field, tap the route's end to pin it, tap again; the route runs through
+## the first stop to the second. Without the pin a tap replaces the route;
+## shift-click appends.
+func _test_routes() -> void:
+	var screen = preload("res://scripts/battle_screen.gd").new()
+	screen.setup(Campaign.make_battle(Campaign.new_run(9)), "dug_in", "routes")
+	root.add_child(screen)
+	await process_frame
+	screen.begin_battle()
+	var r: Regiment = screen.battle.team_regiments(0).filter(func(x): return x.kind == K.SWORDS)[0]
+	var first: Vector2 = r.pos + Vector2(-140.0, -30.0)
+	var second: Vector2 = r.pos + Vector2(-260.0, 20.0)
+	_tap(screen, r.pos)
+	_check(screen.selected == [r.id], "tapping a banner selects it")
+	_tap(screen, first)
+	_check(screen.route_end(r).distance_to(first) < 1.0, "tapping the field sends it there")
+	_tap(screen, first)
+	_check(screen.pinned, "tapping the route's end pins it")
+	_tap(screen, second)
+	_check(not screen.pinned, "the next tap uses the pin up")
+	_check(screen.route_end(r).distance_to(second) < 1.0, "the pinned route ends at the new stop")
+	_check(Array(r.waypoints).any(func(w): return w.distance_to(first) < 1.0), "the pinned route still goes through the first stop")
+	_tap(screen, first)
+	_check(not Array(r.waypoints).any(func(w): return w.distance_to(second) < 1.0), "a tap without the pin replaces the route")
+	screen._press(screen.to_screen(second), false, true)
+	screen._release(screen.to_screen(second))
+	_check(screen.route_end(r).distance_to(second) < 1.0 and Array(r.waypoints).any(func(w): return w.distance_to(first) < 1.0), "shift-click adds a stop")
+	screen.free()
+
+
+func _tap(screen, world_pos: Vector2) -> void:
+	var sp: Vector2 = screen.to_screen(world_pos)
+	screen._press(sp, false, false)
+	screen._release(sp)
 
 
 ## Fight every campaign battle AI against AI, the player's army growing by

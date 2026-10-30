@@ -326,6 +326,7 @@ func _how_to_play() -> String:
 		"",
 		"Tap a banner to select. Double-tap selects every regiment of that kind. With nothing selected, drag to box-select.",
 		"Tap the field to move. Drag to set a line. Tap an enemy to attack.",
+		"To add a stop, tap the gold marker at the end of a route, then tap where to go next (or shift-click on a computer).",
 		"",
 		"Pikes stop cavalry. Swords beat pikes. Cavalry rides down archers and guns. Flanks and rears take more damage and break faster.",
 		"Pause any time; orders still work. Rally brings broken regiments back near your general.",

@@ -66,8 +66,12 @@ once and the run is over; your score goes on the board.
   select every regiment of that type. **All** selects the whole army.
 - With nothing selected, drag on the field to box-select.
 - With a selection: tap the field to move there; drag to draw a line and the
-  regiments form up along it, facing away from your side of the drag; tap an
-  enemy to attack it.
+  regiments form up along it, facing the enemy; tap an enemy to attack it.
+- Waypoints: a selected route ends in a gold marker. Tap it to pin it (a
+  ring with a plus) and the next tap on the field adds a leg from there
+  instead of replacing the route; tap it again to unpin. On a computer,
+  shift-click the field does the same in one click. Routing a flank force
+  around woods or through a chosen ford is what this is for.
 - Pause any time; orders can be given while paused. 2× speed for the
   quiet parts.
 - Abilities: **Rally** (from the start), **Barrage** and **Forced March**

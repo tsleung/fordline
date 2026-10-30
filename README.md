@@ -38,7 +38,9 @@ screen: the field turns a quarter and your army stands on the left.
 
 Tap a banner to select it (again to deselect; double-tap for every regiment
 of that kind). With nothing selected, drag to box-select. With a selection,
-tap the field to move, drag to form a line, tap an enemy to attack.
+tap the field to move, drag to form a line, tap an enemy to attack. To add a
+stop, tap the gold marker at the end of the route, then tap the next spot;
+shift-click does it in one click.
 Keys: Space pause, A select all, F 2× speed, Esc clear. Right-drag always
 gives an order.
 
