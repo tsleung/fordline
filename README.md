@@ -10,6 +10,13 @@ Design and rules: [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Play
 
+**In a browser:** https://tsleung.github.io/fordline/ (on a phone, Add to
+Home Screen installs it to play full screen and offline). Every push to
+`main` that passes `./test.sh` is published there by
+[.github/workflows/pages.yml](.github/workflows/pages.yml).
+
+**On this Mac:**
+
 ```bash
 /Applications/Godot.app/Contents/MacOS/Godot --path ~/github/fordline
 ```
@@ -80,3 +87,7 @@ scripts/main.gd         title, briefing, results, final screens
 scripts/sfx.gd          synthesised sound (autoload)
 tests/                  headless suite and the screenshot capture
 ```
+
+## Licence
+
+MIT; see [LICENSE](LICENSE).
