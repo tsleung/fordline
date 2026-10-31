@@ -161,11 +161,20 @@ static func of_era(era_id: String) -> Array:
 	return LIST.filter(func(s): return s.era == era_id)
 
 
+## Grand battles: a historical day on a hand-drawn field several screens
+## across, with armies arriving by road. See DESIGN.md.
+const GRAND := [Gettysburg.SPEC, Waterloo.SPEC]
+
+
 static func get_spec(id: String) -> Dictionary:
-	for s in LIST:
+	for s in LIST + GRAND:
 		if s.id == id:
 			return s
 	return {}
+
+
+static func is_grand(spec: Dictionary) -> bool:
+	return spec.get("mode", "") == "grand"
 
 
 ## The scenario as it will be fought with `seed_value`: a Skirmish draws
@@ -173,7 +182,7 @@ static func get_spec(id: String) -> Dictionary:
 ## the rest are fixed.
 static func resolve(id: String, seed_value: int) -> Dictionary:
 	var spec := get_spec(id).duplicate(true)
-	if spec.map != "random":
+	if is_grand(spec) or spec.map != "random":
 		return spec
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
@@ -192,12 +201,14 @@ static func resolve(id: String, seed_value: int) -> Dictionary:
 ## The ground is the scenario's; `dice` seeds the battle's own random
 ## numbers, so replays differ a little.
 static func make_battle(spec: Dictionary, dice: int) -> Battle:
+	if is_grand(spec):
+		return _make_grand(spec, dice)
 	var map_seed: int = spec.map_seed
 	var b := Battle.new(Terrain.generate(spec.map, map_seed), dice)
 	b.abilities.assign(spec.get("abilities", ["rally"]))
 	if spec.has("deploy_depth"):
 		b.terrain.deploy_depth[0] = spec.deploy_depth
-	var mid := Terrain.SIZE * 0.5
+	var mid := b.terrain.size * 0.5
 	for team in 2:
 		var face := -PI * 0.5 if team == 0 else PI * 0.5
 		b.add_regiment(team, K.GENERAL, UnitTypes.stat(K.GENERAL, "men"), mid, face, 0, {})
@@ -213,6 +224,60 @@ static func make_battle(spec: Dictionary, dice: int) -> Battle:
 			for i in b.flags.size():
 				b.claim_flag(i, team)
 	return b
+
+
+## A grand battle: the hand-drawn field, who holds it at the start, and
+## everyone else on the road, due at the hour the spec gives.
+static func _make_grand(spec: Dictionary, dice: int) -> Battle:
+	var plan: Dictionary = spec.plan
+	var b := Battle.new(Terrain.from_plan(plan), dice)
+	b.abilities.assign(spec.get("abilities", ["rally"]))
+	var veterancy: Array = spec.get("veterancy", [0, 0])
+	var start_hour: float = spec.start_hour
+	var hour: float = spec.hour
+	for force in spec.start:
+		var team: int = force.team
+		for u in force.units:
+			var stars: int = veterancy[team] + (u[4] if u.size() > 4 else 0)
+			var r := b.add_regiment(team, u[0], UnitTypes.stat(u[0], "men"), u[2], u[3], stars, {})
+			r.name = u[1]
+			r.formation = force.formation
+			r.objectives = _flag_points(plan, force.objectives)
+			r.holds_until = (force.get("from_hour", start_hour) - start_hour) * hour
+	for a in spec.arrivals:
+		var stars: int = veterancy[a.team]
+		var units: Array = a.units.map(func(u): return {"kind": u[0], "name": u[1], "stars": stars + (u[2] if u.size() > 2 else 0)})
+		b.arrivals.append({
+			"at": (a.hour - start_hour) * hour, "team": a.team, "formation": a.formation,
+			"from": a.from, "road": PackedVector2Array(a.road), "face": a.face,
+			"objectives": _flag_points(plan, a.objectives), "units": units,
+		})
+	b.arrivals.sort_custom(func(x, y): return x.at < y.at)
+	b.deadline = spec.deadline
+	b.deadline_flags.assign(spec.deadline_flags)
+	b.flag_drain = spec.flag_drain
+	b.rout_scale = spec.rout_scale
+	b.pace = spec.pace
+	b.dusk_time = INF
+	for i in spec.own_flags:
+		b.claim_flag(i, 0)
+	for i in spec.get("their_flags", []):
+		b.claim_flag(i, 1)
+	return b
+
+
+static func _flag_points(plan: Dictionary, indices: Array) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for i in indices:
+		out.append(plan.flags[i].at)
+	return out
+
+
+## The hour of a grand battle's day at battle time `t`, as "13:45".
+static func hour_text(spec: Dictionary, t: float) -> String:
+	var h: float = spec.start_hour + t / spec.hour
+	var minutes := int(h * 60.0)
+	return "%d:%02d" % [minutes / 60, minutes % 60]
 
 
 static func goal_text(spec: Dictionary) -> String:
@@ -233,6 +298,8 @@ static func condition_text(c: Dictionary) -> String:
 		return "Lose no more than %d%% of your men" % roundi(c.losses * 100.0)
 	if c.has("flags"):
 		return "Hold %d %s at the end" % [c.flags, c.get("noun", "crossings")]
+	if c.has("hold"):
+		return "Hold %s at the end" % c.noun
 	return ""
 
 
@@ -264,6 +331,8 @@ static func _met(c: Dictionary, b: Battle) -> bool:
 		return float(lost) / maxf(full, 1) <= c.losses
 	if c.has("flags"):
 		return b.flags_held(0) >= c.flags
+	if c.has("hold"):
+		return b.flags[c.hold].owner == 0
 	return false
 
 

@@ -5,12 +5,16 @@ extends Node
 ## Saves <out>-deploy.png, then <out>-<seconds>s.png at each time in SHOTS.
 ## With --menus it instead saves the title and the first briefing; with
 ## --routes, a paused battle with one regiment given a two-stop route;
+## with --arrow, a paused battle with an arrow being dragged for two regiments;
 ## with --scenarios, the Pike and Shot scenario list and one briefing.
-## --scenario=<id> plays that quick battle instead of a campaign battle.
+## --scenario=<id> plays that quick battle instead of a campaign battle; a
+## grand battle runs at 4× and saves the opening, a close look and the whole
+## field at GRAND_SHOTS instead.
 
 const BattleScreen := preload("res://scripts/battle_screen.gd")
 const Main := preload("res://scenes/main.tscn")
 const SHOTS := [25.0, 50.0, 80.0]
+const GRAND_SHOTS := [2.0, 330.0, 500.0, 620.0, 800.0]
 
 var _screen
 var _out := "build/shots/shot"
@@ -40,6 +44,10 @@ func _ready() -> void:
 		var resolved := Scenarios.resolve(scenario, 7)
 		_screen.setup(Scenarios.make_battle(resolved, 7), resolved.persona, resolved.name)
 		_screen.autopilot = true
+		if Scenarios.is_grand(resolved):
+			_screen.grand = true
+			_screen.clock = func(t: float) -> String: return Scenarios.hour_text(resolved, t)
+			_screen.cam_centre = resolved.view
 		add_child(_screen)
 		return
 	var run := Campaign.new_run(7)
@@ -75,6 +83,12 @@ func _process(_delta: float) -> void:
 	var b: Battle = _screen.battle
 	if "--routes" in OS.get_cmdline_user_args():
 		_routes()
+		return
+	if "--arrow" in OS.get_cmdline_user_args():
+		_arrow()
+		return
+	if _screen.grand:
+		_grand()
 		return
 	if b.phase == "deploy":
 		if _frames == 20:
@@ -112,6 +126,71 @@ func _routes() -> void:
 	elif _frames == 30:
 		set_process(false)
 		_save(_out + "-routes.png")
+		get_tree().quit()
+
+
+## A grand battle at 4×: the opening as the player first sees it, then at
+## each later shot the fighting up close and the whole field.
+func _grand() -> void:
+	var b: Battle = _screen.battle
+	if _frames == 5:
+		_screen.speed = 4.0
+	if _frames == 30:
+		_screen.paused = false
+	if _taken >= GRAND_SHOTS.size() or b.phase == "over":
+		set_process(false)
+		await _save(_out + "-end.png")
+		get_tree().quit()
+		return
+	if b.time >= GRAND_SHOTS[_taken] and _frames > 20:
+		var at := int(GRAND_SHOTS[_taken])
+		if _taken > 0:
+			_screen.cam_zoom = 0.6
+			_screen.look_at(_busiest(b))
+			await get_tree().process_frame
+			await _save("%s-%ds-close.png" % [_out, at])
+			_screen.cam_zoom = 0.01
+			_screen.look_at(Vector2.ZERO)
+			await get_tree().process_frame
+			await _save("%s-%ds-field.png" % [_out, at])
+		else:
+			await _save("%s-open.png" % _out)
+		_taken += 1
+
+
+## Where the most blocks of both sides are within reach of each other.
+func _busiest(b: Battle) -> Vector2:
+	var best := b.terrain.size * 0.5
+	var most := -1
+	for r in b.regiments:
+		if not r.fighting():
+			continue
+		var n := 0
+		for o in b.regiments:
+			if o.fighting() and o.team != r.team and o.pos.distance_to(r.pos) < 400.0:
+				n += 1
+		if n > most:
+			most = n
+			best = r.pos
+	return best
+
+
+## Two regiments selected and an arrow held mid-drag, pointing at the
+## right flank: the preview the player sees before letting go.
+func _arrow() -> void:
+	if _frames == 10:
+		_screen.autopilot = false
+		_screen.begin_battle()
+		_screen.paused = true
+		var foot: Array = _screen.battle.team_regiments(0).filter(func(x): return x.kind == UnitTypes.Kind.SWORDS)
+		_screen._select([foot[0].id, foot[1].id] as Array[int])
+		var at: Vector2 = foot[0].pos + Vector2(60, -120)
+		_screen._press(_screen.to_screen(at), false, false)
+		_screen.drag.now_world = at + Vector2(130, 40)
+		_screen.drag.now_screen = _screen.to_screen(_screen.drag.now_world)
+	elif _frames == 30:
+		set_process(false)
+		_save(_out + "-arrow.png")
 		get_tree().quit()
 
 

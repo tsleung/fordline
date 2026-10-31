@@ -77,14 +77,24 @@ func _draw() -> void:
 	_projectiles(b)
 	_effects(p)
 	var threats := {} if screen.demo else _intents(b, p)
-	for f in b.flags:
-		_flag(f, p)
+	for i in b.flags.size():
+		_flag(b.flags[i], p)
+		if i < b.terrain.flag_names.size():
+			_flag_name(b.flags[i].pos, b.terrain.flag_names[i], p)
 	for r in b.regiments:
 		if r.alive():
 			_banner(r, p, threats.has(r.id))
 	if not screen.demo:
 		_orders(b, p)
 		_preview(p)
+
+
+## A grand battle's place names, under each flag, at a fixed size on screen.
+func _flag_name(at: Vector2, name: String, p: float) -> void:
+	var size := int(13.0 * p)
+	var spot := at + Vector2(-90.0 * p, 24.0 * p)
+	draw_string_outline(_font, spot, name, HORIZONTAL_ALIGNMENT_CENTER, 180.0 * p, size, int(4.0 * p), Color(0, 0, 0, 0.6))
+	draw_string(_font, spot, name, HORIZONTAL_ALIGNMENT_CENTER, 180.0 * p, size, Palette.INK)
 
 
 ## Cracks across a battered gate and a bar of what is left of it.
@@ -109,7 +119,7 @@ func _gate_damage(b: Battle, p: float) -> void:
 
 
 func _deploy_zones(depth: Array) -> void:
-	var size := Terrain.SIZE
+	var size: Vector2 = screen.battle.terrain.size
 	var e := Terrain.EDGE
 	var mine := Rect2(e, size.y - depth[0], size.x - e * 2.0, depth[0] - e * 0.6)
 	var theirs := Rect2(e, e * 0.6, size.x - e * 2.0, depth[1] - e * 0.6)
@@ -179,7 +189,7 @@ func _soldiers(r: Regiment) -> void:
 				draw_rect(Rect2(s - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), body)
 		_:
 			var pikes := r.kind == K.PIKES and r.state != S.ROUTING
-			var muskets := r.kind == K.MUSKETS and r.state != S.ROUTING
+			var muskets := UnitTypes.is_shot(r.kind) and r.state != S.ROUTING
 			if r.fighting():
 				_front_edge(r, dark)
 			var rank := r.formation_cols(r.men())
@@ -216,6 +226,12 @@ func _banner(r: Regiment, p: float, threatened: bool) -> void:
 		_morale_bar(r, p)
 	for i in r.stars:
 		draw_circle(Vector2((i - (r.stars - 1) * 0.5) * 5.0 * p, (BANNER_PX + 12.0) * p), 1.8 * p, Palette.GOLD)
+	if r.id in screen.delegated:
+		# Under its own command: a gold diamond over the banner.
+		var top := -(BANNER_PX + 9.0) * p
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(0, top - 4.0 * p), Vector2(4.0 * p, top), Vector2(0, top + 4.0 * p), Vector2(-4.0 * p, top),
+		]), Palette.GOLD)
 	draw_set_transform(Vector2.ZERO)
 
 
@@ -366,11 +382,16 @@ func _dashed(a: Vector2, b: Vector2, color: Color, p: float) -> void:
 	draw_dashed_line(a, b, color, 1.6 * p, 6.0 * p)
 
 
-## Ghost positions while the player drags out a line.
+## The arrow the player is dragging, and the ghost positions it gives.
 func _preview(p: float) -> void:
 	var slots: Array = screen.preview_slots()
 	if slots.is_empty():
 		return
+	var arrow: PackedVector2Array = screen.preview_arrow()
+	var tip := arrow[1]
+	var back := (arrow[0] - tip).normalized() * 12.0 * p
+	draw_line(arrow[0], tip, Color(Palette.GOLD, 0.8), 2.5 * p)
+	draw_colored_polygon(PackedVector2Array([tip, tip + back.rotated(0.45), tip + back.rotated(-0.45)]), Palette.GOLD)
 	var b: Battle = screen.battle
 	for s in slots:
 		var r := b.get_regiment(s[0])

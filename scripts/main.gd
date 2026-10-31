@@ -45,6 +45,7 @@ func show_title() -> void:
 	col.add_child(_spacer(12))
 	col.add_child(_button("New campaign", _start_run, true))
 	col.add_child(_button("Quick battle", show_scenarios))
+	col.add_child(_button("Grand battles", show_grand))
 	var rules := _panel_text(_how_to_play())
 	rules.visible = false
 	col.add_child(_button("How to play", func(): rules.visible = not rules.visible))
@@ -73,45 +74,64 @@ func show_scenarios(era_id := "") -> void:
 		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tabs.add_child(tab)
 	col.add_child(tabs)
-	var thumb_w := 150.0 if get_viewport().get_visible_rect().size.x > 760 else 110.0
 	for spec in Scenarios.of_era(era_id):
-		# Skirmish's field is drawn now, so the thumbnail is the field you get.
-		var seed_value := randi()
-		var card := Button.new()
-		card.focus_mode = Control.FOCUS_NONE
-		card.custom_minimum_size = Vector2(0, thumb_w * Terrain.SIZE.y / Terrain.SIZE.x + 28.0)
-		card.pressed.connect(show_scenario.bind(spec.id, seed_value))
-		var row := HBoxContainer.new()
-		row.set_anchors_preset(Control.PRESET_FULL_RECT)
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_theme_constant_override("separation", 14)
-		var words := VBoxContainer.new()
-		words.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var title := _inline(spec.name, 22, Palette.INK)
-		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		words.add_child(title)
-		var brief := _text(spec.brief, 15, Palette.INK_DIM, false)
-		brief.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		words.add_child(brief)
-		var thumb := MapPreview.new()
-		thumb.custom_minimum_size = Vector2(thumb_w, thumb_w * Terrain.SIZE.y / Terrain.SIZE.x)
-		thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		thumb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		var resolved := Scenarios.resolve(spec.id, seed_value)
-		thumb.show_battle(Scenarios.make_battle(resolved, seed_value), hash(resolved.name))
-		row.add_child(thumb)
-		row.add_child(words)
-		row.add_child(StarRow.make(int(_load("stars", spec.id, 0)), 22))
-		var pad := MarginContainer.new()
-		pad.set_anchors_preset(Control.PRESET_FULL_RECT)
-		pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		for side in ["left", "right", "top", "bottom"]:
-			pad.add_theme_constant_override("margin_" + side, 14)
-		pad.add_child(row)
-		card.add_child(pad)
-		col.add_child(card)
+		col.add_child(_scenario_card(spec))
 	col.add_child(_button("Back", show_title))
+
+
+## The historical days, each a field several screens across.
+func show_grand() -> void:
+	Sfx.play("click")
+	var col := _page()
+	col.add_child(_inline("GRAND BATTLES", 15, Palette.BRASS))
+	col.add_child(_text("Historical days", 40, Palette.INK, false))
+	col.add_child(_text("A whole day's battle on a field several screens across, with armies arriving by road. About fifteen minutes; drag the field to look around.", 18, Palette.INK_DIM, false))
+	for spec in Scenarios.GRAND:
+		col.add_child(_scenario_card(spec))
+	col.add_child(_button("Back", show_title))
+
+
+## A scenario's card: its field, its name and brief, and the stars earned.
+func _scenario_card(spec: Dictionary) -> Button:
+	var thumb_w := 150.0 if get_viewport().get_visible_rect().size.x > 760 else 110.0
+	# Skirmish's field is drawn now, so the thumbnail is the field you get.
+	var seed_value := randi()
+	var resolved := Scenarios.resolve(spec.id, seed_value)
+	var b := Scenarios.make_battle(resolved, seed_value)
+	var aspect := b.terrain.size.y / b.terrain.size.x
+	var card := Button.new()
+	card.focus_mode = Control.FOCUS_NONE
+	card.custom_minimum_size = Vector2(0, thumb_w * aspect + 28.0)
+	card.pressed.connect(show_scenario.bind(spec.id, seed_value))
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 14)
+	var words := VBoxContainer.new()
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var title := _inline(spec.name, 22, Palette.INK)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_child(title)
+	var brief := _text(spec.brief, 15, Palette.INK_DIM, false)
+	brief.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_child(brief)
+	var thumb := MapPreview.new()
+	thumb.custom_minimum_size = Vector2(thumb_w, thumb_w * aspect)
+	thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	thumb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	thumb.show_battle(b, hash(resolved.name))
+	row.add_child(thumb)
+	row.add_child(words)
+	row.add_child(StarRow.make(int(_load("stars", spec.id, 0)), 22))
+	var pad := MarginContainer.new()
+	pad.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in ["left", "right", "top", "bottom"]:
+		pad.add_theme_constant_override("margin_" + side, 14)
+	pad.add_child(row)
+	card.add_child(pad)
+	return card
 
 
 ## `seed_value` picks Skirmish's field (and every scenario's dice); a new
@@ -121,8 +141,9 @@ func show_scenario(id: String, seed_value := -1) -> void:
 	if seed_value < 0:
 		seed_value = randi()
 	var spec := Scenarios.resolve(id, seed_value)
+	var grand := Scenarios.is_grand(spec)
 	var col := _page()
-	col.add_child(_inline("QUICK BATTLE", 15, Palette.BRASS))
+	col.add_child(_inline("GRAND BATTLE" if grand else "QUICK BATTLE", 15, Palette.BRASS))
 	col.add_child(_text(spec.name, 40, Palette.INK, false))
 	col.add_child(_text(spec.brief, 18, Palette.INK_DIM, false))
 	col.add_child(_map(Scenarios.make_battle(spec, seed_value), spec.name))
@@ -141,12 +162,33 @@ func show_scenario(id: String, seed_value := -1) -> void:
 		row.add_child(StarRow.make(1 if earned > i else 0, 18, 1))
 		row.add_child(_inline(lines[i], 17, Palette.INK))
 		col.add_child(row)
-	col.add_child(_inline("THEY BRING", 14, Palette.BRASS))
-	col.add_child(_army_strip(_army(spec.enemy), 1))
-	col.add_child(_inline("YOU BRING", 14, Palette.BRASS))
-	col.add_child(_army_strip(_army(spec.player), 0))
+	if grand:
+		col.add_child(_inline("THE DAY", 14, Palette.BRASS))
+		col.add_child(_panel_text(_day_text(spec)))
+	else:
+		col.add_child(_inline("THEY BRING", 14, Palette.BRASS))
+		col.add_child(_army_strip(_army(spec.enemy), 1))
+		col.add_child(_inline("YOU BRING", 14, Palette.BRASS))
+		col.add_child(_army_strip(_army(spec.player), 0))
 	col.add_child(_button("Fight", _start_scenario.bind(spec, seed_value), true))
-	col.add_child(_button("Back", show_scenarios))
+	col.add_child(_button("Back", show_grand if grand else show_scenarios))
+
+
+## A grand battle's order of march: who is on the field at the start and
+## who comes up which road when, both sides, by the hour.
+func _day_text(spec: Dictionary) -> String:
+	var sides := ["You", "They"]
+	var start := Scenarios.hour_text(spec, 0.0)
+	var lines := PackedStringArray()
+	for team in 2:
+		var forces: Array = spec.start.filter(func(f): return f.team == team)
+		lines.append("%s  %s: %s" % [start, sides[team], ", ".join(forces.map(func(f): return f.formation))])
+	var arrivals: Array = spec.arrivals.duplicate()
+	arrivals.sort_custom(func(a, c): return a.hour < c.hour)
+	for a in arrivals:
+		var at := Scenarios.hour_text(spec, (a.hour - spec.start_hour) * spec.hour)
+		lines.append("%s  %s: %s, %s (%d)" % [at, sides[a.team], a.formation, a.from, a.units.size()])
+	return "\n".join(lines)
 
 
 ## The field `b` will be fought on, both armies deployed, as wide as the
@@ -154,7 +196,7 @@ func show_scenario(id: String, seed_value := -1) -> void:
 func _map(b: Battle, title: String) -> Control:
 	var vp := get_viewport().get_visible_rect().size
 	var map := MapPreview.new()
-	var h := minf((vp.x - 40.0) * Terrain.SIZE.y / Terrain.SIZE.x, vp.y * 0.36)
+	var h := minf((vp.x - 40.0) * b.terrain.size.y / b.terrain.size.x, vp.y * 0.36)
 	map.custom_minimum_size = Vector2(0, h)
 	map.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	map.show_battle(b, hash(title))
@@ -176,8 +218,12 @@ func _start_scenario(spec: Dictionary, seed_value: int) -> void:
 	screen.setup(Scenarios.make_battle(spec, seed_value), spec.persona, spec.name)
 	screen.goal = Scenarios.goal_text(spec)
 	screen.quick = true
+	if Scenarios.is_grand(spec):
+		screen.grand = true
+		screen.clock = func(t: float) -> String: return Scenarios.hour_text(spec, t)
+		screen.cam_centre = spec.view
 	screen.finished.connect(_scenario_over.bind(spec))
-	screen.left.connect(show_scenarios)
+	screen.left.connect(show_grand if Scenarios.is_grand(spec) else show_scenarios)
 	screen.restarted.connect(_start_scenario.bind(spec, seed_value))
 	_fresh(screen)
 
@@ -199,12 +245,15 @@ func _scenario_over(b: Battle, spec: Dictionary) -> void:
 	for i in spec.stars.size():
 		lines.append("%s  %s" % ["Done" if met[i] else "Not yet", Scenarios.condition_text(spec.stars[i])])
 	var t := int(b.time)
-	lines.append("Time  %d:%02d" % [t / 60, t % 60])
+	if Scenarios.is_grand(spec):
+		lines.append("Ended  %s" % Scenarios.hour_text(spec, b.time))
+	else:
+		lines.append("Time  %d:%02d" % [t / 60, t % 60])
 	if stars > before:
 		lines.append("New best for this scenario")
 	col.add_child(_panel_text("\n".join(lines)))
 	col.add_child(_button("Again" if spec.id != "skirmish" else "Another field", show_scenario.bind(spec.id), true))
-	col.add_child(_button("Scenarios", show_scenarios))
+	col.add_child(_button("Grand battles" if Scenarios.is_grand(spec) else "Scenarios", show_grand if Scenarios.is_grand(spec) else show_scenarios))
 
 
 func _start_run() -> void:
@@ -523,7 +572,7 @@ func _how_to_play() -> String:
 		"Hold more of the three flags to drain the enemy's resolve. Rout their regiments to drain it faster. At zero, their army breaks.",
 		"",
 		"Tap a banner to select. Double-tap selects every regiment of that kind. With nothing selected, drag to box-select.",
-		"Tap the field to move. Drag to set a line. Tap an enemy to attack.",
+		"Tap the field to move. Drag an arrow: they stand where it starts and face where it points. Tap an enemy to attack.",
 		"To add a stop, tap the gold marker at the end of a route, then tap where to go next (or shift-click on a computer).",
 		"",
 		"Pikes stop cavalry. Swords beat pikes. Cavalry rides down archers, muskets and guns. Muskets go through armour and shake whoever they hit. Flanks and rears take more damage and break faster.",

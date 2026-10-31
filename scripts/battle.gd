@@ -36,6 +36,14 @@ const GATE_SHOT := 5.0
 const GATE_SHELL := 14.0
 const RAM_PER_MAN := 0.04
 const RAM_REACH := 48.0
+## Line infantry standing its ground forms square when enemy horse comes
+## this near, and stays in it until none is within SQUARE_STAND. In square:
+## horse hits it at SQUARE_VS_HORSE, a charge doesn't land, it has no flank
+## or rear, and only one face fires (SQUARE_FIRE of a volley).
+const SQUARE_CALL := 240.0
+const SQUARE_STAND := 330.0
+const SQUARE_VS_HORSE := 0.35
+const SQUARE_FIRE := 0.5
 
 ## Stamina per second: lost in melee, on the march and in flight; regained
 ## standing clear of the fight.
@@ -68,6 +76,23 @@ var hold_needed := 1
 ## Resolve per second per flag of difference; a siege sets 0, so the
 ## castle's flags decide at the deadline rather than bleeding the attacker.
 var flag_drain := FLAG_DRAIN
+## Grand battles: a rout costs this share of ROUT_COST and DESTROYED_COST,
+## since there are many more blocks to lose; and when deadline_flags is
+## set, the player must hold every one of those flags at the deadline.
+var rout_scale := 1.0
+## When the late drain starts (INF: never; a grand battle ends at its own
+## dusk). pace: a grand battle stretches its fights to fit the day's clock,
+## so volleys of arrows and shot do this share of their damage and nerve
+## comes back at this share of its rate. A volley's shock is not scaled:
+## brigades break long before they are shot to pieces.
+var dusk_time := DUSK_TIME
+var pace := 1.0
+var deadline_flags: Array[int] = []
+## Forces still on the road, soonest first. Each: {"at": seconds, "team",
+## "formation": name, "road": points from the map edge to where it musters,
+## "face": the angle it musters facing, "objectives", "units": [{"kind",
+## "name", "stars"?}]}. Each arrives at its time; see _arrive.
+var arrivals: Array[Dictionary] = []
 ## Each gate's strength left (fortress maps).
 var gate_hp: Array[float] = []
 ## Abilities the player (team 0) has, and their cooldowns.
@@ -170,6 +195,8 @@ func apply_orders(orders: Array) -> void:
 				_ability_march(o.ids)
 			"bombard":
 				_order_bombard(o)
+			"objective":
+				_order_objective(o)
 
 
 func _commandable(id: int) -> Regiment:
@@ -239,6 +266,15 @@ func _order_bombard(o: Dictionary) -> void:
 	r.ordered = true
 
 
+## A block handed to its division's own command: its objective is now this
+## one flag, to take and hold. Whoever commands it (the AI) moves it there.
+func _order_objective(o: Dictionary) -> void:
+	var r := _commandable(o.id)
+	if r == null or phase != "battle":
+		return
+	r.objectives = PackedVector2Array([o.at])
+
+
 func _gate_standing(g: int) -> bool:
 	return g >= 0 and g < gate_hp.size() and not terrain.gate_broken[g]
 
@@ -301,11 +337,14 @@ func step(dt: float) -> void:
 	if phase != "battle":
 		return
 	time += dt
+	while not arrivals.is_empty() and time >= arrivals[0].at:
+		_arrive(arrivals.pop_front())
 	_update_contacts()
 	for r in regiments:
 		if r.alive():
 			_think(r, dt)
 	_separate()
+	_squares()
 	_melee(dt)
 	_ram(dt)
 	_tire(dt)
@@ -321,19 +360,59 @@ func step(dt: float) -> void:
 	_check_end(dt)
 
 
+## A force reaches the field: its blocks appear in column on the road at
+## the map edge and march up it to muster side by side across its end.
+func _arrive(a: Dictionary) -> void:
+	var road: PackedVector2Array = a.road
+	var end := road[road.size() - 1]
+	var face: float = a.face
+	var across := Vector2.from_angle(face).orthogonal()
+	var units: Array = a.units
+	var gap := 10.0
+	var widths: Array[float] = []
+	var regs: Array[Regiment] = []
+	var inward := (road[1] - road[0]).normalized()
+	for i in units.size():
+		var u: Dictionary = units[i]
+		var at := terrain.clamp_to_field(road[0] + inward * (30.0 + 55.0 * i))
+		var r := add_regiment(a.team, u.kind, UnitTypes.stat(u.kind, "men"), at, inward.angle(), u.get("stars", 0), {})
+		r.name = u.name
+		r.formation = a.formation
+		r.objectives = a.get("objectives", PackedVector2Array())
+		regs.append(r)
+		widths.append(r.width())
+	var total := -gap
+	for w in widths:
+		total += w + gap
+	var cursor := -total * 0.5
+	for i in regs.size():
+		var r := regs[i]
+		var slot := end + across * (cursor + widths[i] * 0.5)
+		cursor += widths[i] + gap
+		r.waypoints = road.slice(1, road.size() - 1)
+		r.waypoints.append(slot)
+		r.final_facing = face
+		r.ordered = true
+		r.state = S.MOVING
+	_emit({"type": "arrival", "team": a.team, "formation": a.formation, "from": a.get("from", ""), "pos": end})
+
+
 func _update_contacts() -> void:
 	var pairs: Array = []
 	for r in regiments:
 		r.contacts.clear()
-	for i in regiments.size():
-		var a := regiments[i]
-		if not a.alive():
-			continue
-		for j in range(i + 1, regiments.size()):
-			var b := regiments[j]
-			if b.team == a.team or not b.alive():
+	var live := _live()
+	var at := _live_positions(live)
+	var radii := _live_radii(live)
+	var fighting := live.map(func(r): return r.fighting())
+	for i in live.size():
+		var a: Regiment = live[i]
+		for j in range(i + 1, live.size()):
+			var b: Regiment = live[j]
+			if b.team == a.team or not (fighting[i] or fighting[j]):
 				continue
-			if not a.fighting() and not b.fighting():
+			var near := radii[i] + radii[j]
+			if at[i].distance_squared_to(at[j]) >= near * near:
 				continue
 			var d := a.pos.distance_to(b.pos)
 			var ang := (b.pos - a.pos).angle()
@@ -451,7 +530,7 @@ func _on_impact(r: Regiment, enemy: Regiment) -> void:
 		_emit({"type": "flank", "zone": z, "pos": enemy.pos, "team": r.team, "kind": enemy.kind})
 	if not UnitTypes.is_mounted(r.kind) or r.last_speed < r.speed * 0.6 or r.stamina < Combat.CHARGE_STAMINA:
 		return
-	if not Combat.charge_lands(enemy.kind, z):
+	if enemy.square or not Combat.charge_lands(enemy.kind, z):
 		_emit({"type": "braced", "pos": enemy.pos})
 		return
 	r.charge_t = Combat.CHARGE_TIME
@@ -467,7 +546,7 @@ func _flee(r: Regiment, dt: float) -> void:
 	# stone; then it was cleared, and the next step plans afresh.
 	if not r.waypoints.is_empty() and r.pos.distance_to(r.waypoints[0]) < 6.0:
 		r.waypoints.remove_at(0)
-	var edge_y := Terrain.SIZE.y - 12.0 if r.team == 0 else 12.0
+	var edge_y := terrain.size.y - 12.0 if r.team == 0 else 12.0
 	if (r.team == 0 and r.pos.y >= edge_y) or (r.team == 1 and r.pos.y <= edge_y):
 		r.state = S.GONE
 		r.fled = true
@@ -475,7 +554,7 @@ func _flee(r: Regiment, dt: float) -> void:
 
 
 func _edge_point(r: Regiment) -> Vector2:
-	return Vector2(r.pos.x, Terrain.SIZE.y - 4.0 if r.team == 0 else 4.0)
+	return Vector2(r.pos.x, terrain.size.y - 4.0 if r.team == 0 else 4.0)
 
 
 func _advance(r: Regiment, goal: Vector2, pace: float, dt: float) -> void:
@@ -515,13 +594,17 @@ func _turn(r: Regiment, angle: float, dt: float) -> void:
 
 
 func _separate() -> void:
-	for i in regiments.size():
-		var a := regiments[i]
-		if not a.alive():
-			continue
-		for j in range(i + 1, regiments.size()):
-			var b := regiments[j]
-			if not b.alive():
+	var live := _live()
+	var at := _live_positions(live)
+	var radii := _live_radii(live)
+	for i in live.size():
+		var a: Regiment = live[i]
+		for j in range(i + 1, live.size()):
+			var b: Regiment = live[j]
+			# No pair farther apart than their widest reaches can overlap;
+			# most pairs on a big field are, and are skipped cheaply.
+			var near := (radii[i] + radii[j]) * (0.85 if a.team == b.team else 0.7)
+			if at[i].distance_squared_to(at[j]) >= near * near:
 				continue
 			var delta := b.pos - a.pos
 			var d := delta.length()
@@ -532,6 +615,34 @@ func _separate() -> void:
 			var push := delta / d * (want - d) * 0.25
 			_nudge(a, -push)
 			_nudge(b, push)
+			at[i] = a.pos
+			at[j] = b.pos
+
+
+## The regiments still on the field, in order, and their positions and
+## radius() alongside, for the pair loops' cheap test.
+func _live() -> Array[Regiment]:
+	var out: Array[Regiment] = []
+	for r in regiments:
+		if r.alive():
+			out.append(r)
+	return out
+
+
+func _live_positions(live: Array[Regiment]) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	out.resize(live.size())
+	for i in live.size():
+		out[i] = live[i].pos
+	return out
+
+
+func _live_radii(live: Array[Regiment]) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(live.size())
+	for i in live.size():
+		out[i] = live[i].radius()
+	return out
 
 
 func _nudge(r: Regiment, by: Vector2) -> void:
@@ -552,13 +663,51 @@ func _melee(dt: float) -> void:
 			var z := Combat.zone(e.pos, e.facing, r.pos)
 			if e.state == S.ROUTING:
 				z = Combat.Zone.REAR
+			elif e.square:
+				z = Combat.Zone.FRONT
 			var dps := Combat.melee_dps(
 				r.kind, r.men(), r.formation_cols(r.men()), r.atk,
 				e.kind, e.def + terrain.defence_bonus(e.pos), z, r.charge_t > 0.0
 			) * share * Combat.fatigue_hit(r.stamina)
+			if e.square and UnitTypes.is_mounted(r.kind):
+				dps *= SQUARE_VS_HORSE
 			if e.fighting():
 				e.morale -= Combat.MELEE_STRAIN * Combat.ZONE_MORALE[z] * share * dt * Combat.fatigue_nerve(e.stamina)
 			_wound(e, dps * dt, r.pos, r, Combat.ZONE_MORALE[z])
+
+
+## Line infantry forms square when enemy horse comes near while it stands,
+## unless the horse is already on it; it forms line again once the horse has
+## gone, or when it is ordered to march.
+func _squares() -> void:
+	var horse_by_team := [[], []]
+	for e in regiments:
+		if e.fighting() and UnitTypes.is_mounted(e.kind):
+			horse_by_team[e.team].append(e)
+	for r in regiments:
+		if r.kind != K.LINE or not r.fighting():
+			if r.square:
+				r.square = false
+			continue
+		var horse := _nearest_of(r, horse_by_team[1 - r.team])
+		var near := INF if horse == null else horse.pos.distance_to(r.pos)
+		if r.square:
+			if not r.waypoints.is_empty() or near > SQUARE_STAND:
+				r.square = false
+		elif r.waypoints.is_empty() and near < SQUARE_CALL and not r.contacts.any(func(id): return UnitTypes.is_mounted(get_regiment(id).kind)):
+			r.square = true
+			_emit({"type": "square", "pos": r.pos, "team": r.team})
+
+
+func _nearest_of(r: Regiment, among: Array) -> Regiment:
+	var best: Regiment = null
+	var best_d := INF
+	for e in among:
+		var d: float = e.pos.distance_to(r.pos)
+		if d < best_d:
+			best_d = d
+			best = e
+	return best
 
 
 ## Foot pressed against an enemy gate from outside batter it down.
@@ -650,7 +799,7 @@ func _ranged(dt: float) -> void:
 		match r.kind:
 			K.ARCHERS:
 				_loose_volley(r, t)
-			K.MUSKETS:
+			K.MUSKETS, K.RIFLES, K.LINE:
 				_fire_muskets(r, t)
 			_:
 				_fire_guns(r, t.pos)
@@ -702,6 +851,8 @@ func _fire_muskets(r: Regiment, t: Regiment) -> void:
 	var dmg := Combat.volley_damage(r.men(), r.shot, r.accuracy, armour) * terrain.cover(t.pos)
 	if not t.contacts.is_empty():
 		dmg *= 0.6
+	if r.square:
+		dmg *= SQUARE_FIRE
 	projectiles.append({
 		"kind": "shot", "from": r.pos, "to": t.pos, "t": 0.0, "dur": 0.08 + d / 2000.0,
 		"target": t.id, "src": r.id, "team": r.team, "dmg": dmg, "shock": r.shock,
@@ -738,7 +889,7 @@ func _fly(dt: float) -> void:
 			if t != null and t.alive():
 				if t.fighting():
 					t.morale -= p.shock
-				_wound(t, p.dmg, p.from, src, 1.0)
+				_wound(t, p.dmg * pace, p.from, src, 1.0)
 		else:
 			_blast(p.to, 1 - p.team, 13.0, 3, 6.0, src)
 			_hit_gates(p.to, 40.0, GATE_SHOT, p.team)
@@ -811,7 +962,7 @@ func _kill(e: Regiment, indices: Array, src: Regiment, morale_mult: float) -> vo
 func _destroy(e: Regiment) -> void:
 	var was_routed := e.routed_once
 	e.state = S.GONE
-	resolve[e.team] -= DESTROYED_COST + (0.0 if was_routed else ROUT_COST)
+	resolve[e.team] -= (DESTROYED_COST + (0.0 if was_routed else ROUT_COST)) * rout_scale
 	if e.kind == K.GENERAL:
 		_lose_general(e.team)
 	_emit({"type": "destroyed", "pos": e.pos, "team": e.team, "kind": e.kind})
@@ -838,7 +989,7 @@ func _morale(dt: float) -> void:
 			continue
 		if r.state == S.ROUTING:
 			if _nearest_enemy(r, 130.0, true) == null:
-				r.morale += 7.0 * dt
+				r.morale += 7.0 * pace * dt
 			if r.morale >= r.morale_max * 0.4 and r.strength() >= 0.25:
 				_rally(r)
 			continue
@@ -847,7 +998,7 @@ func _morale(dt: float) -> void:
 			regen = 3.5 + (3.0 if _in_aura(r) else 0.0)
 		elif _in_aura(r):
 			regen = 1.2
-		r.morale = minf(r.morale_max, r.morale + regen * dt)
+		r.morale = minf(r.morale_max, r.morale + regen * pace * dt)
 		if r.morale <= 0.0:
 			_rout(r)
 
@@ -861,7 +1012,7 @@ func _rout(r: Regiment) -> void:
 	r.waypoints = terrain.path(r.pos, _edge_point(r))
 	if not r.routed_once:
 		r.routed_once = true
-		resolve[r.team] -= ROUT_COST
+		resolve[r.team] -= ROUT_COST * rout_scale
 		if r.kind == K.GENERAL:
 			_lose_general(r.team)
 	for f in team_regiments(r.team):
@@ -921,7 +1072,7 @@ func _flags(dt: float) -> void:
 
 func _drain(dt: float) -> void:
 	var diff := flags_held(0) - flags_held(1)
-	var dusk := time > DUSK_TIME
+	var dusk := time > dusk_time
 	var rate := flag_drain * (2.0 if dusk else 1.0)
 	if diff > 0:
 		resolve[1] -= rate * diff * dt
@@ -944,7 +1095,10 @@ func _check_end(dt: float) -> void:
 		return
 	if deadline > 0.0 and time >= deadline:
 		_emit({"type": "deadline", "held": flags_held(0)})
-		_break(1 if flags_held(0) >= hold_needed else 0)
+		var held := flags_held(0) >= hold_needed
+		if not deadline_flags.is_empty():
+			held = deadline_flags.all(func(i): return flags[i].owner == 0)
+		_break(1 if held else 0)
 		return
 	for team in 2:
 		var standing := false
@@ -975,8 +1129,9 @@ func _place_soldiers(dt: float) -> void:
 		var routing := r.state == S.ROUTING
 		var fwd := r.forward()
 		var front := r.formation_cols(n)
+		var slots := r.slots(n)
 		for i in n:
-			var target := r.slot_world(i, n)
+			var target := slots[i]
 			if routing:
 				var h := float(i * 7919 + r.id * 104729)
 				target += Vector2(sin(h), cos(h * 1.3)) * 16.0

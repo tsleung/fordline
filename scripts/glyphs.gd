@@ -34,12 +34,15 @@ static func draw(ci: CanvasItem, kind: int, c: Vector2, r: float, color: Color) 
 			ci.draw_arc(c + Vector2(-r * 0.1, r * 0.22), r * 0.36, 0, TAU, 14, color, w)
 			ci.draw_circle(c + Vector2(-r * 0.1, r * 0.22), r * 0.1, color)
 			ci.draw_line(c + Vector2(-r * 0.2, r * 0.05), c + Vector2(r * 0.66, -r * 0.48), color, w * 1.6)
-		K.MUSKETS:
+		K.MUSKETS, K.RIFLES, K.LINE:
 			var muzzle := c + Vector2(r * 0.66, -r * 0.5)
 			var lock := c + Vector2(-r * 0.2, r * 0.16)
 			ci.draw_line(lock, muzzle, color, w)
 			ci.draw_line(lock, c + Vector2(-r * 0.62, r * 0.52), color, w * 2.2)
 			ci.draw_circle(muzzle + Vector2(-r * 0.04, -r * 0.2), r * 0.13, color)
+			if kind != K.MUSKETS:
+				# A bayonet past the muzzle.
+				ci.draw_line(muzzle, muzzle + Vector2(r * 0.22, -r * 0.17), color, w * 0.7)
 		K.GENERAL:
 			var pts := PackedVector2Array()
 			for i in 10:

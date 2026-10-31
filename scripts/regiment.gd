@@ -9,6 +9,17 @@ var team := 0
 var kind := 0
 ## Index into the campaign roster, or -1 for an enemy regiment.
 var roster_index := -1
+## Grand battles: the block's historical name ("Iron Brigade"), the
+## division it belongs to, and that division's objectives in order, which
+## the AI takes one after another. Set once, when the block is raised.
+var name := ""
+var formation := ""
+var objectives := PackedVector2Array()
+## Battle time before which the block keeps to its ground: its historical
+## orders start later in the day.
+var holds_until := 0.0
+## Line infantry formed in square against horse. Written by Battle.
+var square := false
 
 var men_max := 1
 ## One position per living soldier; slot i is soldier i, front rank first.
@@ -124,7 +135,14 @@ func forward() -> Vector2:
 
 
 func formation_cols(count: int) -> int:
+	if square:
+		return square_side(count)
 	return clampi(cols, 1, maxi(count, 1))
+
+
+## Men along each face of a square.
+static func square_side(count: int) -> int:
+	return maxi(1, ceili(count / 4.0))
 
 
 func formation_rows(count: int) -> int:
@@ -136,6 +154,8 @@ func width() -> float:
 
 
 func depth() -> float:
+	if square:
+		return width()
 	return formation_rows(men()) * spacing
 
 
@@ -148,6 +168,8 @@ func reach(dir_angle: float) -> float:
 
 ## Where soldier `i` stands in a formation of `count` soldiers.
 func slot_world(i: int, count: int) -> Vector2:
+	if square:
+		return _square_slot(i, count)
 	var c := formation_cols(count)
 	var rows := formation_rows(count)
 	var row := i / c
@@ -160,6 +182,44 @@ func slot_world(i: int, count: int) -> Vector2:
 	return pos + right * x - fwd * y
 
 
+## The farthest its edge reaches in any direction: no reach() is longer.
+func radius() -> float:
+	return maxf(depth(), width()) * 0.5 + 3.0
+
+
+## Every soldier's slot at once, as slot_world gives them one by one.
+func slots(count: int) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	out.resize(count)
+	if square:
+		for i in count:
+			out[i] = _square_slot(i, count)
+		return out
+	var c := formation_cols(count)
+	var rows := formation_rows(count)
+	var fwd := forward()
+	var right := fwd.orthogonal() * -1.0
+	for i in count:
+		var row := i / c
+		var col := i % c
+		var in_row := c if row < rows - 1 else count - row * c
+		var x := (col - (in_row - 1) * 0.5) * spacing
+		var y := (row - (rows - 1) * 0.5) * spacing
+		out[i] = pos + right * x - fwd * y
+	return out
+
+
 func hit_test(p: Vector2) -> bool:
 	var local := (p - pos).rotated(-facing)
 	return absf(local.x) <= depth() * 0.5 + 8.0 and absf(local.y) <= width() * 0.5 + 8.0
+
+
+## A square: the men in turn on its four faces, each face square to one way.
+func _square_slot(i: int, count: int) -> Vector2:
+	var per := square_side(count)
+	var half := per * spacing * 0.5
+	var face := i % 4
+	var k := i / 4
+	var along := (k - (per - 1) * 0.5) * spacing
+	var fwd := forward().rotated(face * PI * 0.5)
+	return pos + fwd * half + fwd.orthogonal() * along

@@ -26,6 +26,7 @@ func _run() -> void:
 	await _test_routes()
 	await _test_screens()
 	_test_scenarios()
+	await _test_grand(quick)
 	_test_battles(quick)
 	print("\n%d checks, %d failed" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
@@ -58,6 +59,7 @@ func _test_combat() -> void:
 	_check(_duel(1.0, 1.0) == "even", "fresh against fresh is even")
 	_check(_duel(1.0, 0.2) == "first", "fresh swords beat tired swords")
 	_test_muskets()
+	_test_squares()
 
 
 ## A volley of shot goes through armour, drops men all at once, and costs
@@ -204,6 +206,19 @@ func _test_routes() -> void:
 	screen._press(screen.to_screen(second), false, true)
 	screen._release(screen.to_screen(second))
 	_check(screen.route_end(r).distance_to(second) < 1.0 and Array(r.waypoints).any(func(w): return w.distance_to(first) < 1.0), "shift-click adds a stop")
+	# A drag is an arrow: stand where it starts, face the way it points,
+	# whichever side the enemy is on.
+	var spot: Vector2 = r.pos + Vector2(0.0, -150.0)
+	screen._select([r.id] as Array[int])
+	_drag(screen, spot, spot + Vector2(0.0, 90.0))
+	_check(screen.route_end(r).distance_to(spot) < 1.0, "a drag on the field sends the selection to where it starts")
+	_check(absf(angle_difference(r.final_facing, PI * 0.5)) < 0.01, "and faces it the way the drag points, even away from the enemy")
+	_drag(screen, r.pos, r.pos + Vector2(90.0, 0.0))
+	_check(absf(angle_difference(r.final_facing, 0.0)) < 0.01, "a drag from its own banner turns it")
+	var pair: Array[int] = [r.id, screen.battle.team_regiments(0).filter(func(x): return x.kind == K.PIKES)[0].id]
+	screen._select(pair)
+	var slots: Array = screen.arrow_slots(spot, spot + Vector2(90.0, 0.0))
+	_check(slots.size() == 2 and absf(slots[0][1].x - spot.x) < 0.01 and absf(slots[1][1].x - spot.x) < 0.01, "a group forms side by side across the arrow")
 	# The menu stops the battle, gives the pause back, and leaving is
 	# announced for whoever started the battle to act on.
 	var was: float = screen.battle.time
@@ -233,6 +248,11 @@ func _test_routes() -> void:
 	_check(gun.target_gate == 0, "tapping a gate with guns selected batters it")
 	_check(foot.waypoints.size() > 0 and siege.route_end(foot).distance_to(siege.battle.terrain.gates[0].c) < 60.0, "the foot with them march on the gate")
 	siege.free()
+
+
+func _drag(screen, from_world: Vector2, to_world: Vector2) -> void:
+	screen._press(screen.to_screen(from_world), false, false)
+	screen._release(screen.to_screen(to_world))
 
 
 func _tap(screen, world_pos: Vector2) -> void:
@@ -271,6 +291,37 @@ func _test_screens() -> void:
 ## The castle: routes go round stone and through gates, a shut gate stops
 ## the besieger until it is battered down, no blades cross a wall, and the
 ## wall-walk gives height and cover.
+## Napoleonic line infantry forms square against horse while it stands:
+## no flank, a charge that doesn't land, and horse that does little; it
+## forms line to march, and horse that reaches it first catches it in line.
+func _test_squares() -> void:
+	var b := Battle.new(Terrain.generate("woods", 4), 1)
+	var foot := b.add_regiment(0, K.LINE, 40, Vector2(650, 500), -PI * 0.5, 0, {})
+	var horse := b.add_regiment(1, K.CAVALRY, 24, Vector2(650, 290), PI * 0.5, 0, {})
+	b.begin()
+	b.step(Battle.STEP)
+	_check(foot.square and b.take_events().any(func(e): return e.type == "square"), "line infantry forms square as horse comes near")
+	_check(absf(foot.width() - foot.depth()) < 0.01 and foot.formation_cols(40) == 10, "a square is as deep as it is wide, ten men a face")
+	b.apply_orders([{"type": "attack", "id": horse.id, "target": foot.id}])
+	var charged := false
+	var lost := 0
+	for i in 150:
+		b.step(Battle.STEP)
+		charged = charged or b.take_events().any(func(e): return e.type == "charge")
+	lost = 40 - foot.men()
+	_check(not charged, "a charge doesn't land on a square")
+	_check(lost < 8, "horse can't break into a square (lost %d of 40)" % lost)
+	b.apply_orders([{"type": "move", "id": foot.id, "to": Vector2(650, 700)}])
+	b.step(Battle.STEP)
+	_check(not foot.square, "a square forms line again to march")
+	var caught := Battle.new(Terrain.generate("woods", 4), 1)
+	var line := caught.add_regiment(0, K.LINE, 40, Vector2(650, 500), -PI * 0.5, 0, {})
+	caught.add_regiment(1, K.CAVALRY, 24, Vector2(650, 470), PI * 0.5, 0, {})
+	caught.begin()
+	caught.step(Battle.STEP)
+	_check(not line.square, "horse already on a line catches it before it can form square")
+
+
 func _test_fortress() -> void:
 	var t := Terrain.generate("fortress", 3)
 	var outside := Vector2(650, 700)
@@ -367,6 +418,128 @@ func _test_scenarios() -> void:
 
 ## Fight every campaign battle AI against AI, the player's army growing by
 ## one regiment a battle as it would with rewards.
+## A grand battle: the hand-drawn field, armies arriving by road, the
+## division AI, dusk deciding it, and the camera over a field bigger than
+## the screen. The full suite also fights the whole day AI against AI.
+func _test_grand(quick: bool) -> void:
+	var spec := Scenarios.resolve("gettysburg", 1)
+	var b := Scenarios.make_battle(spec, 1)
+	var t := b.terrain
+	var flag := func(i: int) -> Vector2: return Gettysburg.FLAGS[i].at
+	_check(t.size == Vector2(3200, 2200) and t.flag_names.size() == 6, "Gettysburg's field is its own size, with named flags")
+	_check(t.height(flag.call(Gettysburg.CEMETERY)) > 0.9 and t.height(Vector2(1610, 700)) > 0.9, "Cemetery Hill and the crest of Seminary Ridge stand high")
+	_check(t.height(Vector2(1450, 1000)) < 0.3, "the low ground between the ridges is low")
+	_check(t.in_town(flag.call(Gettysburg.TOWN)) and t.cover(flag.call(Gettysburg.TOWN)) == 0.5, "the town gives cover")
+	_check(t.speed_mult(Vector2(1135, 600)) < 0.6, "wading Willoughby Run is slow")
+	_check(t.path(Vector2(300, 300), Vector2(2900, 2000)).size() == 1, "an open field routes straight")
+	_check(spec == Scenarios.resolve("gettysburg", 1) and b.regiments.size() == 8, "the day opens with Buford and Heth's van only")
+	var muster: Vector2 = Gettysburg.EMMITSBURG_ROAD.back()
+	b.begin()
+	while b.time < (10.0 - 8.0) * Gettysburg.HOUR + 1.0:
+		b.step(Battle.STEP)
+	var arrived := b.team_regiments(0).filter(func(r): return r.formation == "Wadsworth's Division")
+	_check(arrived.size() == 3 and arrived.any(func(r): return r.name == "the Iron Brigade"), "Wadsworth's division comes up at 10:00, named")
+	_check(b.take_events().any(func(e): return e.type == "arrival" and e.formation == "Wadsworth's Division"), "its arrival is announced")
+	_check(arrived.all(func(r): return r.waypoints[r.waypoints.size() - 1].distance_to(muster) < 150.0), "it marches to muster at the end of its road")
+	# A division's objectives in order: the next once it holds the last.
+	var heth := PackedVector2Array([flag.call(Gettysburg.MCPHERSON), flag.call(Gettysburg.SEMINARY)])
+	_check(AI._objective(b, 1, heth) == heth[0], "a division goes for its first objective")
+	b.flags[Gettysburg.MCPHERSON].owner = 1
+	_check(AI._objective(b, 1, heth) == heth[1], "and on to the next once it holds it")
+	# Coming from the west, a division's blocks stand north and south of
+	# each other, not one behind another.
+	var west: Array[Regiment] = []
+	for y in [900.0, 1100.0]:
+		west.append(b.add_regiment(1, K.RIFLES, 40, Vector2(300, y), 0.0, 0, {}))
+	var spots := west.map(func(r): return AI._division_spot(b, 1, r, west, Vector2(1300, 1000)))
+	_check(absf(spots[0].x - spots[1].x) < 1.0 and absf(spots[0].y - spots[1].y) >= AI.DIVISION_GAP - 1.0, "a division forms square to its approach")
+	# Dusk decides on Cemetery Hill alone.
+	for team in 2:
+		var dusk := Scenarios.make_battle(spec, 1)
+		dusk.begin()
+		for f in dusk.flags:
+			f.owner = 1
+		dusk.flags[Gettysburg.CEMETERY].owner = team
+		dusk.time = dusk.deadline
+		dusk.step(Battle.STEP)
+		_check(dusk.broken_team == 1 - team, "at dusk the side without Cemetery Hill is beaten (%d holds it)" % team)
+	# The camera: zoom kept in range, the view on the field, the point
+	# under a pinch kept still, and a double-tap taking the division.
+	var screen = preload("res://scripts/battle_screen.gd").new()
+	screen.setup(Scenarios.make_battle(spec, 1), spec.persona, spec.name)
+	screen.grand = true
+	screen.cam_centre = spec.view
+	root.add_child(screen)
+	await process_frame
+	_check(screen.battle.phase == "battle" and screen.paused, "a grand battle opens under way and paused")
+	var probe := Vector2(1200, 900)
+	_check(screen.to_world(screen.to_screen(probe)).distance_to(probe) < 0.01, "screen and field positions round-trip")
+	var under: Vector2 = screen.to_screen(probe)
+	screen.zoom_at(under, 1.3)
+	_check(screen.to_world(under).distance_to(probe) < 0.5, "zooming keeps the point under the finger still")
+	screen.zoom_at(under, 1000.0)
+	_check(screen.cam_zoom == screen.ZOOM_MAX, "zoom stops at its closest")
+	screen.pan_by(Vector2(-1e6, -1e6))
+	var view: Rect2 = screen.view_rect()
+	_check(view.end.x <= 3200.5 and view.end.y <= 2200.5, "panning stops at the field's edge")
+	screen.zoom_at(under, 0.0001)
+	view = screen.view_rect()
+	_check(view.size.x >= 3199.0 or view.size.y >= 2199.0, "zoomed out, the whole field shows")
+	var gamble: Regiment = screen.battle.team_regiments(0).filter(func(r): return r.name == "Gamble's Brigade")[0]
+	_tap(screen, gamble.pos)
+	_tap(screen, gamble.pos)
+	_check(screen.selected.size() == 4, "a double-tap selects the whole division")
+	# A tap on a flag hands the division to its own command: the AI takes
+	# it there, until the player orders a block again.
+	var seminary: Vector2 = flag.call(Gettysburg.SEMINARY)
+	_tap(screen, seminary)
+	_check(screen.delegated.size() == 4 and gamble.objectives == PackedVector2Array([seminary]), "tapping a flag sends the division to take it on its own")
+	screen._command(1.0)
+	_check(gamble.waypoints.size() > 0 and gamble.waypoints[gamble.waypoints.size() - 1].distance_to(seminary) < 250.0, "and the division's own command marches it there")
+	screen._select([gamble.id] as Array[int])
+	_tap(screen, Vector2(1300, 1500))
+	_check(not gamble.id in screen.delegated and screen.delegated.size() == 3, "an order from the player takes the block back")
+	screen.clear_selection()
+	screen.cam_zoom = 0.6
+	screen.look_at(Vector2(1600, 1100))
+	var before: Vector2 = screen.cam_centre
+	var from: Vector2 = screen.to_screen(Vector2(1500, 1700))
+	screen._press(from, false, false)
+	var motion := InputEventMouseMotion.new()
+	motion.position = from - Vector2(60, 0)
+	screen._unhandled_input(motion)
+	screen._release(motion.position)
+	_check(screen.cam_centre.x > before.x and screen.selected.is_empty(), "with nothing selected a drag on the field pans")
+	screen.free()
+	# Waterloo: each side's farms and villages held from the start, and the
+	# French going in corps by corps at their hours.
+	var w_spec := Scenarios.resolve("waterloo", 1)
+	var w := Scenarios.make_battle(w_spec, 1)
+	_check(w.flags.map(func(f): return f.owner) == [0, 0, 0, 0, 1, 1], "at Waterloo each side holds its own ground at 11:00")
+	var guard: Regiment = w.regiments.filter(func(r): return r.name == "the Old Guard")[0]
+	_check(is_equal_approx(guard.holds_until, 8.5 * Waterloo.HOUR) and guard.stars == 4, "the Old Guard waits for 19:30, with four stars")
+	w.begin()
+	var ids: Array = AI.decide(w, 1, AI.PERSONAS.aggressive).map(func(o): return o.get("id", -1))
+	_check(not guard.id in ids and w.regiments.any(func(r): return r.formation == "Jérôme's Division" and r.holds_until > 0.0), "nobody moves before their hour")
+	if quick:
+		return
+	var day := Scenarios.make_battle(spec, 3)
+	day.begin()
+	var think := 0.0
+	while day.phase == "battle" and day.time < day.deadline + 10.0:
+		think -= 1.0 / 15.0
+		if think <= 0.0:
+			think = AI.THINK_EVERY
+			day.apply_orders(AI.decide(day, 1, AI.PERSONAS.aggressive))
+			day.apply_orders(AI.decide(day, 0, AI.PERSONAS.balanced))
+		day.step(1.0 / 15.0)
+		day.take_events()
+	print("  Gettysburg  winner %s at %s  flags %s  resolve %d/%d" % [
+		"Union" if day.winner == 0 else "Confederate", Scenarios.hour_text(spec, day.time),
+		day.flags.map(func(f): return f.owner), int(day.resolve[0]), int(day.resolve[1])])
+	_check(day.phase == "over" and day.time <= day.deadline + Battle.BREAK_DELAY + 0.5, "Gettysburg is decided by dusk")
+
+
 func _test_battles(quick: bool) -> void:
 	var wins := 0
 	var seeds := [3] if quick else [3, 11, 29]

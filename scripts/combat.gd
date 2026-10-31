@@ -48,11 +48,13 @@ static func type_mult(attacker: int, defender: int) -> float:
 				return 1.8
 			if defender == K.CANNONS:
 				return 2.0
-			if defender == K.MUSKETS:
+			if defender == K.MUSKETS or defender == K.LINE:
 				return 1.8
+			if defender == K.RIFLES:
+				return 1.3
 			if defender == K.PIKES:
 				return 0.6
-	if defender == K.ARCHERS or defender == K.MUSKETS:
+	if defender == K.ARCHERS or UnitTypes.is_shot(defender):
 		return 1.2
 	if defender == K.CANNONS:
 		return 1.5

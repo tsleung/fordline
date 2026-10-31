@@ -42,17 +42,23 @@ Xcode and the iOS templates. The game already lays itself out for a tall
 screen: the field turns a quarter and your army stands on the left.
 
 **Quick battle** on the title screen opens the scenarios: single battles
-on designed maps with three stars to earn.
+on designed maps with three stars to earn. **Grand battles** are whole
+historical days on fields several screens across, with armies arriving by
+road: Gettysburg's first day, and Waterloo.
 
 ## Controls
 
 Tap a banner to select it (again to deselect; double-tap for every regiment
 of that kind). With nothing selected, drag to box-select. With a selection,
-tap the field to move, drag to form a line, tap an enemy to attack. To add a
+tap the field to move, tap an enemy to attack, or drag an arrow: they stand
+where it starts and face where it points. To add a
 stop, tap the gold marker at the end of the route, then tap the next spot;
 shift-click does it in one click.
 Keys: Space pause, A select all, F 2× speed, Esc clear. Right-drag always
-gives an order.
+gives an order. In a grand battle, drag empty ground to pan, pinch or scroll
+to zoom, tap the minimap to look there, double-tap a brigade for its
+division, and tap a named flag to send the selection to take and hold it
+on its own; the arrow keys pan and F reaches 4×.
 
 ## Test
 

@@ -7,6 +7,8 @@ const TerrainView := preload("res://scripts/terrain_view.gd")
 
 var _terrain: Node2D
 var _marks: Marks
+## The shown field's extent, for fitting it.
+var _field := Terrain.SIZE
 
 
 func _ready() -> void:
@@ -27,6 +29,7 @@ func _notification(what: int) -> void:
 func show_battle(b: Battle, field_seed: int) -> void:
 	_ensure_children()
 	_terrain.show_terrain(b.terrain, field_seed)
+	_field = b.terrain.size
 	_marks.battle = b
 	_marks.queue_redraw()
 	_fit()
@@ -42,10 +45,10 @@ func _ensure_children() -> void:
 
 
 func _fit() -> void:
-	var s := minf(size.x / Terrain.SIZE.x, size.y / Terrain.SIZE.y)
+	var s := minf(size.x / _field.x, size.y / _field.y)
 	for child in [_terrain, _marks]:
 		child.scale = Vector2(s, s)
-		child.position = (size - Terrain.SIZE * s) * 0.5
+		child.position = (size - _field * s) * 0.5
 	_marks.queue_redraw()
 
 

@@ -15,11 +15,15 @@ func show_terrain(t: Terrain, s: int) -> void:
 func _draw() -> void:
 	if terrain == null:
 		return
-	var size := Terrain.SIZE
+	var size := terrain.size
 	draw_rect(Rect2(Vector2(-400, -400), size + Vector2(800, 800)), Palette.GRASS.darkened(0.25))
 	draw_rect(Rect2(Vector2.ZERO, size), Palette.GRASS)
 	_fields()
 	_hills()
+	for town in terrain.towns:
+		_town(town)
+	for stream in terrain.streams:
+		_stream(stream)
 	for road in terrain.roads:
 		_road(road)
 	if terrain.has_river:
@@ -36,8 +40,8 @@ func _fields() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	var cell := Vector2(200.0, 160.0)
-	var cols := int(ceil(Terrain.SIZE.x / cell.x)) + 1
-	var rows := int(ceil(Terrain.SIZE.y / cell.y)) + 1
+	var cols := int(ceil(terrain.size.x / cell.x)) + 1
+	var rows := int(ceil(terrain.size.y / cell.y)) + 1
 	var grid := []
 	for y in rows + 1:
 		var line := []
@@ -71,14 +75,58 @@ func _inset(poly: PackedVector2Array, by: float) -> PackedVector2Array:
 	return out
 
 
+## Three contour bands. Each band is drawn for every hill and ridge before
+## the next, and its line as a slightly larger shape beneath it, so where
+## hills and ridges overlap each band shows one clean outline.
 func _hills() -> void:
-	for h in terrain.hills:
-		var c: Vector2 = h.c
-		var r: float = h.r
-		for i in 3:
-			var rr := r * (1.0 - i * 0.28)
-			draw_circle(c, rr, Palette.HILL[i])
-			draw_arc(c, rr, 0, TAU, 48, Palette.HILL_LINE, 1.5, true)
+	for i in 3:
+		var k := 1.0 - i * 0.28
+		for h in terrain.hills:
+			draw_circle(h.c, h.r * k + 1.5, Palette.HILL_LINE)
+		for ridge in terrain.ridges:
+			_band(ridge.line, ridge.r * k + 1.5, Palette.HILL_LINE)
+		for h in terrain.hills:
+			draw_circle(h.c, h.r * k, Palette.HILL[i])
+		for ridge in terrain.ridges:
+			_band(ridge.line, ridge.r * k, Palette.HILL[i])
+
+
+## A ridge's band: everything within `r` of its crest line.
+func _band(line: PackedVector2Array, r: float, color: Color) -> void:
+	for i in line.size() - 1:
+		var a := line[i]
+		var b := line[i + 1]
+		var side := (b - a).normalized().orthogonal() * r
+		draw_colored_polygon(PackedVector2Array([a + side, b + side, b - side, a - side]), color)
+	for p in line:
+		draw_circle(p, r, color)
+
+
+## A town: paving, and rows of house roofs wherever there is room off the
+## roads.
+func _town(town: PackedVector2Array) -> void:
+	draw_colored_polygon(town, Palette.PAVING)
+	draw_polyline(town + PackedVector2Array([town[0]]), Palette.PAVING_LINE, 2.0, true)
+	var box := Rect2(town[0], Vector2.ZERO)
+	for p in town:
+		box = box.expand(p)
+	var y := box.position.y + 18.0
+	while y < box.end.y - 10.0:
+		var x := box.position.x + 18.0
+		while x < box.end.x - 10.0:
+			var c := Vector2(x, y)
+			if Geometry2D.is_point_in_polygon(c, town) and not terrain.on_road(c):
+				draw_rect(Rect2(c - Vector2(12, 8), Vector2(24, 16)), Palette.ROOF)
+				draw_line(c - Vector2(12, 0), c + Vector2(12, 0), Palette.ROOF_LIGHT, 2.0)
+			x += 34.0
+		y += 30.0
+
+
+func _stream(stream: PackedVector2Array) -> void:
+	var smooth := _smooth(stream)
+	var w := Terrain.STREAM_HALF * 1.1
+	draw_polyline(smooth, Palette.RIVER_EDGE, w + 3.0, true)
+	draw_polyline(smooth, Palette.RIVER, w, true)
 
 
 func _road(road: PackedVector2Array) -> void:
@@ -200,9 +248,9 @@ func _flagstones(t: Terrain, rng: RandomNumberGenerator) -> void:
 	var cell := 26.0
 	var y := 0.0
 	var row := 0
-	while y < Terrain.SIZE.y:
+	while y < terrain.size.y:
 		var x := -cell * 0.5 * (row % 2)
-		while x < Terrain.SIZE.x:
+		while x < terrain.size.x:
 			var c := Vector2(x + cell * 0.5, y + cell * 0.5)
 			if t.inside(c):
 				draw_rect(Rect2(Vector2(x, y), Vector2(cell, cell)), Palette.PAVING_LINE, false, 1.0)

@@ -88,8 +88,11 @@ once and the run is over; your score goes on the board.
 - Tap a regiment to select it; tap again to deselect it. Double-tap to
   select every regiment of that type. **All** selects the whole army.
 - With nothing selected, drag on the field to box-select.
-- With a selection: tap the field to move there; drag to draw a line and the
-  regiments form up along it, facing the enemy; tap an enemy to attack it.
+- With a selection: tap the field to move there; tap an enemy to attack it.
+- A drag is an arrow: the selection stands where it starts and faces the
+  way it points, side by side across it. Drag from a selected banner to
+  turn the selection where it stands. Any direction works, so a line can
+  face a flank or its own rear.
 - Waypoints: a selected route ends in a gold marker. Tap it to pin it (a
   ring with a plus) and the next tap on the field adds a leg from there
   instead of replacing the route; tap it again to unpin. On a computer,
@@ -205,6 +208,145 @@ three stars. On a fixed map the AI players' results barely vary with the
 dice, so an army composition tends to be all or nothing for them; the
 stars, not the win rate, carry the difficulty.
 
+## Grand battles
+
+The second way to play. Quick battles and the campaign are arcade: one
+screen, a few regiments, three minutes. A grand battle is a historical
+day: a field several screens across, twenty blocks a side, armies that
+arrive along the roads through the afternoon, and about fifteen minutes
+of play. The fun is different: not reflexes at one ford but where to
+send the next division when it comes up the road, and when to give
+ground.
+
+**The scale.** A block is a brigade, not a regiment; the rules are the
+same. The field is 3200 × 2200, about 2.5 × 2.7 quick-battle fields,
+drawn by hand from the real ground. The clock shows the hour of the
+historical day (an hour is 78 seconds), and dusk ends it.
+
+**The pace.** Fights are stretched to fit the day: volleys do 0.4 of
+their damage and nerve comes back at 0.4 of its rate, so a brigade
+firefight lasts the better part of an hour of the day. A volley's shock is
+not stretched, so brigades break and rally long before they are shot to
+pieces, as they did.
+
+**Keeping it calm.** More units must not mean more stress:
+
+- The battle opens paused, and orders work while paused, as always.
+- Time runs at 1×, 2× or 4×; the marches are long, the fights are not.
+- A drag on empty ground with nothing selected pans the map; with two
+  fingers it always pans, and pinching zooms. On a computer: the wheel or
+  a trackpad pinch zooms where the pointer is, a middle-drag or a
+  trackpad scroll pans, the arrow keys move the view, and shift-drag
+  still box-selects.
+- A minimap in the corner shows the whole field, both armies and the
+  view; tap or drag on it to look there.
+- Blocks belong to divisions. Double-tap a block to select its division,
+  then drag one arrow and the division forms its line across it.
+- **Its own command.** With blocks selected, tap a named flag and they
+  take it and hold it on their own: the same AI the enemy uses forms them
+  square to their approach, fights what comes, and holds the ground once
+  there. A gold diamond over the banner marks them; any order of yours
+  takes a block back. This is how a corps commander fights: send a
+  division to the wood and turn to the next problem.
+- A routing brigade is named ("The Iron Brigade is running!") and ringed
+  on the minimap, since it may be off screen.
+- Arrivals are announced ("Wadsworth's Division comes up the
+  Emmitsburg Road"), and a gold ring pulses on the minimap where they
+  come on.
+- The briefing lists the day's order of march, both sides, by the hour.
+- A block given no orders stands, faces what comes and fights it. Fresh
+  divisions march up their road to a mustering point and wait for you.
+
+**Resolve.** A rout costs half what it does in a quick battle, since there
+are three times the blocks, and the four-minute late drain is off. Flags
+don't drain resolve; they decide at dusk, like a siege's.
+
+**History as a test.** The enemy follows its historical orders: each
+division has its objectives in order, and takes the next once it holds the
+last. A division forms its line square to the way it is going, and once
+there, square to the nearest enemy; its batteries unlimber short of the
+objective as soon as anything is in reach. Fought computer against computer, a battle should come out roughly
+as it did in history; `tests/luck_skill.gd` measures how often it does,
+alongside the usual skill ladder. If a historical day plays out as history
+with nobody steering, and a good commander can do better, the scenario
+works.
+
+### Gettysburg, the first day (1 July 1863)
+
+You are the Union. Buford's two cavalry brigades hold McPherson Ridge west
+of town at 8:00 against Heth's division coming down the Chambersburg Pike.
+The I Corps comes up the Emmitsburg Road from 10:00, the XI Corps up the
+Taneytown Road from 12:30. The Confederates keep coming: Rodes from Oak
+Hill to the north at 13:00, Early down the Harrisburg Road at 15:00,
+Pender behind Heth. Historically the Union line broke at about 16:30 and
+fell back through the town to Cemetery Hill, and held it.
+
+- **Win:** hold Cemetery Hill at dusk (19:30), or break their army.
+- **Stars:** also hold Seminary Ridge at dusk; lose no more than 45% of
+  your men.
+- **Era:** rifles. Rifled muskets reach farther than smoothbores (230
+  against 170) and hit more often (accuracy 0.4 against 0.3); cavalry
+  hits them 1.3× rather than musketeers' 1.8×, since a rifled brigade can
+  form and fire with the bayonet fixed.
+- **Veterans:** the Confederate brigades carry one star each, for the
+  Army of Northern Virginia's size and confidence that summer.
+
+Measured (`tests/luck_skill.gd --scenario=gettysburg`, four dice per
+commander, the enemy at its historical orders):
+
+| | idle | slow | standard | sharp |
+|---|---|---|---|---|
+| Union wins | 0% | 25% | 25% | 50% |
+| Union holds Cemetery Hill at the end | 25% | 25% | 25% | 50% |
+| Union holds McPherson Ridge at the end | 0% | 25% | 25% | 25% |
+
+The Confederates took Oak Hill and Barlow's Knoll in every run, and the
+town in all but one, as on the day. A defeat usually comes between 15:00 and 17:00, when the
+Union army breaks; historically it broke at about 16:30 and fell back to
+Cemetery Hill. Holding the hill means doing what Howard did: keeping
+von Steinwehr's division there and giving up the western ridges in time.
+
+### Waterloo (18 June 1815)
+
+You are Wellington, on the ridge of Mont-Saint-Jean with Hougoumont, La
+Haye Sainte and Papelotte held out in front. Napoleon's corps go in at
+their historical hours: Reille at Hougoumont from 11:30, the grand battery
+from 12:30, d'Erlon's four divisions at 13:30, Ney's cuirassiers at 16:00
+and 17:00, Lobau and the Young Guard against the Prussians at Plancenoit,
+and the Middle and Old Guard at 19:30. Bülow's Prussians come out of the
+Paris Wood at 16:30, Pirch's at 18:00, Zieten's by Smohain at 19:00; they
+are yours to command.
+
+- **Win:** hold Mont-Saint-Jean at dusk (21:00), or break their army.
+- **Stars:** also hold La Haye Sainte at dusk; take Plancenoit.
+- **Era:** Napoleonic line infantry: smoothbore muskets (range 170) and
+  the bayonet, and **squares**. Standing line infantry forms square when
+  enemy horse comes within 240 and keeps it until none is within 330. In
+  square it has no flank or rear, a charge doesn't land, horse hits it at
+  0.35, and only one face fires (half a volley); marching breaks it, and
+  horse that reaches a line before it forms catches it in line.
+- **Quality:** the French carry two stars (the Guard two more); four of
+  Wellington's brigades are raw, a star below the line (the
+  Dutch-Belgians, the Nassauers and the Hanoverian militia).
+- **Held back:** a corps whose hour has not come keeps to its ground
+  unless the enemy comes near; horse held back rides at an enemy within
+  500, as a cavalry reserve does.
+
+Measured (four dice per commander):
+
+| | idle | slow | standard | sharp |
+|---|---|---|---|---|
+| Allied wins | 0% | 100% | 75% | 75% |
+
+The French take Hougoumont in every run, as they never did on the day.
+Open: the slow commander does better than the quick ones, because the
+AI's defenders counterattack off the ridge into the French columns; a
+person holding the crest does not have that habit, so the scenario is
+tuned to the quicker AI's result. Each AI-against-AI run first found a
+real problem: Allied horse riding down the grand battery unopposed (the
+French cavalry reserve now answers), and a French army a third short of
+its order of battle.
+
 ## Score
 
 1000 per victory, plus 2 per enemy soldier killed, plus 1 per surviving
@@ -219,13 +361,20 @@ under three minutes. Best score is kept on the device.
   player's side in the headless balance tests uses the same function.
 - `scripts/combat.gd` holds the rules as pure functions over values.
 - `scripts/campaign.gd` is pure: run state in, new run state out.
-- `scripts/terrain.gd` builds a seeded map and answers queries about it.
+- `scripts/terrain.gd` builds a seeded map, or a grand battle's map from
+  a hand-drawn plan (`Terrain.from_plan`), and answers queries about it.
+  Each map has its own size.
+- `scripts/gettysburg.gd` and `scripts/waterloo.gd` are grand battles as
+  pure data: the ground, who starts where, when each corps goes in, and
+  who comes up which road when. `Scenarios` builds the
+  battle from it; the battle raises each arrival at its hour.
   River maps route by banks and crossings; a fortress map routes on a
   16-unit grid (Godot's AStarGrid2D) pulled tight to straight legs, with
   gates open in the plan so a besieger's route ends pressed against the
   gate, which is where it rams. Only the battle writes `gate_broken`.
 - The view (`battle_view.gd`) and HUD read state and turn the battle's
-  events into effects and sound; they never write battle state.
+  events into effects and sound; they never write battle state. A grand
+  battle's camera (centre and zoom) and minimap are screen state.
 - `tests/run_tests.gd` runs headless: rules, pathing, campaign, and
   AI-vs-AI battles that must finish in time.
 

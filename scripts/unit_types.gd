@@ -3,7 +3,7 @@ extends RefCounted
 ## Regiment types and their base stats. Pure data.
 
 ## New kinds go at the end: saved campaigns store kinds by number.
-enum Kind { SWORDS, PIKES, ARCHERS, CAVALRY, CANNONS, GENERAL, MUSKETS }
+enum Kind { SWORDS, PIKES, ARCHERS, CAVALRY, CANNONS, GENERAL, MUSKETS, RIFLES, LINE }
 
 ## men: soldiers at full strength. hp: per soldier. atk: damage per second
 ## per fighting soldier. def: fraction of incoming damage ignored.
@@ -45,6 +45,22 @@ const STATS := {
 		"range": 170.0, "reload": 7.5, "shot": 6.0, "accuracy": 0.3,
 		"pierce": 0.7, "shock": 6.0,
 	},
+	## Rifled muskets, the 1860s: farther and truer than smoothbores, and a
+	## brigade that can form and fire with the bayonet fixed.
+	Kind.RIFLES: {
+		"name": "Rifles", "men": 40, "hp": 8.0, "atk": 0.7, "def": 0.12,
+		"speed": 28.0, "morale": 65.0, "cols": 14, "spacing": 7.5,
+		"range": 230.0, "reload": 8.0, "shot": 6.0, "accuracy": 0.4,
+		"pierce": 0.8, "shock": 5.0,
+	},
+	## Napoleonic line infantry: a smoothbore musket and the bayonet, and
+	## drill enough to form square when horse comes (see Battle._squares).
+	Kind.LINE: {
+		"name": "Line", "men": 40, "hp": 8.0, "atk": 0.7, "def": 0.12,
+		"speed": 28.0, "morale": 68.0, "cols": 14, "spacing": 7.5,
+		"range": 170.0, "reload": 7.0, "shot": 6.0, "accuracy": 0.3,
+		"pierce": 0.7, "shock": 6.0,
+	},
 }
 
 const RECRUITABLE: Array[int] = [
@@ -61,7 +77,13 @@ static func label(kind: int) -> String:
 
 
 static func is_ranged(kind: int) -> bool:
-	return kind == Kind.ARCHERS or kind == Kind.CANNONS or kind == Kind.MUSKETS
+	return kind == Kind.ARCHERS or kind == Kind.CANNONS or is_shot(kind)
+
+
+## Firearms carried by the men themselves: muskets and rifles fire a
+## volley that lands at once.
+static func is_shot(kind: int) -> bool:
+	return kind == Kind.MUSKETS or kind == Kind.RIFLES or kind == Kind.LINE
 
 
 static func is_mounted(kind: int) -> bool:

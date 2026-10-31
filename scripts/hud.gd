@@ -22,6 +22,8 @@ var _leave: Button
 var _restart: Button
 ## A retreat needs a second tap before this time (seconds since start).
 var _leave_armed_until := 0.0
+## Grand battles only: the whole field small, top right.
+var _minimap: Control
 
 
 func top_height(portrait: bool) -> float:
@@ -76,6 +78,10 @@ func _ready() -> void:
 	_hint.add_theme_constant_override("outline_size", 6)
 	_hint.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	add_child(_hint)
+	if screen.grand:
+		_minimap = preload("res://scripts/minimap.gd").new()
+		_minimap.screen = screen
+		add_child(_minimap)
 	_toasts = VBoxContainer.new()
 	_toasts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_toasts.alignment = BoxContainer.ALIGNMENT_BEGIN
@@ -182,6 +188,12 @@ func layout(vp: Vector2, portrait: bool) -> void:
 	_hint.size = Vector2(vp.x - 16, 52)
 	_toasts.position = Vector2(vp.x * 0.5 - 220, top + 40.0)
 	_toasts.size = Vector2(440, 200)
+	if _minimap != null:
+		var field: Vector2 = screen.battle.terrain.size
+		var w := 150.0 if portrait else 230.0
+		_minimap.size = Vector2(w, w * field.y / field.x)
+		_minimap.position = Vector2(vp.x - w - 8.0, top + 8.0)
+		_hint.size.x = vp.x - w - 32.0
 	_menu_button.position = Vector2(6, 6)
 	_menu_button.size = Vector2(TopBar.INSET - 14.0, top - 12.0)
 
@@ -198,7 +210,7 @@ func _process(_delta: float) -> void:
 	for key in ["pause", "speed", "rally", "barrage", "march"]:
 		_buttons[key].visible = not deploying
 	_buttons.pause.text = "Resume" if screen.paused else "Pause"
-	_buttons.speed.text = "2×" if screen.speed > 1.0 else "1×"
+	_buttons.speed.text = "%d×" % int(screen.speed)
 	_buttons.clear.visible = not screen.selected.is_empty()
 	for name in ["rally", "barrage", "march"]:
 		var btn: Button = _buttons[name]
@@ -215,12 +227,16 @@ func _process(_delta: float) -> void:
 		_hint.text = "Tap the field to aim the barrage."
 	elif screen.pinned:
 		_hint.text = "Tap where to go next."
+	elif screen.paused and screen.grand and b.time < 1.0:
+		_hint.text = "Drag the field to look around; pinch or scroll to zoom. Double-tap a brigade for its division. Resume when ready."
 	elif screen.paused:
 		_hint.text = "Paused. Orders still work."
 	elif b.time < 10.0 and screen.goal != "":
 		_hint.text = screen.goal
+	elif screen.grand and not screen.selected.is_empty() and screen.delegated.is_empty() and b.time < 400.0:
+		_hint.text = "Tap a flag to send them to take and hold it on their own."
 	elif b.time < 12.0 and screen.selected.is_empty():
-		_hint.text = "Tap a banner to select. Tap the field to move, drag to form a line, tap an enemy to attack."
+		_hint.text = "Tap a banner to select. Tap the field to move, drag an arrow to stand and face, tap an enemy to attack."
 	else:
 		_hint.text = ""
 	_top.queue_redraw()
@@ -239,9 +255,16 @@ func _selection_text(b: Battle) -> String:
 		var men := 0
 		for r in regs:
 			men += r.men()
-		return "%d regiments · %d men" % [regs.size(), men]
+		var division := regs[0].formation
+		if division != "" and regs.all(func(r): return r.formation == division):
+			return "%s · %d brigades · %d men" % [division, regs.size(), men]
+		return "%d %s · %d men" % [regs.size(), "brigades" if screen.grand else "regiments", men]
 	var r := regs[0]
 	var stars := " " + "★".repeat(r.stars) if r.stars > 0 else ""
+	if r.name != "":
+		var own: String = screen.objective_name(r)
+		var command := " · taking %s" % own if own != "" else ""
+		return "%s%s · %s · %d of %d men · %s · %s%s" % [r.name, stars, r.formation, r.men(), r.men_max, _morale_word(r), _stamina_word(r), command]
 	return "%s%s · %d of %d men · %s · %s" % [UnitTypes.label(r.kind), stars, r.men(), r.men_max, _morale_word(r), _stamina_word(r)]
 
 
@@ -264,7 +287,12 @@ func _morale_word(r: Regiment) -> String:
 	return "wavering"
 
 
-func toast(text: String, team: int) -> void:
+func ping(at: Vector2, team: int) -> void:
+	if _minimap != null:
+		_minimap.ping(at, team)
+
+
+func toast(text: String, team: int, hold := 1.6) -> void:
 	var l := _label(17, Palette.TEAM_LIGHT[team])
 	l.text = text
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -274,7 +302,7 @@ func toast(text: String, team: int) -> void:
 	while _toasts.get_child_count() > 3:
 		_toasts.get_child(0).free()
 	var tw := l.create_tween()
-	tw.tween_interval(1.6)
+	tw.tween_interval(hold)
 	tw.tween_property(l, "modulate:a", 0.0, 0.6)
 	tw.tween_callback(l.queue_free)
 
@@ -313,7 +341,11 @@ class TopBar extends Control:
 		var t := int(b.time)
 		var clock := "%d:%02d" % [t / 60, t % 60]
 		var warn := b.time > Battle.DUSK_TIME
-		if b.phase == "deploy":
+		if screen.clock.is_valid():
+			# A historical day: the hour, and when night ends it.
+			clock = "%s   dusk %s" % [screen.clock.call(b.time), screen.clock.call(b.deadline)]
+			warn = b.deadline - b.time < 60.0
+		elif b.phase == "deploy":
 			clock = screen.title
 		elif b.deadline > 0.0:
 			var left := maxi(0, ceili(b.deadline - b.time))

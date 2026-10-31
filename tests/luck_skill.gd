@@ -77,7 +77,9 @@ func _fight(battle_index: int, draw: int, die: int, policy_name: String, scenari
 	var player_think := 0.0
 	var sample := 0.0
 	b.begin()
-	while b.phase == "battle" and b.time < TIME_CAP:
+	# A grand battle runs to its own dusk.
+	var cap := maxf(TIME_CAP, b.deadline + 5.0)
+	while b.phase == "battle" and b.time < cap:
 		enemy_think -= DT
 		if enemy_think <= 0.0:
 			enemy_think = AI.THINK_EVERY
@@ -99,6 +101,7 @@ func _fight(battle_index: int, draw: int, die: int, policy_name: String, scenari
 		"stars": Scenarios.stars(spec, b) if scenario != "" else 0,
 		"won": b.winner == 0, "margin": b.resolve[0] - b.resolve[1], "time": snappedf(b.time, 0.1),
 		"lead_changes": tracker.changes, "killed": b.killed,
+		"flags": b.flags.map(func(f): return f.owner),
 	}
 
 

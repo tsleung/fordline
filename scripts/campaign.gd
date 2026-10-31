@@ -183,7 +183,7 @@ static func make_battle(run: Dictionary) -> Battle:
 	var seed_value := battle_seed(run)
 	var b := Battle.new(Terrain.generate(spec.map, seed_value), seed_value)
 	b.abilities.assign(run.abilities)
-	var mid := Terrain.SIZE * 0.5
+	var mid := b.terrain.size * 0.5
 	for i in run.roster.size():
 		var reg: Dictionary = run.roster[i]
 		b.add_regiment(0, reg.kind, reg.men, mid, -PI * 0.5, reg.stars, run.doctrine, i)

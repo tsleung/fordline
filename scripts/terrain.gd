@@ -17,12 +17,19 @@ const RAMPART := 40.0
 ## Share of arrows and shot that get through to a regiment on the wall-walk.
 const BATTLEMENTS := 0.3
 const NAV_CELL := 16.0
+## A creek's half-width: wading it slows a regiment, but anyone may.
+const STREAM_HALF := 12.0
+## Houses and walls are worth about a hill's crest to the men behind them.
+const TOWN_DEFENCE := 0.1
 ## A gate's half-width along its wall.
 const GATE_HALF := 34.0
 ## The moat's inner and outer distance from the curtain wall.
 const MOAT := Vector2(22.0, 50.0)
 
 var kind := ""
+## The field's extent. Quick battles and the campaign use SIZE; a grand
+## battle's plan sets its own.
+var size := SIZE
 var has_river := false
 ## River centre line, sampled left to right.
 var river := PackedVector2Array()
@@ -31,6 +38,9 @@ var crossings: Array[Dictionary] = []
 ## Each forest and hill: {"c": Vector2, "r": float}.
 var forests: Array[Dictionary] = []
 var hills: Array[Dictionary] = []
+## Grand battles: long ridges, each {"line": its crest, "r": how far its
+## slopes reach}. Height falls away from the crest as from a hill's top.
+var ridges: Array[Dictionary] = []
 var roads: Array[PackedVector2Array] = []
 var flags := PackedVector2Array()
 ## How far each side's deployment zone reaches in from its edge. The map is
@@ -56,6 +66,13 @@ var posts := PackedVector2Array()
 var moat := PackedVector2Array()
 var _nav: AStarGrid2D
 
+## Grand battles only. towns: built-up ground, each a polygon; streams:
+## fordable creeks, each a centre line; flag_names: what each flag stands
+## for ("Cemetery Hill"), or empty on the arcade maps.
+var towns: Array[PackedVector2Array] = []
+var streams: Array[PackedVector2Array] = []
+var flag_names := PackedStringArray()
+
 
 static func generate(map_kind: String, seed_value: int) -> Terrain:
 	var t := Terrain.new()
@@ -79,11 +96,35 @@ static func generate(map_kind: String, seed_value: int) -> Terrain:
 	return t
 
 
+## A field drawn by hand from a plan rather than seeded: a grand battle's
+## historical ground. Plan keys: id, size, ridges (each {"line", "r"}: a
+## crest line and how far its slopes reach), hills and forests (each {"c",
+## "r"}), towns (polygons), streams and roads (lines), and flags (each
+## {"name", "at"}).
+static func from_plan(plan: Dictionary) -> Terrain:
+	var t := Terrain.new()
+	t.kind = plan.id
+	t.size = plan.size
+	for ridge in plan.get("ridges", []):
+		t.ridges.append({"line": PackedVector2Array(ridge.line), "r": ridge.r})
+	for hill in plan.get("hills", []):
+		t.hills.append({"c": hill.c, "r": hill.r})
+	for forest in plan.get("forests", []):
+		t.forests.append({"c": forest.c, "r": forest.r})
+	t.towns.assign(plan.get("towns", []))
+	t.streams.assign(plan.get("streams", []))
+	t.roads.assign(plan.get("roads", []))
+	for f in plan.flags:
+		t.flags.append(f.at)
+		t.flag_names.append(f.name)
+	return t
+
+
 # --- queries ---------------------------------------------------------------
 
 func river_y(x: float) -> float:
 	if river.is_empty():
-		return SIZE.y * 0.5
+		return size.y * 0.5
 	var step := river[1].x - river[0].x
 	var i := clampi(int((x - river[0].x) / step), 0, river.size() - 2)
 	var a := river[i]
@@ -188,7 +229,7 @@ func gate_near(p: Vector2, reach: float) -> int:
 
 
 func in_bounds(p: Vector2) -> bool:
-	return p.x >= 4.0 and p.y >= 4.0 and p.x <= SIZE.x - 4.0 and p.y <= SIZE.y - 4.0
+	return p.x >= 4.0 and p.y >= 4.0 and p.x <= size.x - 4.0 and p.y <= size.y - 4.0
 
 
 func in_forest(p: Vector2) -> bool:
@@ -207,6 +248,10 @@ func height(p: Vector2) -> float:
 		var d: float = p.distance_to(hill.c) / hill.r
 		if d < 1.0:
 			h = maxf(h, 1.0 - d * d)
+	for ridge in ridges:
+		var d: float = _dist_to_line(p, ridge.line) / ridge.r
+		if d < 1.0:
+			h = maxf(h, 1.0 - d * d)
 	return h
 
 
@@ -219,6 +264,17 @@ func on_road(p: Vector2) -> bool:
 	return false
 
 
+func in_town(p: Vector2) -> bool:
+	for town in towns:
+		if Geometry2D.is_point_in_polygon(p, town):
+			return true
+	return false
+
+
+func near_stream(p: Vector2) -> bool:
+	return not streams.is_empty() and streams.any(func(line): return _near_line(p, line, STREAM_HALF))
+
+
 func speed_mult(p: Vector2) -> float:
 	if in_river_band(p):
 		var c := crossing_at(p.x)
@@ -228,13 +284,17 @@ func speed_mult(p: Vector2) -> float:
 		return 0.6
 	if on_road(p):
 		return 1.2
+	if near_stream(p):
+		return 0.55
+	if in_town(p):
+		return 0.75
 	return 1.0 - 0.15 * height(p)
 
 
-## Share of arrow and shot damage that gets through at `p`: trees stop
-## half, battlements most of it.
+## Share of arrow and shot damage that gets through at `p`: trees and
+## houses stop half, battlements most of it.
 func cover(p: Vector2) -> float:
-	if in_forest(p):
+	if in_forest(p) or in_town(p):
 		return 0.5
 	return BATTLEMENTS if holder >= 0 and on_rampart(p) else 1.0
 
@@ -244,26 +304,26 @@ func range_mult(p: Vector2) -> float:
 
 
 func defence_bonus(p: Vector2) -> float:
-	return 0.12 * height(p)
+	return 0.12 * height(p) + (TOWN_DEFENCE if in_town(p) else 0.0)
 
 
 func in_deploy(team: int, p: Vector2) -> bool:
-	if p.x < EDGE or p.x > SIZE.x - EDGE:
+	if p.x < EDGE or p.x > size.x - EDGE:
 		return false
 	if team == 0:
-		return p.y > SIZE.y - deploy_depth[0] and p.y < SIZE.y - EDGE * 0.6
+		return p.y > size.y - deploy_depth[0] and p.y < size.y - EDGE * 0.6
 	return p.y < deploy_depth[1] and p.y > EDGE * 0.6
 
 
 func clamp_deploy(team: int, p: Vector2) -> Vector2:
-	var x := clampf(p.x, EDGE, SIZE.x - EDGE)
+	var x := clampf(p.x, EDGE, size.x - EDGE)
 	if team == 0:
-		return Vector2(x, clampf(p.y, SIZE.y - deploy_depth[0] + 10.0, SIZE.y - EDGE))
+		return Vector2(x, clampf(p.y, size.y - deploy_depth[0] + 10.0, size.y - EDGE))
 	return Vector2(x, clampf(p.y, EDGE, deploy_depth[1] - 10.0))
 
 
 func clamp_to_field(p: Vector2) -> Vector2:
-	return Vector2(clampf(p.x, 8.0, SIZE.x - 8.0), clampf(p.y, 8.0, SIZE.y - 8.0))
+	return Vector2(clampf(p.x, 8.0, size.x - 8.0), clampf(p.y, 8.0, size.y - 8.0))
 
 
 ## Waypoints from `from` to `to`, through a crossing when the river is
@@ -336,9 +396,9 @@ func _make_river(rng: RandomNumberGenerator) -> void:
 	var p2 := rng.randf_range(0.0, TAU)
 	var tilt := rng.randf_range(-0.05, 0.05)
 	var x := -40.0
-	while x <= SIZE.x + 40.0:
-		var y := SIZE.y * 0.5 + a1 * sin(x * 0.0042 + p1) + a2 * sin(x * 0.013 + p2)
-		y += (x - SIZE.x * 0.5) * tilt
+	while x <= size.x + 40.0:
+		var y := size.y * 0.5 + a1 * sin(x * 0.0042 + p1) + a2 * sin(x * 0.013 + p2)
+		y += (x - size.x * 0.5) * tilt
 		river.append(Vector2(x, y))
 		x += 40.0
 
@@ -357,33 +417,33 @@ func _make_crossings(rng: RandomNumberGenerator) -> void:
 			spots = [0.18, 0.5, 0.82]
 			bridges = [false, true, false]
 	for i in spots.size():
-		var x: float = SIZE.x * spots[i] + rng.randf_range(-70.0, 70.0)
+		var x: float = size.x * spots[i] + rng.randf_range(-70.0, 70.0)
 		crossings.append({"x": x, "half": 16.0 if bridges[i] else 34.0, "bridge": bridges[i]})
 	if kind == "bridges":
-		var x := SIZE.x * 0.5 + rng.randf_range(-40.0, 40.0)
+		var x := size.x * 0.5 + rng.randf_range(-40.0, 40.0)
 		flags.append(Vector2(x, river_y(x) + (60.0 if rng.randf() < 0.5 else -60.0)))
 
 
 func _make_open_flags(rng: RandomNumberGenerator) -> void:
-	var mid := SIZE.y * 0.5
+	var mid := size.y * 0.5
 	if kind == "ridge":
-		flags.append(Vector2(SIZE.x * 0.5, mid - 20.0))
-		flags.append(Vector2(SIZE.x * 0.2 + rng.randf_range(-40, 40), mid + rng.randf_range(-50, 50)))
-		flags.append(Vector2(SIZE.x * 0.8 + rng.randf_range(-40, 40), mid + rng.randf_range(-50, 50)))
+		flags.append(Vector2(size.x * 0.5, mid - 20.0))
+		flags.append(Vector2(size.x * 0.2 + rng.randf_range(-40, 40), mid + rng.randf_range(-50, 50)))
+		flags.append(Vector2(size.x * 0.8 + rng.randf_range(-40, 40), mid + rng.randf_range(-50, 50)))
 		return
 	for f in [0.22, 0.5, 0.78]:
-		flags.append(Vector2(SIZE.x * f + rng.randf_range(-50, 50), mid + rng.randf_range(-70, 70)))
+		flags.append(Vector2(size.x * f + rng.randf_range(-50, 50), mid + rng.randf_range(-70, 70)))
 
 
 func _make_hills(rng: RandomNumberGenerator) -> void:
 	if kind == "ridge":
-		hills.append({"c": Vector2(SIZE.x * 0.5, SIZE.y * 0.47), "r": 180.0})
+		hills.append({"c": Vector2(size.x * 0.5, size.y * 0.47), "r": 180.0})
 	var count: int = {"fords": 2, "woods": 3, "bridges": 2, "roads": 2, "ridge": 2}.get(kind, 2)
 	var tries := 0
 	while hills.size() < count + (1 if kind == "ridge" else 0) and tries < 200:
 		tries += 1
 		var r := rng.randf_range(80.0, 130.0)
-		var c := Vector2(rng.randf_range(120, SIZE.x - 120), rng.randf_range(250, SIZE.y - 250))
+		var c := Vector2(rng.randf_range(120, size.x - 120), rng.randf_range(250, size.y - 250))
 		if has_river and absf(c.y - river_y(c.x)) < r * 0.9:
 			continue
 		var clash := false
@@ -400,7 +460,7 @@ func _make_forests(rng: RandomNumberGenerator) -> void:
 	var made := 0
 	while made < clusters and tries < 400:
 		tries += 1
-		var centre := Vector2(rng.randf_range(60, SIZE.x - 60), rng.randf_range(DEPLOY_DEPTH + 50, SIZE.y - DEPLOY_DEPTH - 50))
+		var centre := Vector2(rng.randf_range(60, size.x - 60), rng.randf_range(DEPLOY_DEPTH + 50, size.y - DEPLOY_DEPTH - 50))
 		if not _forest_allowed(centre, 70.0):
 			continue
 		made += 1
@@ -411,7 +471,7 @@ func _make_forests(rng: RandomNumberGenerator) -> void:
 
 
 func _forest_allowed(p: Vector2, clearance: float) -> bool:
-	if p.y < DEPLOY_DEPTH + 20.0 or p.y > SIZE.y - DEPLOY_DEPTH - 20.0:
+	if p.y < DEPLOY_DEPTH + 20.0 or p.y > size.y - DEPLOY_DEPTH - 20.0:
 		return false
 	for f in flags:
 		if p.distance_to(f) < 90.0 + clearance:
@@ -428,10 +488,10 @@ func _forest_allowed(p: Vector2, clearance: float) -> bool:
 func _make_roads(rng: RandomNumberGenerator) -> void:
 	for f in flags:
 		var road := PackedVector2Array()
-		var bottom_x := clampf(f.x + rng.randf_range(-160, 160), 40, SIZE.x - 40)
-		var top_x := clampf(f.x + rng.randf_range(-160, 160), 40, SIZE.x - 40)
-		road.append(Vector2(bottom_x, SIZE.y + 10.0))
-		road.append(Vector2(lerpf(bottom_x, f.x, 0.6), lerpf(SIZE.y, f.y, 0.55)))
+		var bottom_x := clampf(f.x + rng.randf_range(-160, 160), 40, size.x - 40)
+		var top_x := clampf(f.x + rng.randf_range(-160, 160), 40, size.x - 40)
+		road.append(Vector2(bottom_x, size.y + 10.0))
+		road.append(Vector2(lerpf(bottom_x, f.x, 0.6), lerpf(size.y, f.y, 0.55)))
 		if has_river:
 			var ry := river_y(f.x)
 			road.append(Vector2(f.x, ry + 40.0))
@@ -453,7 +513,7 @@ const CASTLE_FLAGS := [Vector2(360, 330), Vector2(940, 330), Vector2(650, 190)]
 
 func _make_fortress(rng: RandomNumberGenerator, team: int) -> void:
 	holder = team
-	var m := func(p: Vector2) -> Vector2: return p if team == 1 else Vector2(p.x, SIZE.y - p.y)
+	var m := func(p: Vector2) -> Vector2: return p if team == 1 else Vector2(p.x, size.y - p.y)
 	curtain = PackedVector2Array([m.call(Vector2(230, -10)), m.call(Vector2(230, 430)), m.call(Vector2(1070, 430)), m.call(Vector2(1070, -10))])
 	keep = PackedVector2Array([m.call(Vector2(520, -10)), m.call(Vector2(520, 260)), m.call(Vector2(780, 260)), m.call(Vector2(780, -10))])
 	gates.append({"c": m.call(Vector2(650, 430)), "along": Vector2(1, 0), "out": m.call(Vector2(0, 1)) - m.call(Vector2.ZERO), "keep": false, "hp": 300.0})
@@ -470,7 +530,7 @@ func _make_fortress(rng: RandomNumberGenerator, team: int) -> void:
 		towers.append({"c": m.call(Vector2(t[0], t[1])), "r": float(t[2])})
 	var donjon := Rect2(595, 25, 110, 90)
 	if team == 0:
-		donjon.position.y = SIZE.y - donjon.end.y
+		donjon.position.y = size.y - donjon.end.y
 	blocks.append(donjon)
 	for f in CASTLE_FLAGS:
 		flags.append(m.call(f))
@@ -485,7 +545,7 @@ func _make_fortress(rng: RandomNumberGenerator, team: int) -> void:
 ## for the besiegers' guns.
 func _make_siege_ground(rng: RandomNumberGenerator, m: Callable) -> void:
 	var gate: Vector2 = gates[0].c
-	var road := PackedVector2Array([m.call(Vector2(650 + rng.randf_range(-120, 120), SIZE.y + 10.0)), m.call(Vector2(650, 600)), gate])
+	var road := PackedVector2Array([m.call(Vector2(650 + rng.randf_range(-120, 120), size.y + 10.0)), m.call(Vector2(650, 600)), gate])
 	roads.append(road)
 	var side := 1.0 if rng.randf() < 0.5 else -1.0
 	hills.append({"c": m.call(Vector2(650 + side * rng.randf_range(260, 360), rng.randf_range(560, 600))), "r": rng.randf_range(80.0, 105.0)})
@@ -493,7 +553,7 @@ func _make_siege_ground(rng: RandomNumberGenerator, m: Callable) -> void:
 	var tries := 0
 	while made < 4 and tries < 200:
 		tries += 1
-		var c: Vector2 = m.call(Vector2(rng.randf_range(80, SIZE.x - 80), rng.randf_range(510, 620)))
+		var c: Vector2 = m.call(Vector2(rng.randf_range(80, size.x - 80), rng.randf_range(510, 620)))
 		if absf(c.x - gate.x) < 170.0 or _dist_to_line(c, curtain) < MOAT.y + 60.0:
 			continue
 		made += 1
@@ -561,7 +621,7 @@ func _nav_solid(p: Vector2, clear: float) -> bool:
 
 func _build_nav() -> void:
 	_nav = AStarGrid2D.new()
-	_nav.region = Rect2i(0, 0, int(ceil(SIZE.x / NAV_CELL)), int(ceil(SIZE.y / NAV_CELL)))
+	_nav.region = Rect2i(0, 0, int(ceil(size.x / NAV_CELL)), int(ceil(size.y / NAV_CELL)))
 	_nav.cell_size = Vector2(NAV_CELL, NAV_CELL)
 	_nav.offset = Vector2(NAV_CELL, NAV_CELL) * 0.5
 	_nav.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
