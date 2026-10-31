@@ -612,20 +612,20 @@ func _record(key: String, b: Battle) -> void:
 ## battles come out, made in the same commit as the change that caused it.
 func _compare_golden(record: bool) -> void:
 	var known := {}
-	if FileAccess.file_exists(GOLDEN):
-		for line in FileAccess.get_file_as_string(GOLDEN).split("\n", false):
+	if FileAccess.file_exists(_golden_path):
+		for line in FileAccess.get_file_as_string(_golden_path).split("\n", false):
 			known[line.get_slice(" ", 0)] = line
 	if record:
 		known.merge(_golden, true)
 		var keys := known.keys()
 		keys.sort()
-		var f := FileAccess.open(GOLDEN, FileAccess.WRITE)
+		var f := FileAccess.open(_golden_path, FileAccess.WRITE)
 		for k in keys:
 			f.store_line(known[k])
 		print("  recorded %d battles" % _golden.size())
 		return
 	for key in _golden:
-		_check(known.has(key), "%s is recorded in %s (run ./test.sh --record)" % [key, GOLDEN])
+		_check(known.has(key), "%s is recorded in %s (run ./test.sh --record)" % [key, _golden_path])
 		if known.has(key) and known[key] != _golden[key]:
 			_check(false, "%s comes out as recorded:\n    was %s\n    now %s" % [key, known[key], _golden[key]])
 
