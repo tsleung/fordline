@@ -246,8 +246,14 @@ not loaded, the pack is left out of the menus and the suite says so.
 - **Recorded battles.** The suite fights fixed battles through the one
   commander loop: the campaign on three seeds, every quick scenario, the
   sieges, and Gettysburg and Waterloo through the whole day. It compares
-  each winner, time, losses and flags with `tests/golden.txt`, recorded on
-  the platform CI runs on. A change that moves any of them fails until the
+  each winner, time, losses and flags with the recording for the platform
+  it runs on (`tests/golden-macos.txt`, `tests/golden-linux.txt`). A
+  battle is deterministic on one platform, but the maths library's last
+  bits differ between platforms, and the knife edge grows them into a
+  different battle: on 1 November 2026, 21 of 44 battles came out
+  differently on CI's Linux than on macOS. So each platform keeps its own
+  recording, and the studies, which measure many battles, are what holds
+  across platforms, including the web build players run. A change that moves any of them fails until the
   file is updated in the same commit, so every balance change is a visible,
   deliberate diff.
 - **Modules don't leak.** A pack that lists a module whose data its

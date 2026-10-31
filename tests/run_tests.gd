@@ -9,9 +9,13 @@ var _failures := 0
 ## Lead changes in the last battle _fight fought.
 var _lead_changes := 0
 var _checks := 0
-## This run's recorded battles, key -> line, compared with GOLDEN at the end.
+## This run's recorded battles, key -> line, compared at the end with the
+## recordings for the platform the suite runs on. Battles are deterministic
+## on one platform, but the last bits of the maths library differ between
+## platforms, and in a battle this sensitive those bits grow into a
+## different battle; so each platform keeps its own recording.
 var _golden := {}
-const GOLDEN := "res://tests/golden.txt"
+var _golden_path := "res://tests/golden-%s.txt" % OS.get_name().to_lower()
 ## Budgets for the largest battle's step, in microseconds: the mean, and the
 ## slowest one in a hundred.
 const STEP_BUDGET_MEAN := 4000
@@ -621,7 +625,7 @@ func _compare_golden(record: bool) -> void:
 		print("  recorded %d battles" % _golden.size())
 		return
 	for key in _golden:
-		_check(known.has(key), "%s is recorded (run ./test.sh --record)" % key)
+		_check(known.has(key), "%s is recorded in %s (run ./test.sh --record)" % [key, GOLDEN])
 		if known.has(key) and known[key] != _golden[key]:
 			_check(false, "%s comes out as recorded:\n    was %s\n    now %s" % [key, known[key], _golden[key]])
 

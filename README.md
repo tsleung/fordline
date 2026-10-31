@@ -70,8 +70,12 @@ Runs the rules, map and campaign checks, replays a recorded battle to
 prove the simulation deterministic, then fights the campaign, every quick
 scenario and the grand battles AI against AI, through the same loop the
 game uses (`scripts/battle_run.gd`). Each battle must come out exactly as
-recorded in `tests/golden.txt`; after a deliberate change to how battles
-come out, `./test.sh --record` records them again, in the same commit.
+recorded for the platform the suite runs on (`tests/golden-macos.txt`,
+`tests/golden-linux.txt`, which CI uses); after a deliberate change to how
+battles come out, `./test.sh --record` records them again for this
+platform, in the same commit. The other platform's file is then updated
+from CI's report of what it got: each line it fails on says what it was
+and what it now is.
 Fails on any failed check, any script error, a battle past its time, or
 Waterloo's step over budget. `./test.sh --quick` fights one seed and skips
 the long battles.
