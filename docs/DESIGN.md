@@ -353,6 +353,134 @@ real problem: Allied horse riding down the grand battery unopposed (the
 French cavalry reserve now answers), and a French army a third short of
 its order of battle.
 
+## Play over time
+
+What the game should feel like at each time horizon, as measures the
+studies compute and targets they are judged against. The frame is the
+owner's, from the weapon-target game (2026-10-13): decisions matter,
+aren't monotonous, and their consequences are long lasting yet, with
+effort, reversible; "killing isnt everything".
+
+Every measure is read from a battle's trace (one sample a second) and its
+order log, fought through the same loop the game uses. A target is a band
+the studies report against, not a check the suite enforces: balance is
+judged, then changed deliberately.
+
+| Horizon | Question | Measure | Target |
+|---|---|---|---|
+| The moment (seconds) | Can you see it coming? | warning: seconds a regiment had been aimed at one of yours before the blow landed | median 4 s or more; under a fifth of blows unannounced |
+| The moment | Is there always something to do? | longest quiet stretch after the first clash: no block engaged and nothing fired | under 10 s in a quick battle |
+| The engagement (a minute) | Do decisions matter? | decision impact: take one of the player's orders out of the log, fight again, compare | at least a third of orders move the final margin by 5 or more |
+| The engagement | Do they last? | persistence: an order's effect on the margin at the end over its effect 20 s after | 1 or more on average: effects grow or hold rather than wash out |
+| The battle (minutes) | Does skill win? | the ladder (idle, slow, standard, sharp) in win rate, and skill's share of the outcome | rising up the ladder; skill's share over half |
+| The battle | Is it decided early? | lead changes; comebacks: battles won by a side that was behind by 0.15 after the first clash | lead changes 0.5 or more; comebacks 15–35% |
+| The battle | Is it short? | battle length | quick battles 2–4 minutes |
+| The run (twenty minutes) | Do consequences carry? | how much a costly win (40% of men lost) lowers the next battle's win rate | a real drop, but the next battle is still winnable more often than not |
+| The day (a grand battle) | Does history hold, and can you beat it? | how often the AI-against-AI day ends as history did; the ladder | history most of the time with nobody steering; skill still rising |
+
+How far the AI can be trusted as a stand-in for a player is its own
+question, measured alongside: see the AI audit below.
+
+**Every older table in this document was measured at the wrong step.**
+Until 1 November 2026 the tests and studies stepped the battle at 1/15 s
+while the game steps at 1/30 s, and the two are different games: 6 of the
+15 campaign battles in the suite change winner between them. The suite,
+the studies and the screen now share one loop at the game's step
+(`scripts/battle_run.gd`). The older tables stay below as a record of how
+the design got here, and are not current.
+
+### Measured, 1 November 2026
+
+Every quick scenario and campaign battle, AI against AI through the game's
+own loop, four dice each (`tests/luck_skill.gd`, reported by
+`tests/play.py`). Win rates for the player's commander:
+
+| Battle | idle | slow | standard | sharp | minutes | lead changes | orders a minute |
+|---|---|---|---|---|---|---|---|
+| Millbrook Ford | 0% | 100% | 100% | 100% | 1.0 | 0.0 | 85 |
+| Ashwood | 0% | 100% | 100% | 100% | 0.6 | 0.0 | 79 |
+| Two Bridges | 0% | 100% | 100% | 100% | 3.2 | 0.0 | 134 |
+| Saltmarsh Road | 0% | 0% | 0% | 0% | 1.7 | 1.0 | 100 |
+| Marshal's Ridge | 0% | 100% | 100% | 100% | 2.1 | 1.0 | 110 |
+| Skirmish | 0% | 50% | 75% | 100% | 2.6 | 0.0 | 28 |
+| Hold the Fords | 100% | 100% | 0% | 0% | 1.7 | 1.0 | 37 |
+| Hammer and Anvil | 0% | 0% | 0% | 100% | 2.0 | 1.0 | 81 |
+| Two Narrow Bridges | 0% | 0% | 0% | 0% | 1.6 | 0.0 | 40 |
+| Riders at Dawn | 0% | 100% | 100% | 100% | 1.9 | 0.0 | 44 |
+| The Storming of Duskwatch | 0% | 0% | 0% | 100% | 3.5 | 0.0 | 47 |
+| The Last Keep | 75% | 100% | 50% | 100% | 3.3 | 0.5 | 29 |
+| Skirmish (Pike and Shot) | 0% | 0% | 100% | 100% | 2.4 | 1.0 | 66 |
+| Push of Pike | 0% | 0% | 100% | 100% | 1.6 | 0.0 | 93 |
+| Shot at the Fords | 0% | 100% | 0% | 100% | 1.2 | 1.0 | 65 |
+| The Cuirassiers | 0% | 100% | 100% | 100% | 1.1 | 0.0 | 179 |
+| The Great Battery | 0% | 0% | 75% | 100% | 2.3 | 0.2 | 103 |
+| The Breach at Greyhold | 0% | 25% | 100% | 50% | 2.0 | 2.0 | 67 |
+
+Minutes, lead changes and orders a minute are for the standard commander.
+Against the targets:
+
+- **The outcome is set by the commander and the map, not the dice.** A
+  battle and a commander almost always give the same winner on every dice,
+  yet one order taken out of Hold the Fords flips the winner a third of the
+  time (Push of Pike: never; Millbrook Ford: never, but the margin moves in
+  a quarter of cases). The battle is a knife edge more than a dice roll:
+  small differences grow (the effect of a dropped order is larger at the
+  end than 20 s after), so a player's small slips can matter far more than
+  they look.
+- **Battles are short and settled early.** Most last 1–2 minutes against a
+  target of 2–4, with 0–1 lead changes and few comebacks.
+- **The ladder breaks on defence.** Where you start holding the ground
+  (Hold the Fords, The Last Keep), doing nothing beats the standard
+  commander, which gives the ground up to attack. Elsewhere it rises.
+- **The AI commands like no person can.** The standard commander gives
+  40–180 orders a minute; a person gives perhaps 10–30. "Standard wins"
+  says what an untiring micro-manager can do, not what a player will.
+- **Warning is under-measured.** A third to a half of blows land with no
+  regiment having been aimed at the one it hits, because the AI closes with
+  move orders rather than attack orders; the screen's red arrows read
+  movement too, so the measure needs to as well.
+
+### The AI audit
+
+What the AI is: a reactive commander. Every 0.75 s each regiment's role
+(foot, shooters, horse, guns, general) picks an order from the battle as it
+stands, tuned by a persona (how long to hold, whether to flank, a reserve).
+In a grand battle, divisions take objectives in order. It has no lookahead,
+no memory and no read of the player's plan.
+
+`tests/plans.gd` searches fixed plans against it: each of the player's
+regiments is sent to one flag, or left to the AI's line, and the standard
+commander fights the plan out on three dice. Thirty to forty plans each:
+
+| Battle | the AI's own line | plans that win all three dice | plans that win none |
+|---|---|---|---|
+| Hold the Fords | wins none | 24 of 33 | 9 |
+| Hammer and Anvil | wins none | 24 of 30 | 6 |
+| Push of Pike | wins all three | 21 of 35 | 4 |
+
+So:
+
+- **As an opponent it is easy to beat on purpose.** Sending the army at
+  chosen flags, almost any choice, beats it on every dice where its own
+  line, spread across every flag, loses on every dice. A player who
+  concentrates will find the quick battles easier than the tables above
+  say.
+- **As a stand-in for a player it is fit for some things only.** It is
+  fit for regressions (the recorded battles), for comparing scenarios with
+  each other, and for the history checks of the grand battles. It is not
+  fit for saying how hard a battle is for a person: it gives superhuman
+  orders a minute, spreads itself thin, and gives up good ground.
+- **The plan is worth almost everything; the dice almost nothing.** A plan
+  wins on every dice or on none far more often than it splits them.
+
+What to expect of it, and the next fixes, each measured by these studies:
+the line should concentrate as divisions do (the plans that win are
+divisions); a side that starts on good ground should hold it; and the
+standard commander should give orders at a person's rate, so that "the
+standard commander wins" means something about players. Past that, a
+planner that searches plans during the battle would be the stronger AI and
+the honest ceiling; see "Solving the game" in ARCHITECTURE.md.
+
 ## Score
 
 1000 per victory, plus 2 per enemy soldier killed, plus 1 per surviving
@@ -378,13 +506,16 @@ under three minutes. Best score is kept on the device.
   16-unit grid (Godot's AStarGrid2D) pulled tight to straight legs, with
   gates open in the plan so a besieger's route ends pressed against the
   gate, which is where it rams. Only the battle writes `gate_broken`.
-- The view (`battle_view.gd`) and HUD read state and turn the battle's
+- The views (`terrain_view.gd`, `units_view.gd`, `minimap.gd`) and HUD read state and turn the battle's
   events into effects and sound; they never write battle state. A grand
   battle's camera (centre and zoom) and minimap are screen state.
 - `tests/run_tests.gd` runs headless: rules, pathing, campaign, and
   AI-vs-AI battles that must finish in time.
 
 ## Luck and skill (measured)
+
+Measured at the old test step (1/15 s); see "Play over time" for what is
+current.
 
 `tests/luck_skill.gd` fights each campaign battle under a ladder of player
 commanders of rising skill (idle; slow; standard; sharp, which thinks

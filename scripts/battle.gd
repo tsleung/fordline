@@ -104,6 +104,7 @@ var shells: Array[Dictionary] = []
 var _events: Array[Dictionary] = []
 var _by_id := {}
 var _next_id := 1
+var _looks := 0
 
 
 func _init(map: Terrain, seed_value: int) -> void:
@@ -838,7 +839,7 @@ func _loose_volley(r: Regiment, t: Regiment) -> void:
 	projectiles.append({
 		"kind": "arrows", "from": r.pos, "to": t.pos, "t": 0.0, "dur": 0.5 + d / 420.0,
 		"target": t.id, "src": r.id, "team": r.team, "dmg": dmg, "shock": r.shock,
-		"count": mini(r.men(), 12), "seed": rng.randi(),
+		"count": mini(r.men(), 12), "seed": _look_seed(),
 	})
 	_emit({"type": "volley", "pos": r.pos, "team": r.team})
 
@@ -856,9 +857,17 @@ func _fire_muskets(r: Regiment, t: Regiment) -> void:
 	projectiles.append({
 		"kind": "shot", "from": r.pos, "to": t.pos, "t": 0.0, "dur": 0.08 + d / 2000.0,
 		"target": t.id, "src": r.id, "team": r.team, "dmg": dmg, "shock": r.shock,
-		"count": mini(r.men(), 14), "seed": rng.randi(),
+		"count": mini(r.men(), 14), "seed": _look_seed(),
 	})
 	_emit({"type": "musket", "pos": r.pos, "facing": r.facing, "width": r.width(), "team": r.team})
+
+
+## A seed for how a flight looks on screen (where its arrows scatter). It is
+## counted, not drawn from the battle's random numbers, so what is drawn
+## never changes what happens.
+func _look_seed() -> int:
+	_looks += 1
+	return hash(_looks)
 
 
 func _fire_guns(r: Regiment, at: Vector2) -> void:

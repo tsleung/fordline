@@ -9,6 +9,13 @@ var _failures := 0
 ## Lead changes in the last battle _fight fought.
 var _lead_changes := 0
 var _checks := 0
+## This run's recorded battles, key -> line, compared with GOLDEN at the end.
+var _golden := {}
+const GOLDEN := "res://tests/golden.txt"
+## Budgets for the largest battle's step, in microseconds: the mean, and the
+## slowest one in a hundred.
+const STEP_BUDGET_MEAN := 4000
+const STEP_BUDGET_P99 := 20000
 
 
 func _initialize() -> void:
@@ -27,7 +34,11 @@ func _run() -> void:
 	await _test_screens()
 	_test_scenarios()
 	await _test_grand(quick)
+	_test_replay()
 	_test_battles(quick)
+	if not quick:
+		_test_budget()
+	_compare_golden("--record" in OS.get_cmdline_user_args())
 	print("\n%d checks, %d failed" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -76,7 +87,7 @@ func _test_muskets() -> void:
 	var block := battle.add_regiment(1, K.PIKES, 48, mid - Vector2(0, 75), PI * 0.5, 0, {})
 	battle.begin()
 	while block.men() == block.men_max and battle.time < 20.0:
-		battle.step(1.0 / 15.0)
+		battle.step(Battle.STEP)
 	var lost := block.men_max - block.men()
 	_check(lost >= 3, "one volley drops several pikemen at once")
 	_check(block.morale_max - block.morale > Combat.loss_morale(lost, block.men_max) + 4.0, "a volley shakes more than its losses")
@@ -96,7 +107,7 @@ func _duel(a: float, b: float) -> String:
 	second.stamina = b
 	battle.begin()
 	while battle.time < 120.0:
-		battle.step(1.0 / 15.0)
+		battle.step(Battle.STEP)
 		var first_broke := not first.fighting()
 		var second_broke := not second.fighting()
 		if first_broke and second_broke:
@@ -356,13 +367,13 @@ func _test_fortress() -> void:
 	b.apply_orders([{"type": "move", "id": sword.id, "to": Vector2(650, 330)}])
 	var got_in_early := false
 	while not b.terrain.gate_broken[0] and b.time < 240.0:
-		b.step(1.0 / 15.0)
+		b.step(Battle.STEP)
 		got_in_early = got_in_early or b.terrain.inside(sword.pos)
 	_check(not got_in_early, "a shut gate keeps the besieger out")
 	_check(b.terrain.gate_broken[0] and b.time > 60.0, "one regiment rams the gate down, slowly (%ds)" % int(b.time))
 	b.apply_orders([{"type": "move", "id": sword.id, "to": Vector2(650, 330)}])
-	for i in 300:
-		b.step(1.0 / 15.0)
+	for i in 600:
+		b.step(Battle.STEP)
 	_check(b.terrain.inside(sword.pos), "through the broken gate")
 
 	# Swords either side of the curtain wall can't fight; guns can batter
@@ -375,10 +386,10 @@ func _test_fortress() -> void:
 	w.begin()
 	w.apply_orders([{"type": "bombard", "id": gun.id, "gate": 0}, {"type": "bombard", "id": own_gun.id, "gate": 0}])
 	_check(own_gun.target_gate < 0, "a garrison's guns won't batter their own gate")
-	w.step(1.0 / 15.0)
+	w.step(Battle.STEP)
 	_check(out_sword.pos.distance_to(in_sword.pos) < 40.0 and out_sword.contacts.is_empty(), "no blades cross a wall")
-	for i in 30 * 15:
-		w.step(1.0 / 15.0)
+	for i in 30 * 30:
+		w.step(Battle.STEP)
 	_check(w.gate_hp[0] < w.terrain.gates[0].hp, "guns batter a gate")
 
 
@@ -393,7 +404,7 @@ func _test_scenarios() -> void:
 				_check(not b.terrain.is_water(r.pos), "%s deploys on dry ground" % spec.id)
 				_check(not b.terrain.walled(r.pos, r.team), "%s deploys clear of walls" % spec.id)
 				_check(b.terrain.inside(r.pos) == (r.team == b.terrain.holder), "%s deploys on its own side of the walls" % spec.id)
-			var ok := _fight(b, true, resolved.persona)
+			var ok := _fight(b, true, resolved.persona, "scenario/%s/%d" % [spec.id, s])
 			print("  scenario %-9s seed %d  %-14s %3ds  stars %d  lead changes %d" % [
 				spec.id, s, "player won" if b.winner == 0 else "enemy won", int(b.time),
 				Scenarios.stars(resolved, b), _lead_changes])
@@ -410,7 +421,7 @@ func _test_scenarios() -> void:
 	_check(front < Terrain.SIZE.y - Terrain.DEPLOY_DEPTH, "hold deploys forward of the usual zone")
 	held.begin()
 	while held.phase == "battle":
-		held.step(1.0 / 15.0)
+		held.step(Battle.STEP)
 	# Holding all three drains them, so an enemy that never comes breaks
 	# before the clock does.
 	_check(held.winner == 0 and held.time <= held.deadline + Battle.BREAK_DELAY, "an enemy that never comes loses the fords' race")
@@ -494,7 +505,7 @@ func _test_grand(quick: bool) -> void:
 	var seminary: Vector2 = flag.call(Gettysburg.SEMINARY)
 	_tap(screen, seminary)
 	_check(screen.delegated.size() == 4 and gamble.objectives == PackedVector2Array([seminary]), "tapping a flag sends the division to take it on its own")
-	screen._command(1.0)
+	screen.run.advance()
 	_check(gamble.waypoints.size() > 0 and gamble.waypoints[gamble.waypoints.size() - 1].distance_to(seminary) < 250.0, "and the division's own command marches it there")
 	screen._select([gamble.id] as Array[int])
 	_tap(screen, Vector2(1300, 1500))
@@ -523,21 +534,33 @@ func _test_grand(quick: bool) -> void:
 	_check(not guard.id in ids and w.regiments.any(func(r): return r.formation == "Jérôme's Division" and r.holds_until > 0.0), "nobody moves before their hour")
 	if quick:
 		return
-	var day := Scenarios.make_battle(spec, 3)
-	day.begin()
-	var think := 0.0
-	while day.phase == "battle" and day.time < day.deadline + 10.0:
-		think -= 1.0 / 15.0
-		if think <= 0.0:
-			think = AI.THINK_EVERY
-			day.apply_orders(AI.decide(day, 1, AI.PERSONAS.aggressive))
-			day.apply_orders(AI.decide(day, 0, AI.PERSONAS.balanced))
-		day.step(1.0 / 15.0)
-		day.take_events()
+	var day := Fights.fight(Scenarios.make_battle(spec, 3), AI.PERSONAS.aggressive, "standard").battle
+	_record("grand/gettysburg/3", day)
 	print("  Gettysburg  winner %s at %s  flags %s  resolve %d/%d" % [
 		"Union" if day.winner == 0 else "Confederate", Scenarios.hour_text(spec, day.time),
 		day.flags.map(func(f): return f.owner), int(day.resolve[0]), int(day.resolve[1])])
 	_check(day.phase == "over" and day.time <= day.deadline + Battle.BREAK_DELAY + 0.5, "Gettysburg is decided by dusk")
+
+
+## A battle is its scenario, its seed and its log: replaying a recorded
+## player's log fights the same battle to the man, and a log with an order
+## taken out fights a different one.
+func _test_replay() -> void:
+	var spec := Scenarios.resolve("hold", 1)
+	var make := func() -> Battle: return Scenarios.make_battle(spec, 1)
+	var played := Fights.fight(make.call(), AI.PERSONAS[spec.persona], "standard", true)
+	var seats := func() -> Array:
+		var s := Fights.seats(AI.PERSONAS[spec.persona], "standard")
+		s[1] = BattleRun.Seat.new(0, null)
+		return s
+	var again := BattleRun.replay(make, seats, played.log, Fights.length(played.battle))
+	var same := func(a: Battle, b: Battle) -> bool:
+		return a.winner == b.winner and a.time == b.time and a.killed == b.killed and a.resolve == b.resolve
+	_check(played.log.size() > 10 and same.call(played.battle, again.battle), "replaying a log fights the same battle (%d turns logged)" % played.log.size())
+	var changed := played.log.duplicate(true)
+	changed[0].orders.clear()
+	var other := BattleRun.replay(make, seats, changed, Fights.length(played.battle))
+	_check(not same.call(played.battle, other.battle), "the same log without the first orders fights another battle")
 
 
 func _test_battles(quick: bool) -> void:
@@ -550,7 +573,7 @@ func _test_battles(quick: bool) -> void:
 			if i > 0:
 				run = Campaign.apply_reward(run, {"id": "recruit", "kind": UnitTypes.RECRUITABLE[(i + s) % 5]})
 			var b := Campaign.make_battle(run)
-			var outcome := _fight(b, true, Campaign.BATTLES[i].persona)
+			var outcome := _fight(b, true, Campaign.BATTLES[i].persona, "campaign/%d/%d" % [s, i])
 			var name: String = Campaign.BATTLES[i].name
 			print("  seed %d  %-16s  winner %s  %3ds  kills %d/%d  resolve %d/%d  lead changes %d" % [
 				s, name, "player" if b.winner == 0 else "enemy", int(b.time),
@@ -559,32 +582,69 @@ func _test_battles(quick: bool) -> void:
 			if b.winner == 0:
 				wins += 1
 	var passive := Campaign.make_battle(Campaign.new_run(5))
-	_fight(passive, false, "balanced")
+	_fight(passive, false, "balanced", "campaign/5/passive")
 	print("  passive player: winner %s at %ds" % ["player" if passive.winner == 0 else "enemy", int(passive.time)])
 	_check(passive.winner == 1, "an army that never moves loses")
 	print("  AI-as-player won %d of %d" % [wins, seeds.size() * Campaign.BATTLES.size()])
 
 
-func _fight(b: Battle, player_acts: bool, persona: String) -> bool:
-	b.begin()
-	var dt := 1.0 / 15.0
-	var think := 0.0
-	var enemy: Dictionary = AI.PERSONAS[persona]
-	var fielded := [Telemetry.fielded(b, 0), Telemetry.fielded(b, 1)]
-	var tracker := Telemetry.LeadTracker.new()
-	var sample := 0.0
-	while b.phase == "battle" and b.time < 600.0:
-		think -= dt
-		if think <= 0.0:
-			think = AI.THINK_EVERY
-			b.apply_orders(AI.decide(b, 1, enemy))
-			if player_acts:
-				b.apply_orders(AI.decide(b, 0, AI.PERSONAS["balanced"]))
-		b.step(dt)
-		b.take_events()
-		sample -= dt
-		if sample <= 0.0:
-			sample = 1.0
-			tracker.sample(Telemetry.lead(b, fielded))
-	_lead_changes = tracker.changes
+## Fight `b` computer against computer and record it under `key`.
+func _fight(b: Battle, player_acts: bool, persona: String, key := "") -> bool:
+	var run := Fights.fight(b, AI.PERSONAS[persona], "standard" if player_acts else "idle")
+	_lead_changes = run.trace.lead.changes
+	if key != "":
+		_record(key, b)
 	return b.phase == "over" and b.time < 420.0
+
+
+func _record(key: String, b: Battle) -> void:
+	_golden[key] = "%s winner %d time %.2f killed %d/%d resolve %.2f/%.2f flags %s" % [
+		key, b.winner, b.time, b.killed[0], b.killed[1], b.resolve[0], b.resolve[1],
+		",".join(b.flags.map(func(f): return str(f.owner)))]
+
+
+## Every battle this run fought must come out as recorded. With --record,
+## the file takes this run's results instead: a deliberate change to how
+## battles come out, made in the same commit as the change that caused it.
+func _compare_golden(record: bool) -> void:
+	var known := {}
+	if FileAccess.file_exists(GOLDEN):
+		for line in FileAccess.get_file_as_string(GOLDEN).split("\n", false):
+			known[line.get_slice(" ", 0)] = line
+	if record:
+		known.merge(_golden, true)
+		var keys := known.keys()
+		keys.sort()
+		var f := FileAccess.open(GOLDEN, FileAccess.WRITE)
+		for k in keys:
+			f.store_line(known[k])
+		print("  recorded %d battles" % _golden.size())
+		return
+	for key in _golden:
+		_check(known.has(key), "%s is recorded (run ./test.sh --record)" % key)
+		if known.has(key) and known[key] != _golden[key]:
+			_check(false, "%s comes out as recorded:\n    was %s\n    now %s" % [key, known[key], _golden[key]])
+
+
+## The largest battle, Waterloo, stays inside the step budget.
+func _test_budget() -> void:
+	var spec := Scenarios.resolve("waterloo", 1)
+	var run := BattleRun.new(Scenarios.make_battle(spec, 3))
+	for seat in Fights.seats(AI.PERSONAS[spec.persona], "standard"):
+		run.add_seat(seat)
+	run.begin()
+	var times := PackedInt64Array()
+	while run.battle.phase == "battle" and run.battle.time < run.battle.deadline + 10.0:
+		var t0 := Time.get_ticks_usec()
+		run.advance()
+		times.append(Time.get_ticks_usec() - t0)
+	_record("grand/waterloo/3", run.battle)
+	var mean := 0
+	for t in times:
+		mean += t
+	mean /= maxi(times.size(), 1)
+	times.sort()
+	var p99: int = times[int(times.size() * 0.99)]
+	print("  Waterloo  winner %s at %s  step %d us mean, %d us p99" % [
+		"Allies" if run.battle.winner == 0 else "French", Scenarios.hour_text(spec, run.battle.time), mean, p99])
+	_check(mean <= STEP_BUDGET_MEAN and p99 <= STEP_BUDGET_P99, "Waterloo's step is within budget (%d us mean, %d us p99)" % [mean, p99])

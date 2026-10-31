@@ -11,29 +11,15 @@ extends SceneTree
 ## change a Skirmish's field and armies).
 
 const K := UnitTypes.Kind
-const DT := 1.0 / 15.0
-const TIME_CAP := 600.0
-
-## Player policies: a ladder of rising skill (idle to sharp), then sharp
-## with one change each (reserve, hills). think: seconds between decisions.
-## persona: the AI persona it plays with. rally: whether it blows the horn
-## when regiments near the general break.
-const POLICIES := {
-	"idle": {"think": 0.0, "persona": {"hold": 8.0, "flank": false}, "rally": false},
-	"slow": {"think": 4.0, "persona": {"hold": 8.0, "flank": false}, "rally": false},
-	"standard": {"think": 0.75, "persona": AI.PERSONAS["balanced"], "rally": false},
-	"sharp": {"think": 0.4, "persona": AI.PERSONAS["balanced"], "rally": true},
-	"reserve": {"think": 0.4, "persona": AI.PERSONAS["reserve"], "rally": true},
-	"hills": {"think": 0.4, "persona": AI.PERSONAS["hills"], "rally": true},
-}
 
 
 func _initialize() -> void:
 	var battle_index := 0
 	var draws := 6
 	var dice := 3
-	var chosen := PackedStringArray(POLICIES.keys())
+	var chosen := PackedStringArray(Fights.POLICIES.keys())
 	var scenario := ""
+	var impact := 0
 	for arg in OS.get_cmdline_user_args():
 		var value := int(arg.get_slice("=", 1))
 		if arg.begins_with("--battle="):
@@ -46,76 +32,48 @@ func _initialize() -> void:
 			scenario = arg.get_slice("=", 1)
 		elif arg.begins_with("--policies="):
 			chosen = arg.get_slice("=", 1).split(",")
+		elif arg.begins_with("--impact="):
+			impact = value
 	for draw in draws:
 		for die in dice:
 			for policy in chosen:
-				print("ROW ", JSON.stringify(_fight(battle_index, draw, die, policy, scenario)))
+				print("ROW ", JSON.stringify(_fight(battle_index, draw, die, policy, scenario, impact)))
 	quit()
 
 
-func _fight(battle_index: int, draw: int, die: int, policy_name: String, scenario: String) -> Dictionary:
-	var b: Battle
+## One battle, its measures of play, and with `impact` > 0 that many of the
+## player's orders taken out one at a time and the battle fought again.
+func _fight(battle_index: int, draw: int, die: int, policy_name: String, scenario: String, impact: int) -> Dictionary:
+	var make: Callable
 	var enemy: Dictionary
 	var spec := {}
 	if scenario != "":
 		spec = Scenarios.resolve(scenario, 1000 + draw)
-		b = Scenarios.make_battle(spec, 7919 * (die + 1))
+		make = func() -> Battle: return Scenarios.make_battle(spec, 7919 * (die + 1))
 		enemy = AI.PERSONAS[spec.persona]
 	else:
 		var run := Campaign.new_run(1000 + draw)
 		run.battle = battle_index
 		for i in battle_index:
 			run = Campaign.apply_reward(run, {"id": "recruit", "kind": UnitTypes.RECRUITABLE[(i + draw) % 5]})
-		b = Campaign.make_battle(run)
-		b.rng.seed = 7919 * (die + 1)
+		make = func() -> Battle:
+			var b := Campaign.make_battle(run)
+			b.rng.seed = 7919 * (die + 1)
+			return b
 		enemy = AI.PERSONAS[Campaign.BATTLES[battle_index].persona]
-	var policy: Dictionary = POLICIES[policy_name]
-	var persona: Dictionary = policy.persona
-	var fielded := [Telemetry.fielded(b, 0), Telemetry.fielded(b, 1)]
-	var tracker := Telemetry.LeadTracker.new()
-	var enemy_think := 0.0
-	var player_think := 0.0
-	var sample := 0.0
-	b.begin()
-	# A grand battle runs to its own dusk.
-	var cap := maxf(TIME_CAP, b.deadline + 5.0)
-	while b.phase == "battle" and b.time < cap:
-		enemy_think -= DT
-		if enemy_think <= 0.0:
-			enemy_think = AI.THINK_EVERY
-			b.apply_orders(AI.decide(b, 1, enemy))
-		player_think -= DT
-		if policy.think > 0.0 and player_think <= 0.0:
-			player_think = policy.think
-			b.apply_orders(AI.decide(b, 0, persona))
-			if policy.rally and _should_rally(b):
-				b.apply_orders([{"type": "rally"}])
-		b.step(DT)
-		b.take_events()
-		sample -= DT
-		if sample <= 0.0:
-			sample = 1.0
-			tracker.sample(Telemetry.lead(b, fielded))
-	return {
+	var fought := Fights.fight(make.call(), enemy, policy_name, impact > 0)
+	var b := fought.battle
+	var warned: Dictionary = Measures.warning(fought, 0)
+	var row := {
 		"battle": scenario if scenario != "" else battle_index, "draw": draw, "dice": die, "policy": policy_name,
 		"stars": Scenarios.stars(spec, b) if scenario != "" else 0,
-		"won": b.winner == 0, "margin": b.resolve[0] - b.resolve[1], "time": snappedf(b.time, 0.1),
-		"lead_changes": tracker.changes, "killed": b.killed,
+		"won": b.winner == 0, "margin": Measures.margin(b), "time": snappedf(b.time, 0.1),
+		"lead_changes": fought.trace.lead.changes, "killed": b.killed,
 		"flags": b.flags.map(func(f): return f.owner),
+		"comeback": Measures.comeback(fought), "quiet": Measures.quiet_max(fought),
+		"warning": warned.median, "unannounced": warned.unannounced,
+		"orders_min": snappedf(Measures.orders_per_minute(fought, 0), 0.1),
 	}
-
-
-func _should_rally(b: Battle) -> bool:
-	if b.cooldowns.rally > 0.0:
-		return false
-	var g := b.general_of(0)
-	if g == null:
-		return false
-	for r in b.team_regiments(0):
-		if r == g or r.pos.distance_to(g.pos) > Battle.RALLY_RADIUS:
-			continue
-		if r.state == Regiment.State.ROUTING and r.strength() >= 0.2:
-			return true
-		if r.fighting() and r.morale < r.morale_max * 0.25:
-			return true
-	return false
+	if impact > 0:
+		row.impact = Measures.impact(fought, make, Fights.seats.bind(enemy, policy_name), impact, 17 + die)
+	return row

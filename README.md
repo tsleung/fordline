@@ -66,13 +66,26 @@ on its own; the arrow keys pan and F reaches 4×.
 ./test.sh
 ```
 
-Runs the rules, map and campaign checks, then fights all five campaign
-battles AI against AI on three seeds; fails if any battle runs past seven
-minutes or any script fails to compile. `./test.sh --quick` fights one seed.
+Runs the rules, map and campaign checks, replays a recorded battle to
+prove the simulation deterministic, then fights the campaign, every quick
+scenario and the grand battles AI against AI, through the same loop the
+game uses (`scripts/battle_run.gd`). Each battle must come out exactly as
+recorded in `tests/golden.txt`; after a deliberate change to how battles
+come out, `./test.sh --record` records them again, in the same commit.
+Fails on any failed check, any script error, a battle past its time, or
+Waterloo's step over budget. `./test.sh --quick` fights one seed and skips
+the long battles.
 
-`tests/luck_skill.gd` and `tests/luck_skill.py` measure how much of a
-battle's outcome is the commander and how much is the draw and the dice;
-see the end of [docs/DESIGN.md](docs/DESIGN.md).
+Studies, all fought through the game's loop:
+- `tests/luck_skill.gd` fights a battle under a ladder of commanders and
+  prints one row per battle; `tests/luck_skill.py` splits the outcome
+  into skill and luck, `tests/play.py` reports the measures of play
+  (length, lead changes, comebacks, quiet, warning, orders a minute,
+  and with `--impact=N` how far one dropped order carries).
+- `tests/plans.gd` searches fixed plans against the enemy AI: the
+  ceiling, and how much a plan is worth.
+
+See "Play over time" in [docs/DESIGN.md](docs/DESIGN.md).
 
 `tests/shot.tscn` plays a battle on autopilot in a real window and saves
 screenshots to `build/shots/` (see the header of `tests/shot.gd`); keep the

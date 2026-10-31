@@ -23,6 +23,13 @@ const DOUBLE_TAP := 0.35
 const MAX_STEPS_PER_FRAME := 8
 
 var battle: Battle
+## The loop that fights it, and its seats: the enemy, the player (an AI on
+## autopilot and in the title's demo), and divisions sent off on their own
+## command.
+var run: BattleRun
+const ENEMY_SEAT := 0
+const PLAYER_SEAT := 1
+const OWN_COMMAND_SEAT := 2
 var demo := false
 ## The scenario's goal, shown as the battle opens; empty in the campaign.
 var goal := ""
@@ -69,7 +76,9 @@ var cam_zoom := 0.0
 var clock := Callable()
 ## The player's blocks handed to their own command (a tap on a flag in a
 ## grand battle): the AI thinks for them until the player orders them again.
-var delegated: Array[int] = []
+var delegated: Array[int]:
+	get:
+		return run.seats[OWN_COMMAND_SEAT].ids
 ## Screen pixels from a flag that a tap counts as a tap on it.
 const FLAG_TAP_PX := 26.0
 
@@ -77,7 +86,6 @@ var _persona: Dictionary
 var _terrain_view
 var _corpses
 var _acc := 0.0
-var _think := 0.0
 var _last_tap := {"id": -1, "at": -10.0}
 var _clash_wait := 0.0
 var _reported := false
@@ -96,6 +104,15 @@ func setup(b: Battle, persona_name: String, battle_title: String, is_demo := fal
 	_persona = AI.PERSONAS[persona_name]
 	title = battle_title
 	demo = is_demo
+	run = BattleRun.new(b)
+
+
+## The seats, once it is known whether the player's side is on autopilot.
+func _seat() -> void:
+	var balanced := Commander.AICommander.new(AI.PERSONAS["balanced"])
+	run.add_seat(BattleRun.Seat.new(1, Commander.AICommander.new(_persona)))
+	run.add_seat(BattleRun.Seat.new(0, balanced if demo or autopilot else null))
+	run.add_seat(BattleRun.Seat.new(0, balanced, AI.THINK_EVERY, false))
 
 
 func _ready() -> void:
@@ -109,13 +126,14 @@ func _ready() -> void:
 	units_view.screen = self
 	world.add_child(units_view)
 	_terrain_view.show_terrain(battle.terrain, hash(title))
+	_seat()
 	if grand:
 		# A historical day opens with the first shots; the pause is for
 		# reading the field.
-		battle.begin()
+		run.begin()
 		paused = true
 	if demo:
-		battle.begin()
+		run.begin()
 	else:
 		hud = Hud.new()
 		hud.screen = self
@@ -207,13 +225,12 @@ func _process(delta: float) -> void:
 		_acc += delta * speed
 		var steps := 0
 		while _acc >= Battle.STEP and steps < MAX_STEPS_PER_FRAME:
-			_command(Battle.STEP)
-			battle.step(Battle.STEP)
+			run.advance()
 			_acc -= Battle.STEP
 			steps += 1
 		if steps == MAX_STEPS_PER_FRAME:
 			_acc = 0.0
-	_react(battle.take_events())
+	_react(run.take_events())
 	_warn_of_horse()
 	_ambient(delta)
 	selected.assign(selected.filter(func(id): return battle.get_regiment(id) != null and battle.get_regiment(id).fighting()))
@@ -224,26 +241,11 @@ func _process(delta: float) -> void:
 		finished.emit(battle)
 
 
-func _command(dt: float) -> void:
-	_think -= dt
-	if _think > 0.0:
-		return
-	_think = AI.THINK_EVERY
-	battle.apply_orders(AI.decide(battle, 1, _persona))
-	if demo or autopilot:
-		battle.apply_orders(AI.decide(battle, 0, AI.PERSONAS["balanced"]))
-	elif not delegated.is_empty():
-		delegated.assign(delegated.filter(func(id): return battle.get_regiment(id) != null and battle.get_regiment(id).fighting()))
-		var own := AI.decide(battle, 0, AI.PERSONAS["balanced"]).filter(func(o): return o.get("id", -1) in delegated)
-		battle.apply_orders(own)
-
-
 ## The player's own orders: any block they name is back under the player's
 ## hand.
 func _give(orders: Array) -> void:
-	for o in orders:
-		delegated.erase(o.get("id", -1))
-	battle.apply_orders(orders)
+	run.release(OWN_COMMAND_SEAT, orders.map(func(o): return o.get("id", -1)))
+	run.give(PLAYER_SEAT, orders)
 
 
 ## A grand battle: a tap on a flag with blocks selected hands them to their
@@ -253,11 +255,12 @@ func _send_to_flag(sp: Vector2) -> bool:
 		if to_screen(f.pos).distance_to(sp) > FLAG_TAP_PX:
 			continue
 		var orders: Array = []
+		var ids: Array[int] = []
 		for r in _selected_regiments():
 			orders.append({"type": "objective", "id": r.id, "at": f.pos})
-			if not r.id in delegated:
-				delegated.append(r.id)
-		battle.apply_orders(orders)
+			ids.append(r.id)
+		run.give(PLAYER_SEAT, orders)
+		run.claim(OWN_COMMAND_SEAT, ids)
 		units_view.add_fx("ring", f.pos, 0.5, {"size": 40.0})
 		_click()
 		return true
@@ -279,7 +282,7 @@ func objective_name(r: Regiment) -> String:
 func begin_battle() -> void:
 	if battle.phase != "deploy":
 		return
-	battle.begin()
+	run.begin()
 	_select([])
 
 
@@ -377,7 +380,7 @@ func _route_ends() -> Array[Vector2]:
 func use_ability(name: String) -> void:
 	match name:
 		"rally":
-			battle.apply_orders([{"type": "rally"}])
+			run.give(PLAYER_SEAT, [{"type": "rally"}])
 		"barrage":
 			targeting = "" if targeting == "barrage" else "barrage"
 		"march":
@@ -385,7 +388,7 @@ func use_ability(name: String) -> void:
 			if ids.is_empty():
 				for r in battle.team_regiments(0):
 					ids.append(r.id)
-			battle.apply_orders([{"type": "march", "ids": ids}])
+			run.give(PLAYER_SEAT, [{"type": "march", "ids": ids}])
 
 
 # --- input ----------------------------------------------------------------
@@ -488,7 +491,7 @@ func _press(sp: Vector2, right: bool, shift: bool) -> void:
 		return
 	var wp := to_world(sp)
 	if targeting == "barrage":
-		battle.apply_orders([{"type": "barrage", "pos": wp}])
+		run.give(PLAYER_SEAT, [{"type": "barrage", "pos": wp}])
 		targeting = ""
 		return
 	var own := _pick(wp, 0)
