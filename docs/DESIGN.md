@@ -36,6 +36,12 @@ once and the run is over; your score goes on the board.
    minutes. A battle is two to four minutes, a run is about twenty.
 5. **One more run.** Losses carry over, regiments earn stars, rewards stack
    into a build, and a run ends on the first defeat with a score.
+6. **History serves the fun.** A rule taken from history or physics earns
+   its place when it shows on the map and changes a decision. Hills do:
+   you see them and choose where to stand. Squares do: you see horse
+   coming and the infantry answers. Currents, tides and wind at sea do
+   not: they are invisible and would drift a ship off the place you sent
+   it, fighting the one-tap order instead of adding a choice.
 
 ## Rules
 

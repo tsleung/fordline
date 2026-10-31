@@ -38,7 +38,7 @@ end says how the code gets here, one reversible step at a time.
   packs     campaign · medieval · pike_shot · sieges · gettysburg · waterloo
                 │          │          │          │          │          │
   modules       ·          ·          ·   fortifications    ·          ·
-                                         (command, strategy, map_layers … later)
+                     (command, strategy, map_layers, air, naval, supply … later)
                 │          │          │          │          │          │
   core      battle · regiment · combat · terrain · ai · seats · screen · hud
 ```
@@ -65,9 +65,14 @@ Dormant until data asks for them:
 - **Orders from above.** A regiment may carry a division, objectives and
   an hour before which it holds; the AI reads them, and they are empty in
   every quick battle.
-- **Fire at a place.** Guns may be ordered to fire at a point rather than
-  a regiment. Fortifications uses this to batter gates; barrage and air
-  strikes are the same idea.
+- **Flights.** Everything fired is one thing in flight: arrows, shot,
+  cannonballs, barrage shells today; mortar bombs, railgun rounds, drones
+  and missiles later. A flight goes from a source to a regiment or a place
+  and is described by a few values: speed (so flight time and warning),
+  path (straight, arc or dive), whether it homes, its blast (radius,
+  kills, shock), whether a landing ring and countdown show, and tags
+  saying what can engage it in the air. Guns may fire at a place rather
+  than a regiment; fortifications uses that to batter gates.
 - **Seats.** The screen runs a list of seats, each a commander (the player
   or an AI) over some of a side's regiments. A quick battle has two: you,
   and the enemy AI. A division sent off on its own command is a third.
@@ -81,8 +86,8 @@ Dormant until data asks for them:
 ## Modules
 
 A module is a folder, `modules/<id>/`, whose `module.gd` extends `Module`,
-listed once in `modules/registry.gd`. Today there is one, and the next two
-are designed:
+listed once in `modules/registry.gd`. Today there is one; the rest are
+designed and wait for a pack that needs them:
 
 | Module | Adds | Needs |
 |---|---|---|
@@ -90,7 +95,9 @@ are designed:
 | `command` (next) | sending divisions off on their own command, allied generals' seats, dispatches | — |
 | `strategy` (later) | a plan layer: set every division's objectives on a map of the field | `command` |
 | `map_layers` (later) | overlays you switch on: ground, sight lines, coverage | — |
-| `air`, `supply` (later) | air strikes and anti-air coverage; supply lines from depots | `map_layers` |
+| `air` (later) | drones and missiles, interceptors and anti-air, jamming, aircraft on missions; see Air below | — |
+| `naval` (later) | ships as units on the water, coasts and shallows, landings, fire from the sea; see Navies below | — |
+| `supply` (later) | supply lines from depots; out of supply, reloads and nerve suffer | `map_layers` |
 
 ## The module contract
 
@@ -106,9 +113,9 @@ var map_kinds: Array[String] = []      # map kinds it can build ("fortress")
 var spec_keys: Array[String] = []      # scenario keys it owns
 ```
 
-Every hook below exists because fortifications or command needs it. Each
-runs at the place in the step the code runs today, so no recorded battle
-moves.
+Every hook below exists because fortifications or command needs it, except
+`in_flight`, which air adds. Each runs at the place in the step the code
+runs today, so no recorded battle moves.
 
 **Building a battle**
 
@@ -131,7 +138,8 @@ answers from the core alone, as it does now.
 | `apply_order(battle, order) -> bool` | orders | an order type it owns ("bombard") |
 | `on_order(battle, order)` | orders | any order was given (a new move ends a bombardment) |
 | `after_melee(battle, dt)` | between melee and fatigue | ramming |
-| `on_landed(battle, hit)` | when a ball or shell lands | gate damage |
+| `in_flight(battle, dt)` | after flights move, before any lands | interception, drones steering (air) |
+| `on_landed(battle, hit)` | when a flight lands | gate damage |
 
 **The AI** (the core commander calls these for each regiment, in registry
 order, before the regiment's own role)
@@ -150,7 +158,8 @@ order, before the regiment's own role)
 | `draw_marks(view, battle)` | marks over the regiments (a gate's damage; a division's own-command diamond) |
 | `describe(battle, r) -> String` | its words in the selection readout |
 
-Thirteen hooks in all, counting the terrain feature's queries as one.
+Fourteen hooks in all, counting the terrain feature's queries as one;
+`in_flight` is added with the `air` module, not before (rule 6).
 
 **Per-regiment state.** A module keeps what it knows about a regiment in its
 own state, keyed by regiment id (which gate a battery is battering), not in
@@ -219,9 +228,10 @@ the same, and can be reverted alone.
    moves.
 2. **Make the dormant rules core and data-driven.** Formation shape on
    regiment, read by its geometry. The `square` trait instead of checking
-   for line infantry. Fire at a place. Seats in the screen. One way to
-   write held flags (`own_flags` is a list in every spec, not sometimes a
-   flag).
+   for line infantry. Arrows, shot, balls and shells as one list of
+   flights with their values, and guns firing at a place. Seats in the
+   screen. One way to write held flags (`own_flags` is a list in every
+   spec, not sometimes a flag).
 3. **The contract**: `Module`, `TerrainFeature`, the registry, map kinds,
    the hook calls (empty loops), the build-time checks, the no-module and
    every-module runs.
@@ -241,5 +251,138 @@ core files, so they run one after another in one session.
 
 Unit kinds are core data in one list, and saved campaigns store them by
 number. When a pack needs to add a kind without code, kinds become data
-with a role (foot, shot, horse, guns, general) and traits, and saves store
-them by name with a one-time conversion. Until then this waits.
+with a role (foot, shot, horse, guns, general), traits and a look
+(soldiers in a block, or a crew on a hull), and saves store them by name
+with a one-time conversion. A modern era is that pack: drone
+teams, anti-air, jammers, mortars and railguns are kinds with traits the
+`air` module acts on. Until then this waits.
+
+## Air: a worked example
+
+How drones, missiles and interceptors would enter, to check the contract
+before it is built. Drawn from the research in the owner's notebook
+(`notes/wartech/`, `notes/ideas.md`, `notes/wta-game/`).
+
+**Air is things in flight between ground units, never units in the air.**
+Every drone, missile, shell and interceptor is fired from the ground at a
+regiment or a place, flies, and lands or is stopped. Nothing in the air
+holds a flag, and no aircraft fight each other. Every decision stays a
+ground decision, and the one-tap orders stay enough:
+
+- where your anti-air stands, since its reach is a ring on the map;
+- how close your blocks stand, since massing is both firepower and a
+  target;
+- what to fire at what, and when to spend the expensive round;
+- whether to be somewhere else when the countdown ends.
+
+**Weapons are values, not special cases.** As `ideas.md` puts it, every
+weapon sits on a few shared axes: speed, homing, area, whether it can be
+shot down, warning time, cost. The counters follow from the numbers.
+
+| In flight | Fired by | Speed and warning | Can be stopped by | Notes |
+|---|---|---|---|---|
+| shell | a gun, at a place, on or off the field | arc, seconds; landing ring | close-in guns and lasers, in range, at a rate | counter-battery finds the gun |
+| mortar bomb | a mortar team, over cover | high arc, a few seconds; ring | the same | fires over houses and hills |
+| railgun round | a railgun, straight | almost instant; no warning | nothing | long reload; the precise, narrow end |
+| FPV drone | a drone team, at a regiment | slow (horse pace), homes | any block's guns close in, anti-air guns, interceptor drones; jamming | fibre-optic ones ignore jamming but keep within a ring of their team |
+| loitering munition | a drone team, at an area | slow; waits for a target | the same | a decoy draws it off |
+| one-way drone, cruise missile | off the field, from an edge | minutes in history, seconds in play; ring | interceptor drones, guns, missiles | comes in waves, with decoys |
+| ballistic or hypersonic | off the field | fast; a second's warning or none | only the long-range tier, at a low rate | effectively unstoppable without that tier |
+
+**Interception is a rate, not a roll.** An interceptor has a ring, the
+tags it can engage, the fastest thing it can catch, how many flights it
+can engage at once, how long each one takes, and a magazine. A flight it
+can engage inside its ring is stopped once it has been engaged for that
+long. Too many at once and the rest get through. So failure is
+"I can't kill those fast enough", never "I can't kill that"
+(`wta_game_concept.md`), saturation and decoys work by themselves, and the
+dice stay out of it, which both the WTA findings and Fordline's own luck
+study argue for. A slower interceptor catches a faster flight only while
+it is still coming in, which puts pickets forward.
+
+**Jamming is a zone.** Radio drones that fly into an enemy jammer's ring
+drift and drop; your own falter in your own ring. Fibre drones are immune
+and stay on their leash.
+
+**Aircraft are flights that come back.** A drone or a missile is spent; a
+sortie returns and rearms. Aircraft are a side's wings, each a resource
+given a mission, as in Supreme Commander, where you direct the effort and
+never fly the dogfight:
+
+- **Strike** a place: the wing flies in from its edge, drops its munitions
+  (flights of their own) and turns for home.
+- **Cover** an area: the wing becomes a moving interceptor ring that
+  engages only aircraft, at its rate.
+- **Escort** a strike: its cover ring travels with it.
+
+Who owns the sky is then whose rings are where, and it reads as shading on
+the map: denied, contested, open. Over open sky a strike arrives quickly
+and surely; through enemy rings each ring spends its rate on the sortie,
+which may be turned back or lost, or must drop from outside the rings with
+weapons that can themselves be shot down. Winning the air is a ground
+decision: push your anti-air forward, or kill theirs to open the sky. A
+grand battle can simply give the sky to one side as a scenario value: then
+the other side's arrivals come slower by day, as German reserves did in
+Normandy.
+
+**Effects lean to nerve.** A strike costs more morale and stamina than men,
+so air shapes where blocks will stand rather than deleting them; the WTA
+siege showed air that removes a garrison makes the fight a walk.
+
+**What it takes from the contract:** the core's flights (values and tags),
+`in_flight` to steer, intercept and fly sorties, `on_landed` for what a
+landing does, module state for magazines, wings and jammers, `ai_order` for
+launchers and anti-air, `draw_marks` for rings, shading and countdowns,
+`on_tap` to aim a strike or set a wing's mission. Kinds become data.
+Nothing else.
+
+**Left out on purpose:**
+- Aircraft you steer, and dogfights. A wing is given a mission, not flown.
+- Seeing and being seen. Reconnaissance drones and fog of war would be a
+  `sensing` module, and a costly one: the WTA work kept an all-seeing map
+  for legibility.
+- Cost exchange as an economy. It is the scoreboard, not the fun
+  (`ideas.md`). At most, magazines carry over between campaign battles.
+- Real flight times. Warning is scaled to seconds of play: a grand battle's
+  hour is 78 seconds.
+
+## Navies: a worked example
+
+**If it holds space, it is a unit; if it only passes through, it is a
+flight.** Aircraft pass through, so they are flights. Ships hold water, so
+they are units, commanded with the same one-tap orders as a regiment: tap
+to select, tap to move, drag an arrow to stand and face, tap an enemy to
+fire on it.
+
+**Where they belong.** Battles where land and sea meet: a landing, a river
+with gunboats, guns supporting the shore. A battle of fleets alone would be
+a different game and is left out. First candidates in eras the game
+already has: Vicksburg (river gunboats, with the rifles) and Quebec in 1759
+(the landing below the cliffs and the battle on the Plains of Abraham, with
+line infantry).
+
+**What a ship is.** A kind with a domain: water instead of land. It moves
+only on water, it has a lot of strength and turns slowly, and its look
+comes from its kind: the core draws a hull under its crew, a dormant rule
+like the square. Its weapons are flights like
+everyone's: long guns that fire at a place for the shore; on later ships,
+an escort's anti-air ring that moves with it, and a carrier's wings.
+
+**The sea is three kinds of water and nothing else:** deep (any ship),
+shallows (boats and landing craft only; a visible lighter colour) and the
+coast. No currents, tides or wind (DESIGN.md, pillar 6).
+
+**Landings are arrivals by sea.** A force comes in landing craft along a
+sea lane instead of up a road, and becomes regiments on the beach it
+reaches; craft hit on the way lose men, as anything does.
+
+**What it takes.**
+- From the core, as dormant rules: a domain on regiments (land unless a
+  kind says water), so the terrain's blocking and speed answer for the
+  regiment's domain; the hull look; and the grid router, which moves from
+  fortifications to the core once a second user (the sea) needs it.
+- From the contract: `make_map` for coastlines and shallows as terrain
+  features; `ai_order` for ships (keep station, support the shore);
+  `react` for their effects. Landings use the core's arrivals with a sea
+  lane. Kinds become data. No new hook.
+
