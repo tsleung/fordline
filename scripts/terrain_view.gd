@@ -24,6 +24,8 @@ func _draw() -> void:
 		_road(road)
 	if terrain.has_river:
 		_river()
+	if terrain.has_walls():
+		_fortress()
 	_forests()
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.25), false, 3.0)
 
@@ -141,3 +143,155 @@ func _forests() -> void:
 		for i in int(r / 6.0):
 			var p := c + Vector2.from_angle(rng.randf() * TAU) * rng.randf() * r * 0.7
 			draw_circle(p, rng.randf_range(3.0, 7.0), Palette.TREE_LIGHT)
+
+
+# --- fortress --------------------------------------------------------------
+
+func _fortress() -> void:
+	var t := terrain
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value + 7
+	# Moat, with the bridge to the gatehouse.
+	var mw := Terrain.MOAT.y - Terrain.MOAT.x
+	draw_polyline(t.moat, Palette.RIVER_EDGE, mw + 5.0, true)
+	draw_polyline(t.moat, Palette.RIVER, mw, true)
+	for g in t.gates:
+		if g.keep:
+			continue
+		var c: Vector2 = g.c + g.out * (Terrain.MOAT.x + mw * 0.5)
+		var along: Vector2 = g.along
+		var span: Vector2 = g.out * (mw * 0.5 + 8.0)
+		var half := along * (Terrain.GATE_HALF - 6.0)
+		draw_colored_polygon(PackedVector2Array([c - half - span, c + half - span, c + half + span, c - half + span]), Palette.BRIDGE)
+		for i in 7:
+			var k := lerpf(-1.0, 1.0, i / 6.0)
+			draw_line(c + span * k - half, c + span * k + half, Palette.BRIDGE_RAIL, 1.0)
+		draw_line(c - half - span, c - half + span, Palette.BRIDGE_RAIL, 2.5)
+		draw_line(c + half - span, c + half + span, Palette.BRIDGE_RAIL, 2.5)
+	# Paved wards: the bailey, then the keep's yard over it.
+	draw_colored_polygon(t.curtain, Palette.PAVING)
+	draw_colored_polygon(t.keep, Palette.PAVING_KEEP)
+	_flagstones(t, rng)
+	# Shadows, then the walls, towers and great tower on top.
+	var thick := Terrain.WALL_HALF * 2.0
+	for w in t.walls:
+		draw_line(w[0] + Vector2(4, 6), w[1] + Vector2(4, 6), Palette.WALL_SHADOW, thick + 2.0)
+	for tw in t.towers:
+		draw_circle(tw.c + Vector2(5, 7), tw.r, Palette.WALL_SHADOW)
+	for r in t.blocks:
+		draw_rect(Rect2(r.position + Vector2(7, 10), r.size), Palette.WALL_SHADOW)
+	for w in t.walls:
+		_wall(w[0], w[1], thick)
+	for g in t.gates:
+		_gate_arch(g)
+	for i in t.gates.size():
+		_gate_doors(t.gates[i], t.gate_broken[i], rng)
+	for tw in t.towers:
+		_tower(tw.c, tw.r)
+	for r in t.blocks:
+		_great_tower(r)
+	# Pennants on the corner towers, in the holder's colour.
+	for tw in t.towers:
+		if tw.r >= 26.0:
+			_pennant(tw.c, Palette.TEAM[t.holder])
+
+
+func _flagstones(t: Terrain, rng: RandomNumberGenerator) -> void:
+	var cell := 26.0
+	var y := 0.0
+	var row := 0
+	while y < Terrain.SIZE.y:
+		var x := -cell * 0.5 * (row % 2)
+		while x < Terrain.SIZE.x:
+			var c := Vector2(x + cell * 0.5, y + cell * 0.5)
+			if t.inside(c):
+				draw_rect(Rect2(Vector2(x, y), Vector2(cell, cell)), Palette.PAVING_LINE, false, 1.0)
+				if rng.randf() < 0.08:
+					draw_rect(Rect2(Vector2(x + 2, y + 2), Vector2(cell - 4, cell - 4)), Color(1, 1, 1, 0.07))
+			x += cell
+		y += cell
+		row += 1
+
+
+func _wall(a: Vector2, b: Vector2, thick: float) -> void:
+	draw_line(a, b, Palette.STONE_DARK, thick + 3.0)
+	draw_line(a, b, Palette.STONE, thick)
+	# A walkway down the middle and merlons along both faces.
+	var dir := (b - a).normalized()
+	var side := dir.orthogonal()
+	draw_line(a, b, Palette.STONE_LIGHT, thick * 0.35)
+	var n := int(a.distance_to(b) / 9.0)
+	for i in n:
+		var p := a + dir * (i * 9.0 + 4.5)
+		for face in [-1.0, 1.0]:
+			var q: Vector2 = p + side * face * (thick * 0.5 - 1.5)
+			draw_rect(Rect2(q - Vector2(2.2, 2.2), Vector2(4.4, 4.4)), Palette.STONE_DARK if i % 2 == 0 else Palette.STONE)
+
+
+func _gate_arch(g: Dictionary) -> void:
+	var half: Vector2 = g.along * Terrain.GATE_HALF
+	var depth: Vector2 = g.out * (Terrain.WALL_HALF + 3.0)
+	var c: Vector2 = g.c
+	draw_colored_polygon(PackedVector2Array([c - half - depth, c + half - depth, c + half + depth, c - half + depth]), Palette.STONE_DARK)
+	draw_colored_polygon(PackedVector2Array([c - half * 0.9 - depth * 0.7, c + half * 0.9 - depth * 0.7, c + half * 0.9 + depth * 0.7, c - half * 0.9 + depth * 0.7]), Color(0.25, 0.22, 0.18))
+
+
+## Shut: oak doors banded with iron. Broken: splinters on the stones.
+func _gate_doors(g: Dictionary, broken: bool, rng: RandomNumberGenerator) -> void:
+	var c: Vector2 = g.c
+	var along: Vector2 = g.along
+	var out: Vector2 = g.out
+	var half := along * (Terrain.GATE_HALF - 3.0)
+	if broken:
+		for i in 14:
+			var p := c + along * rng.randf_range(-30, 30) + out * rng.randf_range(-16, 16)
+			var d := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(3.0, 8.0)
+			draw_line(p - d, p + d, Palette.WOOD_DARK if i % 3 == 0 else Palette.WOOD, 2.5)
+		return
+	var depth := out * 4.0
+	draw_colored_polygon(PackedVector2Array([c - half - depth, c + half - depth, c + half + depth, c - half + depth]), Palette.WOOD)
+	for i in 9:
+		var k := lerpf(-1.0, 1.0, i / 8.0)
+		draw_line(c + half * k - depth, c + half * k + depth, Palette.WOOD_DARK, 1.0)
+	for k in [-0.55, 0.0, 0.55]:
+		draw_line(c - half + out * 4.0 * k, c + half + out * 4.0 * k, Color(0.18, 0.18, 0.2), 1.5)
+
+
+func _tower(c: Vector2, r: float) -> void:
+	draw_circle(c, r + 1.5, Palette.STONE_DARK)
+	draw_circle(c, r, Palette.STONE)
+	draw_circle(c, r * 0.62, Palette.STONE_LIGHT)
+	draw_arc(c, r * 0.62, 0, TAU, 32, Palette.STONE_DARK, 1.2, true)
+	var n := int(TAU * r / 9.0)
+	for i in n:
+		if i % 2 == 0:
+			var p := c + Vector2.from_angle(TAU * i / n) * (r - 2.5)
+			draw_rect(Rect2(p - Vector2(2.4, 2.4), Vector2(4.8, 4.8)), Palette.STONE_DARK)
+
+
+## The great tower: a hipped roof seen from above.
+func _great_tower(r: Rect2) -> void:
+	draw_rect(r.grow(2.0), Palette.STONE_DARK)
+	draw_rect(r, Palette.STONE)
+	var roof := r.grow(-9.0)
+	var ridge_a := Vector2(roof.position.x + roof.size.y * 0.5, roof.get_center().y)
+	var ridge_b := Vector2(roof.end.x - roof.size.y * 0.5, roof.get_center().y)
+	var tl := roof.position
+	var tr := Vector2(roof.end.x, roof.position.y)
+	var br := roof.end
+	var bl := Vector2(roof.position.x, roof.end.y)
+	draw_colored_polygon(PackedVector2Array([tl, tr, ridge_b, ridge_a]), Palette.ROOF_LIGHT)
+	draw_colored_polygon(PackedVector2Array([bl, br, ridge_b, ridge_a]), Palette.ROOF)
+	draw_colored_polygon(PackedVector2Array([tl, ridge_a, bl]), Palette.ROOF_LIGHT.lerp(Palette.ROOF, 0.5))
+	draw_colored_polygon(PackedVector2Array([tr, ridge_b, br]), Palette.ROOF.darkened(0.15))
+	draw_line(ridge_a, ridge_b, Palette.WOOD_DARK, 2.0)
+	for corner in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
+		_tower(corner, 13.0)
+	_pennant(r.get_center() + Vector2(0, -4), Palette.TEAM[terrain.holder])
+
+
+func _pennant(at: Vector2, color: Color) -> void:
+	var top := at + Vector2(0, -26)
+	draw_line(at, top, Palette.WOOD_DARK, 2.0)
+	draw_colored_polygon(PackedVector2Array([top, top + Vector2(18, 4), top + Vector2(0, 9)]), color)
+	draw_polyline(PackedVector2Array([top, top + Vector2(18, 4), top + Vector2(0, 9)]), Color(0, 0, 0, 0.4), 1.0)

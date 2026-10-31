@@ -27,6 +27,8 @@ var morale_max := 0.0
 var waypoints := PackedVector2Array()
 var final_facing := NAN
 var target_id := -1
+## A gate to batter with shot (guns only), or -1.
+var target_gate := -1
 ## A point to pass through before closing on the target (a flank).
 var via := Vector2(NAN, NAN)
 var repath := 0.0

@@ -49,6 +49,8 @@ var drag := {}
 var pinned := false
 ## Screen pixels from a route's end marker that still count as tapping it.
 const END_REACH_PX := 20.0
+## How near a gate (in world units) a tap counts as a tap on it.
+const GATE_TAP := 50.0
 
 var _persona: Dictionary
 var _terrain_view
@@ -359,9 +361,33 @@ func _release(sp: Vector2) -> void:
 		"order":
 			if moved:
 				_order_line(d.start_world, wp)
+			elif not deploying and _bombard(wp):
+				pinned = false
 			else:
 				_order_point(wp, d.shift or pinned)
 				pinned = false
+
+
+## A tap on an enemy gate with guns selected: the guns batter it and the
+## rest of the selection goes to it (foot pressed against it ram it).
+func _bombard(wp: Vector2) -> bool:
+	var t := battle.terrain
+	var g := t.gate_near(wp, GATE_TAP)
+	if g < 0 or t.gate_broken[g] or t.holder == 0:
+		return false
+	var guns := _selected_regiments().filter(func(r): return r.kind == UnitTypes.Kind.CANNONS)
+	if guns.is_empty():
+		return false
+	var orders: Array = []
+	for r in _selected_regiments():
+		if r.kind == UnitTypes.Kind.CANNONS:
+			orders.append({"type": "bombard", "id": r.id, "gate": g})
+		else:
+			orders.append({"type": "move", "id": r.id, "to": t.gates[g].c + t.gates[g].out * 30.0})
+	battle.apply_orders(orders)
+	units_view.add_fx("mark", t.gates[g].c, 0.5)
+	_click()
+	return true
 
 
 func _tap_unit(id: int, shift: bool) -> void:
@@ -524,6 +550,15 @@ func _react(events: Array[Dictionary]) -> void:
 				_corpses.add(e.pos, e.team)
 			"volley":
 				_sound("volley", -10.0, randf_range(0.9, 1.15))
+			"ram":
+				units_view.add_fx("dust", e.pos, 0.6, {"size": 14.0})
+				_sound("boom", -14.0, 1.8)
+			"gate":
+				_terrain_view.queue_redraw()
+				units_view.add_fx("dust", e.pos, 1.6, {"size": 46.0})
+				units_view.add_fx("smoke", e.pos, 2.2, {"size": 40.0})
+				units_view.add_fx("text", e.pos, 2.0, {"text": "The gate is down!", "color": Palette.GOLD})
+				_sound("boom", -2.0, 0.7)
 			"musket":
 				var facing: float = e.facing
 				var width: float = e.width

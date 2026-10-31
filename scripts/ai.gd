@@ -15,7 +15,10 @@ const THINK_EVERY := 0.75
 ## reserve: foot regiments kept behind the line and sent onto the flank of
 ## whoever a friend is fighting, as soon as that friend is pinned.
 ## terrain: archers take a hill behind the line when one is in reach.
+## garrison: a castle's defenders. Foot fight only what gets inside the
+## walls, shooters and guns man the wall-walk; horse may still sally.
 const PERSONAS := {
+	"garrison": {"hold": INF, "flank": true, "garrison": true},
 	"balanced": {"hold": 8.0, "flank": true},
 	"aggressive": {"hold": 0.0, "flank": true},
 	"dug_in": {"hold": 45.0, "flank": false},
@@ -101,7 +104,11 @@ static func _interleave(foot: Array[Regiment]) -> Array:
 	return out
 
 
+## Whichever side holds a castle fights as its garrison, whatever its
+## persona otherwise.
 static func decide(b: Battle, team: int, persona: Dictionary) -> Array:
+	if b.terrain.holder == team:
+		persona = persona.merged(PERSONAS.garrison, true)
 	var mine := _fighting(b, team)
 	var foes := _fighting(b, 1 - team)
 	var orders: Array = []
@@ -113,6 +120,16 @@ static func decide(b: Battle, team: int, persona: Dictionary) -> Array:
 	var advancing: bool = b.time >= persona.hold or _foe_near_line(mine, foes, 260.0)
 	var goals := _flags_left_to_right(b)
 	var reserve := _reserve(mine, persona.get("reserve", 0))
+	var garrison: bool = persona.get("garrison", false)
+	# A garrison's line forms across the gateway, not out on the flags.
+	if garrison:
+		goals = [b.terrain.gate_mouth()] as Array[Vector2]
+	# A garrison's foot ignore what is still outside the walls.
+	var foot_foes: Array[Regiment] = []
+	for f in foes:
+		if not garrison or b.terrain.inside(f.pos):
+			foot_foes.append(f)
+	var shooters := mine.filter(func(r): return UnitTypes.is_ranged(r.kind))
 	var line: Array[Regiment] = []
 	for r in mine:
 		if (r.kind == K.SWORDS or r.kind == K.PIKES) and not r.id in reserve:
@@ -123,13 +140,19 @@ static func decide(b: Battle, team: int, persona: Dictionary) -> Array:
 		match r.kind:
 			K.SWORDS, K.PIKES:
 				if r.id in reserve:
-					o = _reserve_foot(b, r, line, foes, home_y)
+					o = _reserve_foot(b, r, line, foot_foes, home_y)
 				else:
-					o = _foot(r, foes, advancing, _line_spot(line, line.find(r), goals), home)
+					o = _foot(r, foot_foes, advancing, _line_spot(line, line.find(r), goals), home)
 			K.ARCHERS, K.MUSKETS:
-				o = _archer(b, r, mine, foes, home_y, advancing, persona.get("terrain", false))
+				if garrison:
+					o = _man_wall(b, r, foes, shooters.find(r))
+				else:
+					o = _archer(b, r, mine, foes, home_y, advancing, persona.get("terrain", false))
 			K.CANNONS:
-				o = _gun(b, r, foes, _flag_goals(b, team), home)
+				if garrison:
+					o = _man_wall(b, r, foes, shooters.find(r))
+				else:
+					o = _gun(b, r, foes, _flag_goals(b, team), home)
 			K.CAVALRY:
 				o = _horse(b, r, foes, advancing, persona)
 			K.GENERAL:
@@ -307,9 +330,37 @@ static func _hill_near(t: Terrain, spot: Vector2, front: Vector2) -> Vector2:
 	return best
 
 
-## Guns keep firing at whatever is in range; otherwise they stand behind
-## the most wanted flag, close enough to cover it.
+## A garrison's shooter takes its station on the wall-walk (the best
+## stations first, in id order) and from there shoots back at the enemy's
+## shooters first, then at the nearest in reach.
+static func _man_wall(b: Battle, r: Regiment, foes: Array[Regiment], index: int) -> Variant:
+	var posts := b.terrain.posts
+	if posts.is_empty():
+		return null
+	var post := posts[index % posts.size()]
+	if r.pos.distance_to(post) > 24.0:
+		return _move(r, post)
+	var reach := r.fire_range * b.terrain.range_mult(r.pos)
+	var shooters: Array[Regiment] = []
+	for f in foes:
+		if UnitTypes.is_ranged(f.kind):
+			shooters.append(f)
+	var target := _nearest(r, shooters, reach)
+	if target == null:
+		target = _nearest(r, foes, reach)
+	return _attack(r, target) if target != null else null
+
+
+## Before a castle, guns batter the nearest gate still shut against them.
+## Otherwise they keep firing at whatever is in range, or stand behind the
+## most wanted flag, close enough to cover it.
 static func _gun(b: Battle, r: Regiment, foes: Array[Regiment], goals: Array[Vector2], home: Vector2) -> Variant:
+	if b.terrain.has_walls() and b.terrain.holder != r.team:
+		for g in b.terrain.gates.size():
+			if not b.terrain.gate_broken[g]:
+				if r.target_gate == g:
+					return null
+				return {"type": "bombard", "id": r.id, "gate": g}
 	var reach := r.fire_range * b.terrain.range_mult(r.pos)
 	if _nearest(r, foes, reach) != null:
 		return null

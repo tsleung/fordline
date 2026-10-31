@@ -66,6 +66,7 @@ func _draw() -> void:
 		_deploy_zones(b.terrain.deploy_depth)
 	for f in b.flags:
 		_flag_zone(f, p)
+	_gate_damage(b, p)
 	for id in screen.selected:
 		var r := b.get_regiment(id)
 		if r != null and r.alive():
@@ -84,6 +85,27 @@ func _draw() -> void:
 	if not screen.demo:
 		_orders(b, p)
 		_preview(p)
+
+
+## Cracks across a battered gate and a bar of what is left of it.
+func _gate_damage(b: Battle, p: float) -> void:
+	for i in b.gate_hp.size():
+		var g: Dictionary = b.terrain.gates[i]
+		var left: float = b.gate_hp[i] / g.hp
+		if b.terrain.gate_broken[i] or left >= 1.0:
+			continue
+		var c: Vector2 = g.c
+		var along: Vector2 = g.along
+		var out: Vector2 = g.out
+		var cracks := int((1.0 - left) * 8.0)
+		for k in cracks:
+			var x := (float(k * 37 % 11) / 10.0 - 0.5) * Terrain.GATE_HALF * 1.6
+			var a := c + along * x - out * 4.0
+			draw_line(a, a + out * 8.0 + along * (3.0 if k % 2 == 0 else -3.0), Color(0.1, 0.07, 0.04), 1.6)
+		var bar := c + out * 22.0 * p - along * 30.0 * p
+		var w := 60.0 * p
+		draw_rect(Rect2(bar - Vector2(0, 3.0 * p), Vector2(w, 6.0 * p)), Color(0, 0, 0, 0.55))
+		draw_rect(Rect2(bar - Vector2(0, 3.0 * p), Vector2(w * left, 6.0 * p)), Palette.TEAM_LIGHT[b.terrain.holder])
 
 
 func _deploy_zones(depth: Array) -> void:

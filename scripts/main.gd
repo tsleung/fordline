@@ -527,6 +527,7 @@ func _how_to_play() -> String:
 		"To add a stop, tap the gold marker at the end of a route, then tap where to go next (or shift-click on a computer).",
 		"",
 		"Pikes stop cavalry. Swords beat pikes. Cavalry rides down archers, muskets and guns. Muskets go through armour and shake whoever they hit. Flanks and rears take more damage and break faster.",
+		"Before a castle: select guns and tap a gate to batter it; foot pressed against a gate ram it.",
 		"Pause any time; orders still work. Rally brings broken regiments back near your general.",
 	])
 

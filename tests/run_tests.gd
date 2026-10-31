@@ -21,6 +21,7 @@ func _run() -> void:
 	var quick := "--quick" in OS.get_cmdline_user_args()
 	_test_combat()
 	_test_terrain()
+	_test_fortress()
 	_test_campaign()
 	await _test_routes()
 	await _test_screens()
@@ -217,6 +218,21 @@ func _test_routes() -> void:
 	screen.leave()
 	_check(heard[0], "leaving is announced")
 	screen.free()
+	# Guns selected, a tap on the enemy's gate: they batter it, and the
+	# foot selected with them march on it.
+	var siege = preload("res://scripts/battle_screen.gd").new()
+	var spec := Scenarios.resolve("storm", 1)
+	siege.setup(Scenarios.make_battle(spec, 1), spec.persona, spec.name)
+	root.add_child(siege)
+	await process_frame
+	siege.begin_battle()
+	var gun: Regiment = siege.battle.team_regiments(0).filter(func(x): return x.kind == K.CANNONS)[0]
+	var foot: Regiment = siege.battle.team_regiments(0).filter(func(x): return x.kind == K.SWORDS)[0]
+	siege._select([gun.id, foot.id] as Array[int])
+	_tap(siege, siege.battle.terrain.gates[0].c)
+	_check(gun.target_gate == 0, "tapping a gate with guns selected batters it")
+	_check(foot.waypoints.size() > 0 and siege.route_end(foot).distance_to(siege.battle.terrain.gates[0].c) < 60.0, "the foot with them march on the gate")
+	siege.free()
 
 
 func _tap(screen, world_pos: Vector2) -> void:
@@ -252,6 +268,69 @@ func _test_screens() -> void:
 	DirAccess.remove_absolute("user://test_screens.cfg")
 
 
+## The castle: routes go round stone and through gates, a shut gate stops
+## the besieger until it is battered down, no blades cross a wall, and the
+## wall-walk gives height and cover.
+func _test_fortress() -> void:
+	var t := Terrain.generate("fortress", 3)
+	var outside := Vector2(650, 700)
+	var keep_flag: Vector2 = t.flags[2]
+	var way := t.path(outside, keep_flag)
+	var at := outside
+	var crosses_stone := false
+	var by_gate := [false, false]
+	for w in way:
+		for k in 40:
+			var q := at.lerp(w, k / 39.0)
+			crosses_stone = crosses_stone or t.walled(q, t.holder)
+			for g in 2:
+				by_gate[g] = by_gate[g] or q.distance_to(t.gates[g].c) < 30.0
+		at = w
+	_check(not crosses_stone, "a route into the keep never crosses stone")
+	_check(by_gate[0] and by_gate[1], "a route into the keep runs through both gates")
+	_check(way[way.size() - 1].distance_to(keep_flag) < 1.0, "a route into the keep ends where it was sent")
+	_check(t.walled(t.gates[0].c, 0) and not t.walled(t.gates[0].c, 1), "a gate is shut to the besieger and open to the garrison")
+	var post := t.posts[0]
+	_check(t.on_rampart(post) and t.height(post) == 1.0 and t.cover(post) == Terrain.BATTLEMENTS, "the wall-walk gives height and cover")
+	_check(t.is_water(t.gates[0].c + t.gates[0].out * 36.0 + Vector2(80, 0)) and not t.is_water(t.gates[0].c + t.gates[0].out * 36.0), "the moat has a bridge at the gate")
+	var held := Terrain.generate("fortress_held", 3)
+	_check(held.inside(Vector2(650, Terrain.SIZE.y - 190)) and not held.inside(Vector2(650, 190)), "a castle can be the player's, at the south edge")
+
+	# One regiment of swords sent at the gate: it stops there, rams it
+	# down, and goes in.
+	var b := Battle.new(Terrain.generate("fortress", 3), 1)
+	var sword := b.add_regiment(0, K.SWORDS, 48, Vector2(650, 560), -PI * 0.5, 0, {})
+	b.add_regiment(1, K.GENERAL, 10, Vector2(650, 160), PI * 0.5, 0, {})
+	b.begin()
+	b.apply_orders([{"type": "move", "id": sword.id, "to": Vector2(650, 330)}])
+	var got_in_early := false
+	while not b.terrain.gate_broken[0] and b.time < 240.0:
+		b.step(1.0 / 15.0)
+		got_in_early = got_in_early or b.terrain.inside(sword.pos)
+	_check(not got_in_early, "a shut gate keeps the besieger out")
+	_check(b.terrain.gate_broken[0] and b.time > 60.0, "one regiment rams the gate down, slowly (%ds)" % int(b.time))
+	b.apply_orders([{"type": "move", "id": sword.id, "to": Vector2(650, 330)}])
+	for i in 300:
+		b.step(1.0 / 15.0)
+	_check(b.terrain.inside(sword.pos), "through the broken gate")
+
+	# Swords either side of the curtain wall can't fight; guns can batter
+	# the gate, but not their own side's.
+	var w := Battle.new(Terrain.generate("fortress", 3), 1)
+	var out_sword := w.add_regiment(0, K.SWORDS, 48, Vector2(400, 448), -PI * 0.5, 0, {})
+	var in_sword := w.add_regiment(1, K.SWORDS, 48, Vector2(400, 414), PI * 0.5, 0, {})
+	var gun := w.add_regiment(0, K.CANNONS, 12, Vector2(650, 760), -PI * 0.5, 0, {})
+	var own_gun := w.add_regiment(1, K.CANNONS, 12, Vector2(650, 300), PI * 0.5, 0, {})
+	w.begin()
+	w.apply_orders([{"type": "bombard", "id": gun.id, "gate": 0}, {"type": "bombard", "id": own_gun.id, "gate": 0}])
+	_check(own_gun.target_gate < 0, "a garrison's guns won't batter their own gate")
+	w.step(1.0 / 15.0)
+	_check(out_sword.pos.distance_to(in_sword.pos) < 40.0 and out_sword.contacts.is_empty(), "no blades cross a wall")
+	for i in 30 * 15:
+		w.step(1.0 / 15.0)
+	_check(w.gate_hp[0] < w.terrain.gates[0].hp, "guns batter a gate")
+
+
 ## Every scenario builds, deploys on dry ground and finishes in time with
 ## the AI as the player; the hold scenario's clock decides on the flags.
 func _test_scenarios() -> void:
@@ -261,6 +340,8 @@ func _test_scenarios() -> void:
 			var b := Scenarios.make_battle(resolved, s)
 			for r in b.regiments:
 				_check(not b.terrain.is_water(r.pos), "%s deploys on dry ground" % spec.id)
+				_check(not b.terrain.walled(r.pos, r.team), "%s deploys clear of walls" % spec.id)
+				_check(b.terrain.inside(r.pos) == (r.team == b.terrain.holder), "%s deploys on its own side of the walls" % spec.id)
 			var ok := _fight(b, true, resolved.persona)
 			print("  scenario %-9s seed %d  %-14s %3ds  stars %d  lead changes %d" % [
 				spec.id, s, "player won" if b.winner == 0 else "enemy won", int(b.time),

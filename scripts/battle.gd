@@ -28,6 +28,15 @@ const PANIC_RADIUS := 140.0
 const PANIC_SHOCK := 3.0
 const ENGAGE_RADIUS := 70.0
 
+## Gates (their strength is the terrain's): what a cannonball or a barrage
+## shell landing on one takes off it; what each soldier of the regiment
+## pressed closest against it from outside takes off per second (one ram
+## at a time); how close counts as pressed.
+const GATE_SHOT := 5.0
+const GATE_SHELL := 14.0
+const RAM_PER_MAN := 0.04
+const RAM_REACH := 48.0
+
 ## Stamina per second: lost in melee, on the march and in flight; regained
 ## standing clear of the fight.
 const FIGHT_TIRE := 0.018
@@ -56,6 +65,11 @@ var killed := [0, 0]
 ## loses otherwise.
 var deadline := 0.0
 var hold_needed := 1
+## Resolve per second per flag of difference; a siege sets 0, so the
+## castle's flags decide at the deadline rather than bleeding the attacker.
+var flag_drain := FLAG_DRAIN
+## Each gate's strength left (fortress maps).
+var gate_hp: Array[float] = []
 ## Abilities the player (team 0) has, and their cooldowns.
 var abilities: Array[String] = []
 var cooldowns := {"rally": 0.0, "barrage": 0.0, "march": 0.0}
@@ -72,6 +86,8 @@ func _init(map: Terrain, seed_value: int) -> void:
 	rng.seed = seed_value
 	for p in map.flags:
 		flags.append({"pos": p, "owner": -1, "progress": 0.0})
+	for g in map.gates:
+		gate_hp.append(g.hp)
 
 
 func add_regiment(
@@ -152,6 +168,8 @@ func apply_orders(orders: Array) -> void:
 				_ability_barrage(o.pos)
 			"march":
 				_ability_march(o.ids)
+			"bombard":
+				_order_bombard(o)
 
 
 func _commandable(id: int) -> Regiment:
@@ -166,7 +184,7 @@ func _order_place(o: Dictionary) -> void:
 	if r == null or phase != "deploy":
 		return
 	var to := terrain.clamp_deploy(r.team, o.to)
-	if terrain.is_water(to):
+	if terrain.is_water(to) or terrain.walled(to, r.team):
 		return
 	r.pos = to
 	if o.has("facing"):
@@ -187,6 +205,7 @@ func _order_move(o: Dictionary) -> void:
 		r.waypoints = terrain.path(r.pos, o.to)
 	r.final_facing = o.get("facing", NAN)
 	r.target_id = -1
+	r.target_gate = -1
 	r.via = Vector2(NAN, NAN)
 	r.ordered = true
 	if r.state == S.IDLE:
@@ -199,11 +218,29 @@ func _order_attack(o: Dictionary) -> void:
 	if r == null or t == null or not t.alive() or t.team == r.team or phase != "battle":
 		return
 	r.target_id = t.id
+	r.target_gate = -1
 	r.via = o.get("via", Vector2(NAN, NAN))
 	r.waypoints = PackedVector2Array()
 	r.repath = 0.0
 	r.final_facing = NAN
 	r.ordered = true
+
+
+## Guns only: batter an enemy gate still standing, from within range.
+func _order_bombard(o: Dictionary) -> void:
+	var r := _commandable(o.id)
+	var g: int = o.gate
+	if r == null or r.kind != K.CANNONS or phase != "battle" or not _gate_standing(g) or terrain.holder == r.team:
+		return
+	r.target_gate = g
+	r.target_id = -1
+	r.waypoints = PackedVector2Array()
+	r.repath = 0.0
+	r.ordered = true
+
+
+func _gate_standing(g: int) -> bool:
+	return g >= 0 and g < gate_hp.size() and not terrain.gate_broken[g]
 
 
 func _order_halt(o: Dictionary) -> void:
@@ -212,6 +249,7 @@ func _order_halt(o: Dictionary) -> void:
 		return
 	r.waypoints = PackedVector2Array()
 	r.target_id = -1
+	r.target_gate = -1
 	r.ordered = true
 
 
@@ -269,6 +307,7 @@ func step(dt: float) -> void:
 			_think(r, dt)
 	_separate()
 	_melee(dt)
+	_ram(dt)
 	_tire(dt)
 	_ranged(dt)
 	_fly(dt)
@@ -298,7 +337,7 @@ func _update_contacts() -> void:
 				continue
 			var d := a.pos.distance_to(b.pos)
 			var ang := (b.pos - a.pos).angle()
-			if d < a.reach(ang) + b.reach(ang + PI):
+			if d < a.reach(ang) + b.reach(ang + PI) and not terrain.wall_between(a.pos, b.pos):
 				pairs.append([d, a, b])
 	pairs.sort_custom(func(x, y): return x[0] < y[0])
 	for p in pairs:
@@ -341,6 +380,9 @@ func _think(r: Regiment, dt: float) -> void:
 
 ## Close on the target, or stop in range of it when shooting.
 func _pursue(r: Regiment) -> void:
+	if r.target_gate >= 0:
+		_pursue_gate(r)
+		return
 	if r.target_id < 0:
 		return
 	var t := get_regiment(r.target_id)
@@ -363,6 +405,21 @@ func _pursue(r: Regiment) -> void:
 	if r.repath <= 0.0 or r.waypoints.is_empty():
 		r.waypoints = terrain.path(r.pos, goal)
 		r.repath = 0.5
+
+
+func _pursue_gate(r: Regiment) -> void:
+	if not _gate_standing(r.target_gate):
+		r.target_gate = -1
+		r.waypoints = PackedVector2Array()
+		return
+	var g: Vector2 = terrain.gates[r.target_gate].c
+	if r.pos.distance_to(g) <= _range_of(r) * 0.9:
+		r.waypoints = PackedVector2Array()
+		r.final_facing = (g - r.pos).angle()
+		return
+	if r.repath <= 0.0 or r.waypoints.is_empty():
+		r.waypoints = terrain.path(r.pos, g + (r.pos - g).normalized() * _range_of(r) * 0.8)
+		r.repath = 1.0
 
 
 func _hold_contact(r: Regiment, dt: float) -> void:
@@ -406,7 +463,9 @@ func _flee(r: Regiment, dt: float) -> void:
 	if r.waypoints.is_empty():
 		r.waypoints = terrain.path(r.pos, _edge_point(r))
 	_advance(r, r.waypoints[0], 1.15, dt)
-	if r.pos.distance_to(r.waypoints[0]) < 6.0:
+	# A route planned before the crowd pushed it off its line can run into
+	# stone; then it was cleared, and the next step plans afresh.
+	if not r.waypoints.is_empty() and r.pos.distance_to(r.waypoints[0]) < 6.0:
 		r.waypoints.remove_at(0)
 	var edge_y := Terrain.SIZE.y - 12.0 if r.team == 0 else 12.0
 	if (r.team == 0 and r.pos.y >= edge_y) or (r.team == 1 and r.pos.y <= edge_y):
@@ -428,12 +487,12 @@ func _advance(r: Regiment, goal: Vector2, pace: float, dt: float) -> void:
 	var stride := minf(dist, r.speed * mult * dt)
 	var dir := to_goal / dist
 	var next := r.pos + dir * stride
-	if terrain.is_blocked(next) and r.state != S.ROUTING:
+	if _stopped(r, next):
 		var slide_x := r.pos + Vector2(dir.x, 0.0) * stride
 		var slide_y := r.pos + Vector2(0.0, dir.y) * stride
-		if not terrain.is_blocked(slide_x):
+		if not _stopped(r, slide_x):
 			next = slide_x
-		elif not terrain.is_blocked(slide_y):
+		elif not _stopped(r, slide_y):
 			next = slide_y
 		else:
 			r.last_speed = 0.0
@@ -442,6 +501,11 @@ func _advance(r: Regiment, goal: Vector2, pace: float, dt: float) -> void:
 	r.last_speed = r.pos.distance_to(next) / dt
 	r.pos = terrain.clamp_to_field(next)
 	_turn(r, dir.angle(), dt * 1.5)
+
+
+## Water stops all but the routing; walls and shut gates stop everyone.
+func _stopped(r: Regiment, p: Vector2) -> bool:
+	return (terrain.is_blocked(p) and r.state != S.ROUTING) or terrain.walled(p, r.team)
 
 
 func _turn(r: Regiment, angle: float, dt: float) -> void:
@@ -472,7 +536,7 @@ func _separate() -> void:
 
 func _nudge(r: Regiment, by: Vector2) -> void:
 	var next := terrain.clamp_to_field(r.pos + by)
-	if not terrain.is_water(next):
+	if not terrain.is_water(next) and not terrain.walled(next, r.team):
 		r.pos = next
 
 
@@ -495,6 +559,48 @@ func _melee(dt: float) -> void:
 			if e.fighting():
 				e.morale -= Combat.MELEE_STRAIN * Combat.ZONE_MORALE[z] * share * dt * Combat.fatigue_nerve(e.stamina)
 			_wound(e, dps * dt, r.pos, r, Combat.ZONE_MORALE[z])
+
+
+## Foot pressed against an enemy gate from outside batter it down.
+func _ram(dt: float) -> void:
+	for g in gate_hp.size():
+		if terrain.gate_broken[g]:
+			continue
+		var gate: Dictionary = terrain.gates[g]
+		var ram: Regiment = null
+		var ram_d := RAM_REACH
+		for r in regiments:
+			if r.team == terrain.holder or not r.fighting() or UnitTypes.is_ranged(r.kind) or UnitTypes.is_mounted(r.kind):
+				continue
+			var d := r.pos.distance_to(gate.c)
+			if d < ram_d and (r.pos - gate.c).dot(gate.out) > 0.0:
+				ram_d = d
+				ram = r
+		if ram != null:
+			var before := gate_hp[g]
+			_hit_gate(g, RAM_PER_MAN * ram.men() * dt)
+			if int(before / 6.0) != int(gate_hp[g] / 6.0):
+				_emit({"type": "ram", "pos": gate.c})
+
+
+func _hit_gates(at: Vector2, radius: float, dmg: float, by_team: int) -> void:
+	if by_team == terrain.holder:
+		return
+	for g in gate_hp.size():
+		if not terrain.gate_broken[g] and at.distance_to(terrain.gates[g].c) < radius:
+			_hit_gate(g, dmg)
+
+
+func _hit_gate(g: int, dmg: float) -> void:
+	gate_hp[g] -= dmg
+	if gate_hp[g] > 0.0:
+		return
+	gate_hp[g] = 0.0
+	terrain.gate_broken[g] = true
+	for r in regiments:
+		if r.target_gate == g:
+			r.target_gate = -1
+	_emit({"type": "gate", "pos": terrain.gates[g].c, "index": g})
 
 
 func _tire(dt: float) -> void:
@@ -522,6 +628,15 @@ func _ranged(dt: float) -> void:
 		if not r.fighting() or not UnitTypes.is_ranged(r.kind):
 			continue
 		r.reload -= dt
+		if r.target_gate >= 0 and _gate_standing(r.target_gate):
+			var gate: Vector2 = terrain.gates[r.target_gate].c
+			if r.contacts.is_empty() and r.pos.distance_to(gate) <= _range_of(r):
+				if r.waypoints.is_empty():
+					_turn(r, (gate - r.pos).angle(), dt)
+				if r.reload <= 0.0:
+					r.reload = r.reload_time
+					_fire_guns(r, gate)
+			continue
 		if not r.contacts.is_empty() or (r.state == S.MOVING and r.target_id < 0):
 			continue
 		var t := _shot_target(r)
@@ -538,7 +653,7 @@ func _ranged(dt: float) -> void:
 			K.MUSKETS:
 				_fire_muskets(r, t)
 			_:
-				_fire_guns(r, t)
+				_fire_guns(r, t.pos)
 
 
 func _shot_target(r: Regiment) -> Regiment:
@@ -595,12 +710,12 @@ func _fire_muskets(r: Regiment, t: Regiment) -> void:
 	_emit({"type": "musket", "pos": r.pos, "facing": r.facing, "width": r.width(), "team": r.team})
 
 
-func _fire_guns(r: Regiment, t: Regiment) -> void:
+func _fire_guns(r: Regiment, at: Vector2) -> void:
 	var guns := 2 if r.men() >= 5 else 1
-	var d := r.pos.distance_to(t.pos)
+	var d := r.pos.distance_to(at)
 	for g in guns:
 		var scatter := 8.0 + d * 0.06
-		var to := t.pos + Vector2(rng.randf_range(-scatter, scatter), rng.randf_range(-scatter, scatter))
+		var to := at + Vector2(rng.randf_range(-scatter, scatter), rng.randf_range(-scatter, scatter))
 		var from := r.pos + r.forward().orthogonal() * (g - 0.5) * 18.0
 		projectiles.append({
 			"kind": "ball", "from": from, "to": to, "t": 0.0, "dur": 0.25 + d / 600.0 + g * 0.12,
@@ -626,6 +741,7 @@ func _fly(dt: float) -> void:
 				_wound(t, p.dmg, p.from, src, 1.0)
 		else:
 			_blast(p.to, 1 - p.team, 13.0, 3, 6.0, src)
+			_hit_gates(p.to, 40.0, GATE_SHOT, p.team)
 			_emit({"type": "impact", "pos": p.to, "big": false})
 
 
@@ -638,6 +754,7 @@ func _shells(dt: float) -> void:
 	for s in due:
 		shells.erase(s)
 		_blast(s.pos, 1, 20.0, 5, 10.0, null)
+		_hit_gates(s.pos, 50.0, GATE_SHELL, 0)
 		_emit({"type": "impact", "pos": s.pos, "big": true})
 
 
@@ -805,7 +922,7 @@ func _flags(dt: float) -> void:
 func _drain(dt: float) -> void:
 	var diff := flags_held(0) - flags_held(1)
 	var dusk := time > DUSK_TIME
-	var rate := FLAG_DRAIN * (2.0 if dusk else 1.0)
+	var rate := flag_drain * (2.0 if dusk else 1.0)
 	if diff > 0:
 		resolve[1] -= rate * diff * dt
 	elif diff < 0:

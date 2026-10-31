@@ -65,6 +65,21 @@ once and the run is over; your score goes on the board.
   half as fast again, moves at three-quarters pace and its horse cannot
   charge. So the side that wins the first clash is tired when the second
   comes: a fresh reserve sent in where the line bends turns fights.
+- **Castles.** A fortress map is a castle backing onto one edge of the
+  field: a moat with one bridge, a curtain wall with a gatehouse, and an
+  inner keep with its own gate in its side wall and a great tower. Nobody
+  walks through stone, and no blades cross a wall; arrows, shot and balls
+  fly over. A gate is open to its own garrison and shut to the besieger
+  until battered down: the outer gate takes 300, the keep's 220; each
+  cannonball landing on it 5, each barrage shell 14, and the regiment of
+  foot pressed closest against it from outside 0.04 per man per second
+  (one ram at a time; 48 men take about two minutes alone). Select guns
+  and tap an enemy gate to batter it. The wall-walk, 40 deep inside each
+  wall, counts as a hilltop (range +25%, defence +0.12) and its
+  battlements stop 70% of arrows and shot. The side holding a castle
+  fights as its garrison: its foot form across the gateway and fight only
+  what gets inside, its shooters and guns man the wall-walk and answer
+  the enemy's shooters first, its horse may sally.
 - **Charge.** Cavalry that hits at speed deals heavy damage and a morale
   shock for two seconds, except against pikes from the front.
 
@@ -119,6 +134,8 @@ losses, crossings held at the end), and the best is kept on the device.
 | Hammer and Anvil | open woods | break them | pin with foot, ride round with horse |
 | Two Narrow Bridges | bridges | hold both bridges at 5:00 | forcing a crossing with guns and a barrage |
 | Riders at Dawn | the ridge | break them | pikes against a cavalry army |
+| The Storming of Duskwatch | a castle | hold two of its three flags at 6:00 | a siege: guns and a ram on the gate, then the keep |
+| The Last Keep | your castle | hold one flag at 5:00 | holding the walls, then the gateway |
 
 Scenarios are grouped by era, oldest first, with a tab for each above the
 list (the list remembers the last one). An era is data: a name, the kinds a
@@ -132,6 +149,10 @@ above; Pike and Shot fights with pikes, muskets, horse and guns:
 | Shot at the Fords | fords, deploy at the river | hold one ford at 3:00 | muskets on ground that makes the enemy wade |
 | The Cuirassiers | roads | break them | ride round the pikes into the shot behind them |
 | The Great Battery | the ridge | break them | cross open ground under three batteries |
+| The Breach at Greyhold | a castle | hold two of its three flags at 6:00 | great guns against walls built for bows |
+
+In a siege the flags don't drain resolve (a castle's three would bleed
+the attacker dry before the gate fell); they decide at the deadline.
 
 A range slider is the next step once there are four or more eras.
 
@@ -144,6 +165,21 @@ Measured 2026-10-31, AI players of the luck study, wins (stars):
 | Shot at the Fords | 0% | 100% | 0% | 100% (2.0) |
 | The Cuirassiers | 0% | 100% (2.0) | 100% (2.0) | 100% (3.0) |
 | The Great Battery | 0% | 0% | 67% | 100% (2.3) |
+
+Sieges, measured the same day:
+
+| Scenario | idle | slow | standard | sharp |
+|---|---|---|---|---|
+| The Storming of Duskwatch | 0% | 50% | 100% | 83% (1.3) |
+| The Last Keep | 67% | 33% | 83% | 100% (3.0) |
+| The Breach at Greyhold | 0% | 83% | 50% | 83% (1.7) |
+
+A garrison that does nothing holds the Last Keep two times in three:
+standing in the bailey is a defence. Building them, three things were
+found and fixed: every regiment at a gate rammed it at once, so it fell in
+twenty seconds; battlements that stopped only half lost the archery duel
+to two regiments in the open; and garrison archers shooting the nearest
+foot rather than the archers shooting them lost it anyway.
 
 Open: in the Pike and Shot Skirmish the slow AI player beats the standard
 one (in Medieval it doesn't: 50% and 53%). The first musket design made a
@@ -184,6 +220,10 @@ under three minutes. Best score is kept on the device.
 - `scripts/combat.gd` holds the rules as pure functions over values.
 - `scripts/campaign.gd` is pure: run state in, new run state out.
 - `scripts/terrain.gd` builds a seeded map and answers queries about it.
+  River maps route by banks and crossings; a fortress map routes on a
+  16-unit grid (Godot's AStarGrid2D) pulled tight to straight legs, with
+  gates open in the plan so a besieger's route ends pressed against the
+  gate, which is where it rams. Only the battle writes `gate_broken`.
 - The view (`battle_view.gd`) and HUD read state and turn the battle's
   events into effects and sound; they never write battle state.
 - `tests/run_tests.gd` runs headless: rules, pathing, campaign, and

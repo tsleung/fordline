@@ -9,6 +9,18 @@ const EDGE := 36.0
 const RIVER_HALF := 13.0
 const BANK_CLEARANCE := 24.0
 const ROAD_HALF := 9.0
+## Fortress walls: half their thickness; how far pathfinding keeps a
+## regiment's centre from them; the wall-walk's depth inside them.
+const WALL_HALF := 8.0
+const NAV_CLEAR := 12.0
+const RAMPART := 40.0
+## Share of arrows and shot that get through to a regiment on the wall-walk.
+const BATTLEMENTS := 0.3
+const NAV_CELL := 16.0
+## A gate's half-width along its wall.
+const GATE_HALF := 34.0
+## The moat's inner and outer distance from the curtain wall.
+const MOAT := Vector2(22.0, 50.0)
 
 var kind := ""
 var has_river := false
@@ -25,6 +37,25 @@ var flags := PackedVector2Array()
 ## generated around DEPLOY_DEPTH; a scenario may push a side forward.
 var deploy_depth := [DEPLOY_DEPTH, DEPLOY_DEPTH]
 
+## Fortress maps only. holder: the team whose castle it is (-1: none).
+## walls: [a, b] segments; towers: {"c", "r"}; blocks: solid Rect2s;
+## gates: {"c", "along", "out", "keep", "hp"}, out pointing away from the
+## ward it shuts, hp its strength; gate_broken: written only by Battle. curtain and keep: each
+## enclosure's corners as a polyline, for drawing and for inside tests.
+## posts: wall-walk stations for the garrison's shooters, best first.
+var holder := -1
+var walls: Array[PackedVector2Array] = []
+var towers: Array[Dictionary] = []
+var blocks: Array[Rect2] = []
+var gates: Array[Dictionary] = []
+var gate_broken: Array[bool] = []
+var curtain := PackedVector2Array()
+var keep := PackedVector2Array()
+var posts := PackedVector2Array()
+## The moat's centre line, for drawing.
+var moat := PackedVector2Array()
+var _nav: AStarGrid2D
+
 
 static func generate(map_kind: String, seed_value: int) -> Terrain:
 	var t := Terrain.new()
@@ -32,6 +63,9 @@ static func generate(map_kind: String, seed_value: int) -> Terrain:
 	rng.seed = seed_value
 	t.kind = map_kind
 	t.has_river = map_kind in ["fords", "bridges", "roads"]
+	if map_kind in ["fortress", "fortress_held"]:
+		t._make_fortress(rng, 1 if map_kind == "fortress" else 0)
+		return t
 	if t.has_river:
 		t._make_river(rng)
 		t._make_crossings(rng)
@@ -74,11 +108,83 @@ func in_river_band(p: Vector2) -> bool:
 
 
 func is_water(p: Vector2) -> bool:
+	if holder >= 0:
+		return in_moat(p)
 	return in_river_band(p) and crossing_at(p.x).is_empty()
 
 
 func is_blocked(p: Vector2) -> bool:
 	return is_water(p) or not in_bounds(p)
+
+
+func has_walls() -> bool:
+	return holder >= 0
+
+
+## Whether stone stands at `p` for a regiment of `team`: a wall, a tower,
+## the great tower, or a gate still shut against that team (a castle's own
+## side opens its gates as it pleases).
+func walled(p: Vector2, team: int) -> bool:
+	if holder < 0:
+		return false
+	return _stone(p, WALL_HALF + 3.0, 2.0) or (team != holder and _shut_gate(p, WALL_HALF + 3.0))
+
+
+## Whether a wall or a shut gate stands between `a` and `b`, so they can't
+## cross blades. Shot and arrows fly over.
+func wall_between(a: Vector2, b: Vector2) -> bool:
+	if holder < 0:
+		return false
+	for w in walls:
+		if Geometry2D.segment_intersects_segment(a, b, w[0], w[1]) != null:
+			return true
+	for i in gates.size():
+		if not gate_broken[i]:
+			var g: Dictionary = gates[i]
+			if Geometry2D.segment_intersects_segment(a, b, g.c - g.along * GATE_HALF, g.c + g.along * GATE_HALF) != null:
+				return true
+	return false
+
+
+## Inside the curtain wall: the castle's ground.
+func inside(p: Vector2) -> bool:
+	return holder >= 0 and Geometry2D.is_point_in_polygon(p, curtain)
+
+
+func in_keep(p: Vector2) -> bool:
+	return holder >= 0 and Geometry2D.is_point_in_polygon(p, keep)
+
+
+## On the wall-walk: just inside the curtain or the keep's wall.
+func on_rampart(p: Vector2) -> bool:
+	if not inside(p) or _stone(p, WALL_HALF, 0.0):
+		return false
+	return _near_line(p, curtain, RAMPART) or (in_keep(p) and _near_line(p, keep, RAMPART))
+
+
+func in_moat(p: Vector2) -> bool:
+	if holder < 0 or inside(p):
+		return false
+	var d := _dist_to_line(p, curtain)
+	if d < MOAT.x or d > MOAT.y:
+		return false
+	for g in gates:
+		if not g.keep and absf((p - g.c).dot(g.along)) < GATE_HALF - 2.0:
+			return false
+	return true
+
+
+## Just inside the main gate: where a garrison's foot stand to hold it.
+func gate_mouth() -> Vector2:
+	return gates[0].c - gates[0].out * 70.0
+
+
+## The gate within `reach` of `p`, or -1.
+func gate_near(p: Vector2, reach: float) -> int:
+	for i in gates.size():
+		if p.distance_to(gates[i].c) < reach:
+			return i
+	return -1
 
 
 func in_bounds(p: Vector2) -> bool:
@@ -92,8 +198,10 @@ func in_forest(p: Vector2) -> bool:
 	return false
 
 
-## 0 off any hill, rising to 1 at a hill's crest.
+## 0 off any hill, rising to 1 at a hill's crest; 1 on a wall-walk.
 func height(p: Vector2) -> float:
+	if holder >= 0 and on_rampart(p):
+		return 1.0
 	var h := 0.0
 	for hill in hills:
 		var d: float = p.distance_to(hill.c) / hill.r
@@ -123,9 +231,12 @@ func speed_mult(p: Vector2) -> float:
 	return 1.0 - 0.15 * height(p)
 
 
-## Share of arrow damage that gets through at `p`.
+## Share of arrow and shot damage that gets through at `p`: trees stop
+## half, battlements most of it.
 func cover(p: Vector2) -> float:
-	return 0.5 if in_forest(p) else 1.0
+	if in_forest(p):
+		return 0.5
+	return BATTLEMENTS if holder >= 0 and on_rampart(p) else 1.0
 
 
 func range_mult(p: Vector2) -> float:
@@ -159,6 +270,8 @@ func clamp_to_field(p: Vector2) -> Vector2:
 ## in between. The last waypoint is always the destination (moved off the
 ## water if it was on it).
 func path(from: Vector2, to: Vector2) -> PackedVector2Array:
+	if holder >= 0:
+		return _nav_path(from, clamp_to_field(to))
 	var dest := _off_water(clamp_to_field(to), side(from))
 	if not has_river:
 		return PackedVector2Array([dest])
@@ -328,3 +441,204 @@ func _make_roads(rng: RandomNumberGenerator) -> void:
 		road.append(Vector2(lerpf(top_x, f.x, 0.6), lerpf(0.0, f.y, 0.55)))
 		road.append(Vector2(top_x, -10.0))
 		roads.append(road)
+
+
+# --- fortress --------------------------------------------------------------
+# Laid out for a castle in the north (holder 1) and mirrored top to bottom
+# for one in the south. The castle backs onto its own edge of the field:
+# its garrison can always flee out of the back, and nobody can walk round.
+
+const CASTLE_FLAGS := [Vector2(360, 330), Vector2(940, 330), Vector2(650, 190)]
+
+
+func _make_fortress(rng: RandomNumberGenerator, team: int) -> void:
+	holder = team
+	var m := func(p: Vector2) -> Vector2: return p if team == 1 else Vector2(p.x, SIZE.y - p.y)
+	curtain = PackedVector2Array([m.call(Vector2(230, -10)), m.call(Vector2(230, 430)), m.call(Vector2(1070, 430)), m.call(Vector2(1070, -10))])
+	keep = PackedVector2Array([m.call(Vector2(520, -10)), m.call(Vector2(520, 260)), m.call(Vector2(780, 260)), m.call(Vector2(780, -10))])
+	gates.append({"c": m.call(Vector2(650, 430)), "along": Vector2(1, 0), "out": m.call(Vector2(0, 1)) - m.call(Vector2.ZERO), "keep": false, "hp": 300.0})
+	gates.append({"c": m.call(Vector2(520, 150)), "along": Vector2(0, 1), "out": Vector2(-1, 0), "keep": true, "hp": 220.0})
+	gate_broken.assign([false, false])
+	var mid_moat := (MOAT.x + MOAT.y) * 0.5
+	moat = PackedVector2Array([m.call(Vector2(230 - mid_moat, -10)), m.call(Vector2(230 - mid_moat, 430 + mid_moat)),
+		m.call(Vector2(1070 + mid_moat, 430 + mid_moat)), m.call(Vector2(1070 + mid_moat, -10))])
+	for line in [curtain, keep]:
+		for i in line.size() - 1:
+			_add_wall(line[i], line[i + 1])
+	for t in [[230, 430, 30], [1070, 430, 30], [230, 215, 24], [1070, 215, 24], [440, 430, 22], [860, 430, 22],
+			[588, 430, 26], [712, 430, 26], [520, 260, 26], [780, 260, 26], [520, 92, 20], [520, 208, 20]]:
+		towers.append({"c": m.call(Vector2(t[0], t[1])), "r": float(t[2])})
+	var donjon := Rect2(595, 25, 110, 90)
+	if team == 0:
+		donjon.position.y = SIZE.y - donjon.end.y
+	blocks.append(donjon)
+	for f in CASTLE_FLAGS:
+		flags.append(m.call(f))
+	for p in [[520, 408], [780, 408], [350, 408], [950, 408], [252, 300], [1048, 300], [252, 150], [1048, 150]]:
+		posts.append(m.call(Vector2(p[0], p[1])))
+	deploy_depth[team] = 415.0
+	_make_siege_ground(rng, m)
+	_build_nav()
+
+
+## The outer half: a road up to the gate, a few copses and one low rise
+## for the besiegers' guns.
+func _make_siege_ground(rng: RandomNumberGenerator, m: Callable) -> void:
+	var gate: Vector2 = gates[0].c
+	var road := PackedVector2Array([m.call(Vector2(650 + rng.randf_range(-120, 120), SIZE.y + 10.0)), m.call(Vector2(650, 600)), gate])
+	roads.append(road)
+	var side := 1.0 if rng.randf() < 0.5 else -1.0
+	hills.append({"c": m.call(Vector2(650 + side * rng.randf_range(260, 360), rng.randf_range(560, 600))), "r": rng.randf_range(80.0, 105.0)})
+	var made := 0
+	var tries := 0
+	while made < 4 and tries < 200:
+		tries += 1
+		var c: Vector2 = m.call(Vector2(rng.randf_range(80, SIZE.x - 80), rng.randf_range(510, 620)))
+		if absf(c.x - gate.x) < 170.0 or _dist_to_line(c, curtain) < MOAT.y + 60.0:
+			continue
+		made += 1
+		for i in rng.randi_range(3, 7):
+			forests.append({"c": c + Vector2(rng.randf_range(-45, 45), rng.randf_range(-30, 30)), "r": rng.randf_range(16.0, 28.0)})
+
+
+## The wall from a to b, with any gate on it left open as a gap.
+func _add_wall(a: Vector2, b: Vector2) -> void:
+	var cuts: Array[float] = []
+	var length := a.distance_to(b)
+	var dir := (b - a) / length
+	for g in gates:
+		var along: float = (g.c - a).dot(dir)
+		if absf((g.c - a).cross(dir)) < 1.0 and along > 0.0 and along < length:
+			cuts.append(along)
+	cuts.sort()
+	var start := 0.0
+	for c in cuts:
+		walls.append(PackedVector2Array([a + dir * start, a + dir * (c - GATE_HALF)]))
+		start = c + GATE_HALF
+	walls.append(PackedVector2Array([a + dir * start, b]))
+
+
+func _stone(p: Vector2, wall_reach: float, tower_reach: float) -> bool:
+	for w in walls:
+		if p.distance_to(Geometry2D.get_closest_point_to_segment(p, w[0], w[1])) < wall_reach:
+			return true
+	for t in towers:
+		if p.distance_to(t.c) < t.r + tower_reach:
+			return true
+	for r in blocks:
+		if r.grow(tower_reach).has_point(p):
+			return true
+	return false
+
+
+func _shut_gate(p: Vector2, reach: float) -> bool:
+	for i in gates.size():
+		if gate_broken[i]:
+			continue
+		var g: Dictionary = gates[i]
+		var q := Geometry2D.get_closest_point_to_segment(p, g.c - g.along * GATE_HALF, g.c + g.along * GATE_HALF)
+		if p.distance_to(q) < reach:
+			return true
+	return false
+
+
+func _dist_to_line(p: Vector2, line: PackedVector2Array) -> float:
+	var best := INF
+	for i in line.size() - 1:
+		best = minf(best, p.distance_to(Geometry2D.get_closest_point_to_segment(p, line[i], line[i + 1])))
+	return best
+
+
+func _near_line(p: Vector2, line: PackedVector2Array, within: float) -> bool:
+	return _dist_to_line(p, line) < within
+
+
+## Pathfinding treats gates as open for everyone: a besieger's route runs
+## through the gate, and the gate stops it there, which is where it rams.
+func _nav_solid(p: Vector2, clear: float) -> bool:
+	return not in_bounds(p) or in_moat(p) or _stone(p, WALL_HALF + clear, clear)
+
+
+func _build_nav() -> void:
+	_nav = AStarGrid2D.new()
+	_nav.region = Rect2i(0, 0, int(ceil(SIZE.x / NAV_CELL)), int(ceil(SIZE.y / NAV_CELL)))
+	_nav.cell_size = Vector2(NAV_CELL, NAV_CELL)
+	_nav.offset = Vector2(NAV_CELL, NAV_CELL) * 0.5
+	_nav.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
+	_nav.update()
+	for x in _nav.region.size.x:
+		for y in _nav.region.size.y:
+			if _nav_solid(_nav.get_point_position(Vector2i(x, y)), NAV_CLEAR):
+				_nav.set_point_solid(Vector2i(x, y))
+
+
+func _cell(p: Vector2) -> Vector2i:
+	var c := Vector2i(int(p.x / NAV_CELL), int(p.y / NAV_CELL))
+	return c.clamp(Vector2i.ZERO, _nav.region.size - Vector2i.ONE)
+
+
+## The open cell nearest `p` that can be walked to in a straight line,
+## searching outward ring by ring (never one on the far side of a wall).
+func _open_cell(p: Vector2) -> Vector2i:
+	var c := _cell(p)
+	if not _nav.is_point_solid(c):
+		return c
+	for ring in range(1, 12):
+		var best := Vector2i(-1, -1)
+		var best_d := INF
+		for dx in range(-ring, ring + 1):
+			for dy in range(-ring, ring + 1):
+				if maxi(absi(dx), absi(dy)) != ring:
+					continue
+				var q := c + Vector2i(dx, dy)
+				if not _nav.is_in_boundsv(q) or _nav.is_point_solid(q):
+					continue
+				var at := _nav.get_point_position(q)
+				if not _walkable(p, at):
+					continue
+				var d := p.distance_squared_to(at)
+				if d < best_d:
+					best_d = d
+					best = q
+		if best.x >= 0:
+			return best
+	return c
+
+
+## Grid route from `from` to `to`, pulled tight: each waypoint is the
+## furthest grid point still in plain sight of the last.
+func _nav_path(from: Vector2, to: Vector2) -> PackedVector2Array:
+	var goal_cell := _open_cell(to)
+	var dest := to if not _nav_solid(to, NAV_CLEAR * 0.5) else _nav.get_point_position(goal_cell)
+	var grid := _nav.get_point_path(_open_cell(from), goal_cell, true)
+	if grid.is_empty():
+		return PackedVector2Array([dest])
+	grid.append(dest)
+	var out := PackedVector2Array()
+	var at := from
+	var i := 0
+	while i < grid.size():
+		var j := grid.size() - 1
+		while j > i and not _line_clear(at, grid[j]):
+			j -= 1
+		at = grid[j]
+		out.append(at)
+		i = j + 1
+	return out
+
+
+## No stone in the way from a to b, at the margin movement itself uses.
+func _walkable(a: Vector2, b: Vector2) -> bool:
+	var steps := int(ceil(a.distance_to(b) / 6.0))
+	for k in range(1, steps + 1):
+		if _stone(a.lerp(b, float(k) / steps), WALL_HALF + 3.0, 2.0):
+			return false
+	return true
+
+
+func _line_clear(a: Vector2, b: Vector2) -> bool:
+	var steps := int(ceil(a.distance_to(b) / 6.0))
+	for k in range(1, steps + 1):
+		if _nav_solid(a.lerp(b, float(k) / steps), NAV_CLEAR * 0.5):
+			return false
+	return true

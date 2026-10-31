@@ -26,7 +26,9 @@ const ERAS := [
 ##   persona: how the enemy fights
 ##   abilities: the player's (Rally if not given)
 ##   deadline / hold_needed: the battle ends on the flags at that time
-##   own_flags: the player starts holding every flag
+##   own_flags / enemy_flags: that side starts holding every flag
+##   flag_drain: resolve per second per flag of difference (sieges: 0)
+##   goal: the briefing's one-line goal, when the generic one won't do
 ##   deploy_depth: how far in from its edge the player may deploy
 ##   stars: the two stars beyond the win, each one condition:
 ##     {"time": s} win within s seconds; {"losses": f} lose at most that
@@ -73,6 +75,26 @@ const LIST := [
 		"stars": [{"time": 150.0}, {"losses": 0.35}],
 	},
 	{
+		"id": "storm", "era": "medieval", "name": "The Storming of Duskwatch",
+		"brief": "A castle on the sea cliffs: a moat, a gatehouse, a walled keep. Batter in the gate, then the keep's, before dusk.",
+		"map": "fortress", "map_seed": 3, "persona": "garrison", "abilities": ["rally", "barrage"],
+		"player": [[K.SWORDS, 1], [K.SWORDS, 0], [K.SWORDS, 0], [K.SWORDS, 0], [K.PIKES, 0], [K.PIKES, 0], [K.ARCHERS, 0], [K.ARCHERS, 0], [K.ARCHERS, 0], [K.CANNONS, 0], [K.CANNONS, 0]],
+		"enemy": [[K.SWORDS, 0], [K.SWORDS, 0], [K.PIKES, 0], [K.ARCHERS, 0], [K.ARCHERS, 0], [K.CAVALRY, 0]],
+		"deadline": 360.0, "hold_needed": 2, "enemy_flags": true, "flag_drain": 0.0,
+		"goal": "Hold two of the castle's three flags at 6:00, or break the garrison.",
+		"stars": [{"time": 240.0}, {"losses": 0.45}],
+	},
+	{
+		"id": "last_keep", "era": "medieval", "name": "The Last Keep",
+		"brief": "Now the castle is yours and a great host is at the gate. Man the walls; when the gate goes, hold the gateway.",
+		"map": "fortress_held", "map_seed": 3, "persona": "aggressive",
+		"player": [[K.SWORDS, 1], [K.SWORDS, 0], [K.SWORDS, 0], [K.PIKES, 0], [K.ARCHERS, 1], [K.ARCHERS, 0], [K.ARCHERS, 0], [K.CANNONS, 0]],
+		"enemy": [[K.SWORDS, 0], [K.SWORDS, 0], [K.SWORDS, 0], [K.SWORDS, 0], [K.PIKES, 0], [K.PIKES, 0], [K.ARCHERS, 0], [K.ARCHERS, 0], [K.CANNONS, 0], [K.CANNONS, 0], [K.CAVALRY, 0], [K.CAVALRY, 0]],
+		"deadline": 300.0, "hold_needed": 1, "own_flags": true, "flag_drain": 0.0,
+		"goal": "Hold one of your three flags at 5:00, or break their army.",
+		"stars": [{"flags": 3, "noun": "flags"}, {"losses": 0.4}],
+	},
+	{
 		"id": "skirmish_shot", "era": "pike_shot", "name": "Skirmish",
 		"brief": "Pike, shot, horse and guns, the same on both sides, on a new field each time.",
 		"map": "random", "persona": "balanced",
@@ -109,6 +131,16 @@ const LIST := [
 		"map": "ridge", "map_seed": 9, "persona": "dug_in", "abilities": ["rally", "barrage"],
 		"player": [[K.PIKES, 1], [K.PIKES, 0], [K.PIKES, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.CAVALRY, 0]],
 		"enemy": [[K.PIKES, 0], [K.PIKES, 0], [K.PIKES, 1], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.CANNONS, 0], [K.CANNONS, 0], [K.CANNONS, 1], [K.CAVALRY, 0]],
+		"stars": [{"time": 240.0}, {"losses": 0.4}],
+	},
+	{
+		"id": "breach", "era": "pike_shot", "name": "The Breach at Greyhold",
+		"brief": "Greyhold's walls were built for bows. Bring up the great guns, open the gate, and send the pikes through the smoke.",
+		"map": "fortress", "map_seed": 11, "persona": "garrison", "abilities": ["rally", "barrage"],
+		"player": [[K.PIKES, 1], [K.PIKES, 0], [K.PIKES, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.CANNONS, 0], [K.CANNONS, 0], [K.CANNONS, 0], [K.CAVALRY, 0]],
+		"enemy": [[K.PIKES, 0], [K.PIKES, 0], [K.MUSKETS, 0], [K.MUSKETS, 0], [K.CANNONS, 0], [K.CAVALRY, 0]],
+		"deadline": 360.0, "hold_needed": 2, "enemy_flags": true, "flag_drain": 0.0,
+		"goal": "Hold two of the castle's three flags at 6:00, or break the garrison.",
 		"stars": [{"time": 240.0}, {"losses": 0.4}],
 	},
 ]
@@ -163,7 +195,8 @@ static func make_battle(spec: Dictionary, dice: int) -> Battle:
 	var map_seed: int = spec.map_seed
 	var b := Battle.new(Terrain.generate(spec.map, map_seed), dice)
 	b.abilities.assign(spec.get("abilities", ["rally"]))
-	b.terrain.deploy_depth[0] = spec.get("deploy_depth", Terrain.DEPLOY_DEPTH)
+	if spec.has("deploy_depth"):
+		b.terrain.deploy_depth[0] = spec.deploy_depth
 	var mid := Terrain.SIZE * 0.5
 	for team in 2:
 		var face := -PI * 0.5 if team == 0 else PI * 0.5
@@ -174,13 +207,17 @@ static func make_battle(spec: Dictionary, dice: int) -> Battle:
 	b.apply_orders(AI.deploy_orders(b, 1))
 	b.deadline = spec.get("deadline", 0.0)
 	b.hold_needed = spec.get("hold_needed", 1)
-	if spec.get("own_flags", false):
-		for i in b.flags.size():
-			b.claim_flag(i, 0)
+	b.flag_drain = spec.get("flag_drain", Battle.FLAG_DRAIN)
+	for team in 2:
+		if spec.get("own_flags" if team == 0 else "enemy_flags", false):
+			for i in b.flags.size():
+				b.claim_flag(i, team)
 	return b
 
 
 static func goal_text(spec: Dictionary) -> String:
+	if spec.has("goal"):
+		return spec.goal
 	if spec.get("deadline", 0.0) <= 0.0:
 		return "Break their army."
 	var t := _clock(spec.deadline)
@@ -195,7 +232,7 @@ static func condition_text(c: Dictionary) -> String:
 	if c.has("losses"):
 		return "Lose no more than %d%% of your men" % roundi(c.losses * 100.0)
 	if c.has("flags"):
-		return "Hold %d crossings at the end" % c.flags
+		return "Hold %d %s at the end" % [c.flags, c.get("noun", "crossings")]
 	return ""
 
 
