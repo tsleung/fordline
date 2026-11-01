@@ -4,7 +4,8 @@ extends SceneTree
 ## writes, under --out, spec.json (what the dataset is) and examples.jsonl
 ## (a row per re-plan). Rerun, it writes the same bytes.
 ##   Godot --headless --path . -s tests/plan_examples.gd -- --scenarios=hold,riders --dice=4 --out=build/plan_examples/a
-##   --draws=N fights N fields of a Skirmish; --commit=SHA records the code it came from.
+##   --draws=N fights N fields of a Skirmish; --commit=SHA records the code it came from;
+##   --replan=, --horizon= (seconds) and --samples= set the planner's look ahead.
 
 const QUICK := ["skirmish", "hold", "hammer", "bridges", "riders", "storm", "last_keep", "skirmish_shot", "push", "fords_shot", "cuirassiers", "battery", "breach"]
 
@@ -15,6 +16,7 @@ func _initialize() -> void:
 	var draws := 1
 	var out := "res://build/plan_examples"
 	var commit := "unknown"
+	var settings := {}
 	for arg in OS.get_cmdline_user_args():
 		var value := arg.get_slice("=", 1)
 		if arg.begins_with("--scenarios="):
@@ -27,9 +29,16 @@ func _initialize() -> void:
 			out = value
 		elif arg.begins_with("--commit="):
 			commit = value
+		elif arg.begins_with("--replan=") or arg.begins_with("--horizon="):
+			settings[arg.substr(2, arg.find("=") - 2)] = float(value)
+		elif arg.begins_with("--samples="):
+			settings.samples = int(value)
 	var dir := out if out.is_absolute_path() or out.begins_with("res://") else "res://" + out
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
 	var planner := Commander.PlannerCommander.new(AI.PERSONAS.balanced, false, {})
+	planner.replan = settings.get("replan", planner.replan)
+	planner.horizon = settings.get("horizon", planner.horizon)
+	planner.samples = settings.get("samples", planner.samples)
 	var seeds: Array = []
 	var lines := PackedStringArray()
 	for id in scenarios:
@@ -39,7 +48,7 @@ func _initialize() -> void:
 				seeds.append({"scenario": id, "draw": draw, "dice": die, "battle_seed": 7919 * (die + 1)})
 				var b := Scenarios.make_battle(spec, 7919 * (die + 1))
 				var episode := "%s:d%dx%d:0" % [id, draw, die]
-				for row in PlannerData.fight(b, 0, AI.PERSONAS.balanced, AI.PERSONAS[spec.persona], die, episode):
+				for row in PlannerData.fight(b, 0, AI.PERSONAS.balanced, AI.PERSONAS[spec.persona], die, episode, settings):
 					lines.append(JSON.stringify(row, "", true))
 	var info := Engine.get_version_info()
 	var units := PlannerData.feature_units()
