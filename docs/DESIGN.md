@@ -565,7 +565,12 @@ wins 69%, 36 of 52 (±13 points on that many), where on the same battles
 standard wins 41%, sharp 48% and person 57%. It does no worse than standard anywhere, and wins
 Riders at Dawn and the Great Battery three times in four, where no
 commander on the ladder wins one. It is the same AI giving the same kinds
-of order; only where the line goes is chosen by looking ahead.
+of order; only where the line goes is chosen by looking ahead. On eight dice
+(104 battles from the thirteen quick scenarios) one rollout per choice
+does as well as two (76% and 70%, standard 44% on the same battles), but a
+10 s look ahead does no better than standard: it has to see about 30 s on,
+which costs about seven times a battle. It sends the whole line to one flag
+more often than it keeps the allotment.
 
 So:
 

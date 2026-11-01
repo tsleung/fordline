@@ -347,6 +347,18 @@ The rollouts draw dice of their own (`Battle.reseed`): a copy keeps the
 battle's random numbers, and without the reseed the planner would see
 where the guns' shot was going to fall.
 
+How much look ahead it needs (2 November 2026, the thirteen quick
+scenarios on eight dice, 104 battles a column, standard on the same
+battles 44%): one rollout per choice wins 76%, two 70%, so one is enough;
+but a 10 s look ahead wins 44%, no better than none. The planner has to see
+about 30 s on, which is four rollouts of 900 steps every 20 s: some six
+rollout steps for each step of the battle, so the battle costs about seven
+times as much. On a desktop at 1× that is a few milliseconds a frame; on a
+phone at 4× it is too much. A `budget` spreads the search over the looks it
+takes (the suite checks the same plans are tried from the same moment); a
+smooth frame needs the work spread over every step, not every look, which a
+commander cannot do yet. Distilling the planner is the way to a phone.
+
 **What would make it cheaper**, most value for least cost first:
 
 1. **Soldiers as a view, not the simulation.** Today each soldier is

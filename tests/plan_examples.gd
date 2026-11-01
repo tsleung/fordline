@@ -5,7 +5,8 @@ extends SceneTree
 ## (a row per re-plan). Rerun, it writes the same bytes.
 ##   Godot --headless --path . -s tests/plan_examples.gd -- --scenarios=hold,riders --dice=4 --out=build/plan_examples/a
 ##   --draws=N fights N fields of a Skirmish; --commit=SHA records the code it came from;
-##   --replan=, --horizon= (seconds) and --samples= set the planner's look ahead.
+##   --replan=, --horizon= (seconds), --samples= and --budget= (rollout steps a
+##   look) set the planner's look ahead.
 
 const QUICK := ["skirmish", "hold", "hammer", "bridges", "riders", "storm", "last_keep", "skirmish_shot", "push", "fords_shot", "cuirassiers", "battery", "breach"]
 
@@ -33,12 +34,15 @@ func _initialize() -> void:
 			settings[arg.substr(2, arg.find("=") - 2)] = float(value)
 		elif arg.begins_with("--samples="):
 			settings.samples = int(value)
+		elif arg.begins_with("--budget="):
+			settings.budget = int(value)
 	var dir := out if out.is_absolute_path() or out.begins_with("res://") else "res://" + out
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
 	var planner := Commander.PlannerCommander.new(AI.PERSONAS.balanced, false, {})
 	planner.replan = settings.get("replan", planner.replan)
 	planner.horizon = settings.get("horizon", planner.horizon)
 	planner.samples = settings.get("samples", planner.samples)
+	planner.budget = settings.get("budget", planner.budget)
 	var seeds: Array = []
 	var lines := PackedStringArray()
 	for id in scenarios:
@@ -57,7 +61,7 @@ func _initialize() -> void:
 		"generator": "tests/plan_examples.gd", "commit": commit,
 		"godot": "%d.%d.%d" % [info.major, info.minor, info.patch], "platform": OS.get_name(),
 		"scenarios": Array(scenarios), "seeds": seeds, "side": "player (team 0), the enemy at its scenario's persona",
-		"planner": {"replan_s": planner.replan, "horizon_s": planner.horizon, "rollout_reseeds_per_choice": planner.samples},
+		"planner": {"replan_s": planner.replan, "horizon_s": planner.horizon, "rollout_reseeds_per_choice": planner.samples, "budget_steps_per_look": planner.budget},
 		"features": Array(names).map(func(n): return {"name": n, "unit": units[_unit_key(n)]}),
 		"choices": Array(PlannerData.choice_names()),
 		"outcome": "1 the side won, 0 lost, 0.5 undecided at the time cap",

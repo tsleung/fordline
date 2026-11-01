@@ -120,50 +120,110 @@ class PacedCommander extends AICommander:
 ## average (Telemetry.lead). Each is fought `samples` times, the commanders
 ## looking a few steps apart each time and the guns' scatter drawn afresh,
 ## since on the knife edge one fight ahead says little, and the planner
-## can't see the battle's own dice to come. The ways: the AI's own allotment (`choice` -1), or
-## the whole line to one flag (its index). Between, the AI carries out the
-## one it chose. This is the plan search of the AI audit, done during the
-## battle.
+## can't see the battle's own dice to come. The ways: the AI's own
+## allotment (`choice` -1), or the whole line to one flag (its index).
+## Between, the AI carries out the one it chose. This is the plan search of
+## the AI audit, done during the battle.
+##
+## With a `budget` it fights only that many steps of its look ahead at each
+## look, so no frame carries the whole search, and the choice lands the
+## looks it took after the moment it was tried from. The budget is counted
+## in steps of the battle, not time on the clock, so a replay comes out the
+## same.
 class PlannerCommander extends AICommander:
 	var rival: Dictionary
 	var replan := 20.0
 	var horizon := 30.0
 	var samples := 2
+	## Rollout steps fought at each look; 0, the whole search at once.
+	var budget := 0
 	var choice := -1
-	## Called at each re-plan with the battle, the side, each choice's score
-	## (choice to lead) and the choice taken: a study's window on the
-	## planner, which changes nothing.
+	## Called as each search ends with the battle as it was when the search
+	## began, the side, each choice's score (choice to lead) and the choice
+	## taken: a study's window on the planner, which changes nothing.
 	var on_choice := Callable()
 	var _replan_at := 0.0
+	## The search under way: the battle as it began from, the rollouts still
+	## to fight (each [choice, sample]), the one being fought, its choice and
+	## the steps it has left, the scores so far, and each side's men when it
+	## began. No search: _from is null.
+	var _from: Battle = null
+	var _todo: Array = []
+	var _rollout: BattleRun = null
+	var _rollout_choice := 0
+	var _rollout_left := 0
+	var _sums := {}
+	var _fielded := []
 
 	func _init(with_persona: Dictionary, blows_rally: bool, rival_persona: Dictionary) -> void:
 		super(with_persona, blows_rally)
 		rival = rival_persona
 
+	## The copy goes on with the search where this one is in it; it has no
+	## study listening.
 	func copy() -> Commander:
 		var c := PlannerCommander.new(persona, rally, rival)
 		c.replan = replan
 		c.horizon = horizon
 		c.samples = samples
+		c.budget = budget
 		c.choice = choice
 		c._replan_at = _replan_at
+		c._from = _from.copy() if _from != null else null
+		c._todo = _todo.duplicate(true)
+		c._rollout = _rollout.copy() if _rollout != null else null
+		c._rollout_choice = _rollout_choice
+		c._rollout_left = _rollout_left
+		c._sums = _sums.duplicate()
+		c._fielded = _fielded.duplicate()
 		return _with_plan_of(c)
 
 	func think(b: Battle, team: int, ids: Array[int] = []) -> Dictionary:
-		if b.time >= _replan_at:
-			var scores := try_all(b, team)
-			choice = best_of(scores)
-			if on_choice.is_valid():
-				on_choice.call(b, team, scores, choice)
+		if _from == null and b.time >= _replan_at:
+			_begin(b)
 			_replan_at = b.time + replan
+		if _from != null:
+			_work(team, budget if budget > 0 else -1)
 		return plan_for(b, team, persona, choice, ids)
 
-	## Each way of sending the line, tried ahead: choice to its score.
-	func try_all(b: Battle, team: int) -> Dictionary:
-		var out := {}
+	func _begin(b: Battle) -> void:
+		_from = b.copy()
+		_fielded = [Telemetry.fielded(b, 0), Telemetry.fielded(b, 1)]
+		_sums = {}
+		_todo = []
 		for c in range(-1, b.flags.size()):
-			out[c] = ahead(b, team, c)
-		return out
+			_sums[c] = 0.0
+			for k in samples:
+				_todo.append([c, k])
+
+	## Fight `steps` steps of the search (-1, all of it); once every
+	## rollout is fought, take the best choice.
+	func _work(team: int, steps: int) -> void:
+		while steps != 0:
+			if _rollout != null and (_rollout_left <= 0 or _rollout.battle.phase != "battle"):
+				_sums[_rollout_choice] += _score(team)
+				_rollout = null
+			if _rollout == null:
+				if _todo.is_empty():
+					_finish(team)
+					return
+				var next: Array = _todo.pop_front()
+				_rollout = _rollout_of(team, next[0], next[1])
+				_rollout_choice = next[0]
+				_rollout_left = ceili(horizon / Battle.STEP)
+				continue
+			_rollout.advance()
+			_rollout_left -= 1
+			steps -= 1 if steps > 0 else 0
+
+	func _finish(team: int) -> void:
+		var scores := {}
+		for c in _sums:
+			scores[c] = _sums[c] / samples
+		choice = best_of(scores)
+		if on_choice.is_valid():
+			on_choice.call(_from, team, scores, choice)
+		_from = null
 
 	## The best-scoring choice; on a tie the one in hand, so a choice no
 	## better doesn't replace it.
@@ -183,28 +243,26 @@ class PlannerCommander extends AICommander:
 				out[id] = c
 		return out
 
-	## How far ahead this side is, on average, `horizon` seconds after
-	## taking up choice `c`: the lead, from -1 to 1 (2 once the battle is
-	## won, -2 lost).
-	func ahead(b: Battle, team: int, c: int) -> float:
-		var fielded := [Telemetry.fielded(b, 0), Telemetry.fielded(b, 1)]
-		var total := 0.0
-		for k in samples:
-			# Dice of its own, not the battle's, and the same for each choice
-			# at this look, so the choices are tried on equal luck.
-			var copied := b.copy()
-			copied.reseed(hash([roundi(b.time / Battle.STEP), k]))
-			var run := BattleRun.new(copied)
-			var mine := PlannerCommander.new(persona, false, rival)
-			mine.choice = c
-			mine._replan_at = INF
-			var theirs := BattleRun.Seat.new(1 - team, AICommander.new(rival))
-			theirs.wait = 5 * k * Battle.STEP
-			run.add_seat(theirs)
-			run.add_seat(BattleRun.Seat.new(team, mine))
-			run.run_for(horizon)
-			var lead := Telemetry.lead(run.battle, fielded)
-			if run.battle.phase == "over":
-				lead = 2.0 if run.battle.winner == 0 else -2.0
-			total += lead if team == 0 else -lead
-		return total / samples
+	## Choice `c` fought on from where the search began, the `k`th time:
+	## dice of its own, not the battle's, and the same for each choice at
+	## this search, so the choices are tried on equal luck.
+	func _rollout_of(team: int, c: int, k: int) -> BattleRun:
+		var copied := _from.copy()
+		copied.reseed(hash([roundi(_from.time / Battle.STEP), k]))
+		var run := BattleRun.new(copied)
+		var mine := PlannerCommander.new(persona, false, rival)
+		mine.choice = c
+		mine._replan_at = INF
+		var theirs := BattleRun.Seat.new(1 - team, AICommander.new(rival))
+		theirs.wait = 5 * k * Battle.STEP
+		run.add_seat(theirs)
+		run.add_seat(BattleRun.Seat.new(team, mine))
+		return run
+
+	## How far ahead this side is at the end of the rollout: the lead, from
+	## -1 to 1 (2 once the battle is won, -2 lost).
+	func _score(team: int) -> float:
+		var lead := Telemetry.lead(_rollout.battle, _fielded)
+		if _rollout.battle.phase == "over":
+			lead = 2.0 if _rollout.battle.winner == 0 else -2.0
+		return lead if team == 0 else -lead

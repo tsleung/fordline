@@ -114,13 +114,15 @@ static func _sum_power(regs: Array) -> float:
 ## Fight `b` with the planner as side `team` against the AI as `enemy`, and
 ## return a row per re-plan: {episode, step, t, state, legal, rollout,
 ## rollout_n, label, outcome}. `settings` may set the planner's replan,
-## horizon and samples. The battle and its seats are as the luck study's,
+## horizon, samples and budget, and the battle's length. The battle and its
+## seats are as the luck study's,
 ## `die` setting when each first looks.
 static func fight(b: Battle, team: int, persona: Dictionary, enemy: Dictionary, die: int, episode: String, settings := {}) -> Array[Dictionary]:
 	var planner := Commander.PlannerCommander.new(persona, false, enemy)
 	planner.replan = settings.get("replan", planner.replan)
 	planner.horizon = settings.get("horizon", planner.horizon)
 	planner.samples = settings.get("samples", planner.samples)
+	planner.budget = settings.get("budget", planner.budget)
 	var rows: Array[Dictionary] = []
 	var samples := planner.samples
 	planner.on_choice = func(at: Battle, side: int, scores: Dictionary, chosen: int) -> void:

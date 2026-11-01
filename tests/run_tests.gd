@@ -611,6 +611,31 @@ func _test_copy() -> void:
 	var before := _state(b)
 	planner.decide(b, 0)
 	_check(_state(b) == before and planner.choice >= -1 and planner.choice < b.flags.size(), "a planner looks ahead on copies and picks one of its ways")
+	# With a budget it fights the same look ahead over several looks: the
+	# same plans tried from the same moment, the same scores, the choice
+	# landing later.
+	var at_once := {}
+	var spread := {}
+	var whole := Commander.PlannerCommander.new(AI.PERSONAS.balanced, false, AI.PERSONAS.aggressive)
+	var sliced := Commander.PlannerCommander.new(AI.PERSONAS.balanced, false, AI.PERSONAS.aggressive)
+	for p in [whole, sliced]:
+		p.horizon = 8.0
+		p.samples = 1
+	sliced.budget = 80
+	whole.on_choice = func(_at, _side, scores, _c): at_once.merge(scores)
+	sliced.on_choice = func(_at, _side, scores, _c): spread.merge(scores)
+	whole.decide(b.copy(), 0)
+	var later := BattleRun.new(b.copy())
+	later.add_seat(BattleRun.Seat.new(1, Commander.AICommander.new(AI.PERSONAS.aggressive)))
+	later.add_seat(BattleRun.Seat.new(0, sliced))
+	var looks := 0
+	while spread.is_empty() and looks < 100:
+		later.run_for(AI.THINK_EVERY)
+		looks += 1
+	whole.on_choice = Callable()
+	sliced.on_choice = Callable()
+	var differ := at_once.values().any(func(v): return v != at_once.values()[0])
+	_check(differ and spread == at_once and looks > 3, "a planner on a budget tries the same plans from the same moment, over %d looks" % looks)
 
 
 ## The planner's choices written as data (PlannerData) come out the same
