@@ -372,7 +372,7 @@ judged, then changed deliberately.
 | The moment | Is there always something to do? | longest quiet stretch after the first clash: no block engaged and nothing fired | under 10 s in a quick battle |
 | The engagement (a minute) | Do decisions matter? | decision impact: take one of the player's orders out of the log, fight again, compare | at least a third of orders move the final margin by 5 or more |
 | The engagement | Do they last? | persistence: an order's effect on the margin at the end over its effect 20 s after | 1 or more on average: effects grow or hold rather than wash out |
-| The battle (minutes) | Does skill win? | the ladder (idle, slow, standard, sharp) in win rate, and skill's share of the outcome | rising up the ladder; skill's share over half |
+| The battle (minutes) | Does skill win? | the ladder (idle, person, standard, sharp) in win rate, and skill's share of the outcome | rising up the ladder; skill's share over half |
 | The battle | Is it decided early? | lead changes; comebacks: battles won by a side that was behind by 0.15 after the first clash | lead changes 0.5 or more; comebacks 15–35% |
 | The battle | Is it short? | battle length | quick battles 2–4 minutes |
 | The run (twenty minutes) | Do consequences carry? | how much a costly win (40% of men lost) lowers the next battle's win rate | a real drop, but the next battle is still winnable more often than not |
@@ -391,95 +391,209 @@ the design got here, and are not current.
 
 ### Measured, 1 November 2026
 
+**The dice had been fighting the same battle.** A battle's own random
+numbers scatter only cannonballs, so in a battle without guns every die
+was one battle, and a cell of four dice could read only 0% or 100%. The
+studies' dice now also set when each commander first looks, a few steps
+into its think (`Fights.seats`). On the knife edge that is another battle:
+Hold the Fords, standard against its attacker, over eight such offsets is
+5 won and 3 lost. Die 0 is the old timing, so the recorded battles did not
+move. Everything in this section is measured this way, the old AI too.
+
 Every quick scenario and campaign battle, AI against AI through the game's
-own loop, four dice each (`tests/luck_skill.gd`, reported by
-`tests/play.py`). Win rates for the player's commander:
+own loop (`tests/luck_skill.gd`, reported by `tests/play.py`): four dice for
+each quick scenario, two draws of four dice for each campaign battle and
+Skirmish. Win rates for the player's commander, the enemy at its persona,
+both under the AI of this day's work:
 
-| Battle | idle | slow | standard | sharp | minutes | lead changes | orders a minute |
-|---|---|---|---|---|---|---|---|
-| Millbrook Ford | 0% | 100% | 100% | 100% | 1.0 | 0.0 | 85 |
-| Ashwood | 0% | 100% | 100% | 100% | 0.6 | 0.0 | 79 |
-| Two Bridges | 0% | 100% | 100% | 100% | 3.2 | 0.0 | 134 |
-| Saltmarsh Road | 0% | 0% | 0% | 0% | 1.7 | 1.0 | 100 |
-| Marshal's Ridge | 0% | 100% | 100% | 100% | 2.1 | 1.0 | 110 |
-| Skirmish | 0% | 50% | 75% | 100% | 2.6 | 0.0 | 28 |
-| Hold the Fords | 100% | 100% | 0% | 0% | 1.7 | 1.0 | 37 |
-| Hammer and Anvil | 0% | 0% | 0% | 100% | 2.0 | 1.0 | 81 |
-| Two Narrow Bridges | 0% | 0% | 0% | 0% | 1.6 | 0.0 | 40 |
-| Riders at Dawn | 0% | 100% | 100% | 100% | 1.9 | 0.0 | 44 |
-| The Storming of Duskwatch | 0% | 0% | 0% | 100% | 3.5 | 0.0 | 47 |
-| The Last Keep | 75% | 100% | 50% | 100% | 3.3 | 0.5 | 29 |
-| Skirmish (Pike and Shot) | 0% | 0% | 100% | 100% | 2.4 | 1.0 | 66 |
-| Push of Pike | 0% | 0% | 100% | 100% | 1.6 | 0.0 | 93 |
-| Shot at the Fords | 0% | 100% | 0% | 100% | 1.2 | 1.0 | 65 |
-| The Cuirassiers | 0% | 100% | 100% | 100% | 1.1 | 0.0 | 179 |
-| The Great Battery | 0% | 0% | 75% | 100% | 2.3 | 0.2 | 103 |
-| The Breach at Greyhold | 0% | 25% | 100% | 50% | 2.0 | 2.0 | 67 |
+| Battle | idle | person | standard | sharp | planner | minutes | lead changes | orders a minute |
+|---|---|---|---|---|---|---|---|---|
+| Millbrook Ford | 0% | 75% | 50% | 88% | – | 1.7 | 0.1 | 24 / 89 |
+| Ashwood | 0% | 62% | 62% | 75% | – | 1.5 | 0.4 | 25 / 115 |
+| Two Bridges | 0% | 38% | 88% | 100% | – | 1.4 | 0.1 | 27 / 129 |
+| Saltmarsh Road | 0% | 38% | 38% | 25% | – | 2.0 | 0.9 | 29 / 108 |
+| Marshal's Ridge | 0% | 0% | 50% | 50% | – | 0.9 | 0.0 | 26 / 164 |
+| Skirmish | 0% | 0% | 50% | 100% | 100% | 2.5 | 0.8 | 22 / 53 |
+| Hold the Fords | 0% | 75% | 0% | 25% | 0% | 1.5 | 1.0 | 17 / 95 |
+| Hammer and Anvil | 0% | 75% | 100% | 50% | 100% | 1.3 | 0.0 | 26 / 87 |
+| Two Narrow Bridges | 0% | 0% | 0% | 0% | 25% | 1.2 | 0.0 | 23 / 92 |
+| Riders at Dawn | 0% | 0% | 0% | 0% | 75% | 1.7 | 0.0 | 21 / 76 |
+| The Storming of Duskwatch | 0% | 100% | 0% | 0% | 0% | 3.0 | 0.0 | 25 / 36 |
+| The Last Keep | 50% | 50% | 50% | 50% | 50% | 2.8 | 0.5 | 22 / 29 |
+| Skirmish (Pike and Shot) | 0% | 88% | 88% | 75% | 100% | 1.9 | 1.1 | 15 / 60 |
+| Push of Pike | 0% | 75% | 75% | 75% | 100% | 2.4 | 0.8 | 26 / 76 |
+| Shot at the Fords | 0% | 75% | 75% | 75% | 100% | 2.3 | 1.2 | 21 / 63 |
+| The Cuirassiers | 0% | 50% | 50% | 100% | 100% | 1.6 | 0.5 | 23 / 90 |
+| The Great Battery | 0% | 50% | 0% | 0% | 75% | 2.6 | 0.8 | 28 / 71 |
+| The Breach at Greyhold | 0% | 100% | 50% | 75% | 75% | 2.7 | 1.5 | 28 / 56 |
 
-Minutes, lead changes and orders a minute are for the standard commander.
+Minutes and lead changes are for the standard commander; orders a minute
+for the person-paced one, then standard. The planner (see the AI audit)
+was fought on the quick scenarios only.
+
+The ladder is idle, person, standard, sharp. The person-paced commander
+(`Commander.PacedCommander`) is the stand-in for a player: it looks every
+2 s and gives at most one of the orders the AI would, the most urgent
+first (the regiment nearest an enemy), 15–30 orders a minute where
+standard gives 30–165. The slow commander is gone.
+
+The same ladder with the AI as it stood that morning, the yardstick kept
+in `tests/ai_baseline.gd`, on both sides:
+
+| Battle | idle | person | standard | sharp |
+|---|---|---|---|---|
+| Millbrook Ford | 0% | 50% | 88% | 100% |
+| Ashwood | 0% | 50% | 88% | 62% |
+| Two Bridges | 0% | 38% | 100% | 88% |
+| Saltmarsh Road | 0% | 0% | 25% | 38% |
+| Marshal's Ridge | 0% | 0% | 12% | 25% |
+| Skirmish | 0% | 25% | 88% | 100% |
+| Hold the Fords | 100% | 25% | 50% | 25% |
+| Hammer and Anvil | 0% | 25% | 75% | 100% |
+| Two Narrow Bridges | 0% | 0% | 0% | 0% |
+| Riders at Dawn | 0% | 75% | 100% | 100% |
+| The Storming of Duskwatch | 0% | 100% | 25% | 100% |
+| The Last Keep | 75% | 75% | 75% | 100% |
+| Skirmish (Pike and Shot) | 0% | 38% | 50% | 75% |
+| Push of Pike | 0% | 50% | 50% | 100% |
+| Shot at the Fords | 0% | 50% | 50% | 50% |
+| The Cuirassiers | 0% | 50% | 100% | 100% |
+| The Great Battery | 0% | 0% | 75% | 100% |
+| The Breach at Greyhold | 0% | 100% | 50% | 75% |
+
 Against the targets:
 
-- **The outcome is set by the commander and the map, not the dice.** A
-  battle and a commander almost always give the same winner on every dice,
-  yet one order taken out of Hold the Fords flips the winner a third of the
-  time (Push of Pike: never; Millbrook Ford: never, but the margin moves in
-  a quarter of cases). The battle is a knife edge more than a dice roll:
-  small differences grow (the effect of a dropped order is larger at the
-  end than 20 s after), so a player's small slips can matter far more than
-  they look.
-- **Battles are short and settled early.** Most last 1–2 minutes against a
-  target of 2–4, with 0–1 lead changes and few comebacks.
-- **The ladder breaks on defence.** Where you start holding the ground
-  (Hold the Fords, The Last Keep), doing nothing beats the standard
-  commander, which gives the ground up to attack. Elsewhere it rises.
-- **The AI commands like no person can.** The standard commander gives
-  40–180 orders a minute; a person gives perhaps 10–30. "Standard wins"
-  says what an untiring micro-manager can do, not what a player will.
-- **Warning is under-measured.** A third to a half of blows land with no
-  regiment having been aimed at the one it hits, because the AI closes with
-  move orders rather than attack orders; the screen's red arrows read
-  movement too, so the measure needs to as well.
+- **The ladder rises at its ends, not in its middle.** Over every battle,
+  idle wins 2%, person 50%, standard 50%, sharp 59% (the yardstick: 7%,
+  38%, 62%, 73%). A person-paced commander now does as well as the
+  untiring one, so "standard wins" says more about what a player giving
+  the right order every two seconds can do. But in eight battles some rung
+  stands below the one beneath it, most often person over standard
+  (Millbrook Ford, Hold the Fords, the two storms, the Great Battery).
+  Two reasons, measured. Four dice read in quarters, so a 25-point step is
+  within the noise of one cell. And the AI as it stands re-thinks where its
+  line goes at every look, and as the battle wavers around a threshold
+  (which flag the enemy is coming for, whether a flag can be made good) it
+  sends blocks back and forth: in eight battles of four scenarios its foot
+  were sent back to where they had been sent seconds before 44 times,
+  where the yardstick's were once. The person-paced commander, carrying
+  out one order in two seconds, filters that out. Re-thinking every 4 s
+  instead cut the reversals to 7 but made the AI weaker from both ends
+  against the yardstick (it won 42% of those battles, not 50%), so it was
+  not kept.
+- **Hold the Fords is now an attacker's battle for the AI.** Doing nothing
+  no longer wins it (the yardstick's idle player won it every time; now
+  never): the attacker takes the empty fords and then goes for the last
+  before the clock runs out, where it used to sit on two. The AI got
+  better at both ends there (against the yardstick, as the defender it
+  wins 75% where the yardstick won 50%, and as the attacker it holds the
+  yardstick's defender to 25%), but the attacker more, so with the AI on
+  both sides the standard defender loses; the person-paced one, which
+  moves its line less, wins three times in four.
+- **Some battles got much harder for the player's side.** Riders at Dawn
+  is lost by every AI player (the yardstick's won it 75–100%). In the
+  battle watched, the player's line split to take all three flags, and
+  the enemy's three horse together broke the two pikes at the centre and
+  rode on into the archers behind them. Two Narrow Bridges is still lost
+  by every AI player.
+- **Battles are short and settled early.** They last 1–3 minutes, most
+  under 2.5, against a target of 2–4, with 0–1.5 lead changes.
+- **Warning is still under-measured**, for the reason given before: a
+  third to two thirds of blows land with no regiment having been aimed at
+  the one it hits, because the AI closes with move orders.
 
 ### The AI audit
 
-What the AI is: a reactive commander. Every 0.75 s each regiment's role
-(foot, shooters, horse, guns, general) picks an order from the battle as it
-stands, tuned by a persona (how long to hold, whether to flank, a reserve).
-In a grand battle, divisions take objectives in order. It has no lookahead,
-no memory and no read of the player's plan.
+What the AI is: a reactive commander with a plan. Every 0.75 s it works
+out where its line goes (`AI.allot`): first to each flag it holds that the
+enemy is coming for, enough to outweigh what comes; then to the flags it
+can take, the least held and nearest first, in strength, and none to a
+flag it hasn't the strength left to make good (no blocks sent one at a
+time to be beaten in turn). Blocks bound for a flag that still needs them
+keep it. Spare blocks stand behind the defence while time is on its side
+(the clock or the drain would decide for it) and go for a flag otherwise.
+Each regiment's role then picks an order: foot holding a flag already
+theirs stand on their side of it and fight what comes; a block in melee
+fights whoever it is fighting; idle horse take a flag no enemy stands
+near; shooters keep behind the line, behind pikes where there are any. In
+a grand battle, divisions take objectives in order, as before. It has no
+lookahead and no read of the player's plan.
 
-`tests/plans.gd` searches fixed plans against it: each of the player's
-regiments is sent to one flag, or left to the AI's line, and the standard
-commander fights the plan out on three dice. Thirty to forty plans each:
+**Against fixed plans** (`tests/plans.gd`: each of the player's regiments
+sent to one flag or left to the AI's line, the standard commander fighting
+the plan out on three dice, twenty-five or so plans each, the dice as
+above):
 
-| Battle | the AI's own line | plans that win all three dice | plans that win none |
+| Battle | the AI's own line wins | plans that win all three dice | plans that win none |
 |---|---|---|---|
-| Hold the Fords | wins none | 24 of 33 | 9 |
-| Hammer and Anvil | wins none | 24 of 30 | 6 |
-| Push of Pike | wins all three | 21 of 35 | 4 |
+| Hold the Fords | 1 of 3 → 0 of 3 | 14 of 26 → 4 of 25 | 3 → 9 |
+| Hammer and Anvil | 2 of 3 → 3 of 3 | 13 of 25 → 14 of 23 | 0 → 0 |
+| Push of Pike | 2 of 3 → 2 of 3 | 7 of 22 → 9 of 22 | 1 → 5 |
+
+In each cell the yardstick comes first. The audit of the morning (24 of
+33, 24 of 30) was measured on dice that fought one battle each, so a plan
+that won once "won all three". In Hold the Fords the enemy is now hard to
+beat with a fixed plan; without the line's allotment it was beaten on all
+three dice by 16 of 25. In Hammer and Anvil it is still beaten by just
+over half: there a plan places only the two foot blocks, the player's
+three horse fight under the AI whatever the plan, and they decide it.
+
+**Against the yardstick** (`tests/versus.gd`): every quick scenario and
+campaign battle, four dice, the AI as the player against the yardstick as
+the enemy and the other way round, and the yardstick against itself for
+the base rate. The player wins 61% of the yardstick's own battles; with
+the AI as the player, 46%; with the AI as the enemy, 46%. So it is 15
+points harder as the enemy and 15 points weaker as the player: as strong
+over all, stronger in the role each scenario gives the enemy, weaker as
+the balanced player. In mirror Skirmishes over six fields of each era
+(`--job=scenario:skirmish --draws=6 --dice=2`, and `skirmish_shot`), where
+both sides are the same army and persona, it beats the yardstick in 31 of
+48 (15 of 24 as the player, 16 of 24 as the enemy): where neither side
+has a role to play, it is the stronger commander.
+
+Taking out one change at a time, on a version one shooter tweak away from
+this one (eleven quick scenarios, 88 battles each): with everything it won
+about 48%, without the line's allotment 45%, without idle horse taking
+flags 51%, each within the noise of the others. What earns the allotment
+its place is Hold the Fords' audit above.
+
+**The planner** (`Commander.PlannerCommander`, see "Solving the game" in
+ARCHITECTURE.md) tries, every 20 s, the AI's allotment and the whole line
+to each flag, each on copies of the battle fought 30 s ahead, and keeps
+the best. On the quick scenarios (four dice each; Skirmish one draw) it
+wins 69%, 36 of 52, where on the same battles standard wins 41%, sharp
+48% and person 57%. It does no worse than standard anywhere, and wins
+Riders at Dawn and the Great Battery three times in four, where no
+commander on the ladder wins one. It is the same AI giving the same kinds
+of order; only where the line goes is chosen by looking ahead.
 
 So:
 
-- **As an opponent it is easy to beat on purpose.** Sending the army at
-  chosen flags, almost any choice, beats it on every dice where its own
-  line, spread across every flag, loses on every dice. A player who
-  concentrates will find the quick battles easier than the tables above
-  say.
-- **As a stand-in for a player it is fit for some things only.** It is
-  fit for regressions (the recorded battles), for comparing scenarios with
-  each other, and for the history checks of the grand battles. It is not
-  fit for saying how hard a battle is for a person: it gives superhuman
-  orders a minute, spreads itself thin, and gives up good ground.
-- **The plan is worth almost everything; the dice almost nothing.** A plan
-  wins on every dice or on none far more often than it splits them.
+- **As an opponent it is harder to beat on purpose, where the plan is the
+  lesson.** Concentrating on a ford no longer beats Hold the Fords on
+  every die; the enemy finds the empty one. Where the lesson is tactics
+  (horse round the flank, pikes against horse), fixed plans say little,
+  and it is about as easy as before.
+- **As a stand-in for a player it is fit for more, and still not for
+  everything.** Fit for regressions, for comparing scenarios, for the
+  history checks; and with the person-paced commander on the ladder, a
+  rough read of what a player at a person's pace can do. Not yet for
+  saying exactly how hard a battle is: four dice read in quarters, and the
+  AI's own back-and-forth flattens the ladder's middle.
+- **The plan is still worth more than the dice.** Plans that lose on every
+  die rose from 3 to 9 of 25 in Hold the Fords: the choice matters more.
+- **A much stronger AI is one search away.** The planner's 69% against
+  standard's 41% is the honest ceiling for these battles today, and says
+  where the AI falls short: in choosing where its line goes, not in
+  carrying it out. It costs about ten battles' worth of steps per battle,
+  fine for the studies and too slow to run live as it stands.
 
-What to expect of it, and the next fixes, each measured by these studies:
-the line should concentrate as divisions do (the plans that win are
-divisions); a side that starts on good ground should hold it; and the
-standard commander should give orders at a person's rate, so that "the
-standard commander wins" means something about players. Past that, a
-planner that searches plans during the battle would be the stronger AI and
-the honest ceiling; see "Solving the game" in ARCHITECTURE.md.
+What to expect next, each measured by these studies: line blocks that keep
+their flag through a threshold's wavering without a slower clock (the
+reversals), pikes that face horse, the general behind the main body rather
+than the middle of a split line, more dice for the ladder (eight to a cell
+reads in eighths), and the planner as a hard enemy once its look ahead can
+be spread over the frames of a battle.
 
 ## Score
 
@@ -493,6 +607,10 @@ under three minutes. Best score is kept on the device.
   state. Everything else hands it orders (`apply_orders`) and reads it.
 - `scripts/ai.gd` is a pure decision: battle state in, orders out. The
   player's side in the headless balance tests uses the same function.
+  Where the line goes is a plan (block to flag) that the commander
+  (`scripts/commander.gd`) keeps, thinks out with `AI.allot` and hands to
+  `AI.decide`. A planner is a commander that picks the plan by trying
+  plans on copies of the battle (`Battle.copy`, `BattleRun.copy`).
 - `scripts/combat.gd` holds the rules as pure functions over values.
 - `scripts/campaign.gd` is pure: run state in, new run state out.
 - `scripts/terrain.gd` builds a seeded map, or a grand battle's map from

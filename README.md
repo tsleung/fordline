@@ -81,13 +81,21 @@ Waterloo's step over budget. `./test.sh --quick` fights one seed and skips
 the long battles.
 
 Studies, all fought through the game's loop:
-- `tests/luck_skill.gd` fights a battle under a ladder of commanders and
-  prints one row per battle; `tests/luck_skill.py` splits the outcome
-  into skill and luck, `tests/play.py` reports the measures of play
-  (length, lead changes, comebacks, quiet, warning, orders a minute,
-  and with `--impact=N` how far one dropped order carries).
+- `tests/luck_skill.gd` fights a battle under a ladder of commanders
+  (idle, person-paced, standard, sharp; `--policies=planner` adds the
+  planner, which tries plans ahead on copies of the battle and fights
+  about ten times as long) and prints one row per battle;
+  `tests/luck_skill.py` splits the outcome into skill and luck,
+  `tests/play.py` reports the measures of play (length, lead changes,
+  comebacks, quiet, warning, orders a minute, and with `--impact=N` how
+  far one dropped order carries). Each die is the battle's random numbers
+  and when each commander first looks.
 - `tests/plans.gd` searches fixed plans against the enemy AI: the
   ceiling, and how much a plan is worth.
+- `tests/versus.gd` fights the AI against its yardstick, the AI of 1
+  November 2026 kept in `tests/ai_baseline.gd`, from both ends of every
+  battle; `tests/play.py` reports it. A change to the AI is better when
+  it beats the yardstick from both ends.
 
 See "Play over time" in [docs/DESIGN.md](docs/DESIGN.md).
 
