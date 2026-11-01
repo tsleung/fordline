@@ -76,7 +76,7 @@ func _score(spec: Dictionary, plan: Array, dice: int, tried: Dictionary) -> floa
 	for die in dice:
 		var b := Scenarios.make_battle(spec, 7919 * (die + 1))
 		_assign(b, plan)
-		Fights.fight(b, AI.PERSONAS[spec.persona], "standard")
+		Fights.fight(b, AI.PERSONAS[spec.persona], "standard", false, die)
 		wins += 1 if b.winner == 0 else 0
 		margin += Measures.margin(b)
 	var result := {"plan": plan, "wins": wins, "margin": snappedf(margin / dice, 0.1), "score": wins + margin / dice / 1000.0}

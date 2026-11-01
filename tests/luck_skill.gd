@@ -3,7 +3,8 @@ extends SceneTree
 ## things independently:
 ##   the commander - the player policies in POLICIES
 ##   the draw      - the map and the enemy roster swap (a run seed)
-##   the dice      - the battle's own random numbers (reloads, scatter)
+##   the dice      - the battle's own random numbers (cannon scatter) and
+##                   when each commander first looks (Fights.seats)
 ## and prints one ROW line of JSON per battle for tests/luck_skill.py.
 ##   Godot --headless --path . -s tests/luck_skill.gd -- --battle=2 --draws=6 --dice=3
 ## --policies=sharp,reserve fights only those. --scenario=hold fights a
@@ -61,7 +62,7 @@ func _fight(battle_index: int, draw: int, die: int, policy_name: String, scenari
 			b.rng.seed = 7919 * (die + 1)
 			return b
 		enemy = AI.PERSONAS[Campaign.BATTLES[battle_index].persona]
-	var fought := Fights.fight(make.call(), enemy, policy_name, impact > 0)
+	var fought := Fights.fight(make.call(), enemy, policy_name, impact > 0, die)
 	var b := fought.battle
 	var warned: Dictionary = Measures.warning(fought, 0)
 	var row := {
@@ -75,5 +76,5 @@ func _fight(battle_index: int, draw: int, die: int, policy_name: String, scenari
 		"orders_min": snappedf(Measures.orders_per_minute(fought, 0), 0.1),
 	}
 	if impact > 0:
-		row.impact = Measures.impact(fought, make, Fights.seats.bind(enemy, policy_name), impact, 17 + die)
+		row.impact = Measures.impact(fought, make, Fights.seats.bind(enemy, policy_name, die), impact, 17 + die)
 	return row

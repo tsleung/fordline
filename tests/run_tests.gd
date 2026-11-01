@@ -39,6 +39,7 @@ func _run() -> void:
 	_test_scenarios()
 	await _test_grand(quick)
 	_test_replay()
+	_test_copy()
 	_test_battles(quick)
 	if not quick:
 		_test_budget()
@@ -565,6 +566,34 @@ func _test_replay() -> void:
 	changed[0].orders.clear()
 	var other := BattleRun.replay(make, seats, changed, Fights.length(played.battle))
 	_check(not same.call(played.battle, other.battle), "the same log without the first orders fights another battle")
+
+
+## A copy of a battle fought on by the same commanders fights the same
+## battle to the man, a castle's gates and all, and leaves the battle it
+## was copied from as it was.
+func _test_copy() -> void:
+	for id in ["hold", "last_keep"]:
+		var spec := Scenarios.resolve(id, 1)
+		var played := BattleRun.new(Scenarios.make_battle(spec, 1))
+		for seat in Fights.seats(AI.PERSONAS[spec.persona], "standard", 1):
+			played.add_seat(seat)
+		played.begin()
+		played.run_for(30.0)
+		var copied := BattleRun.new(played.battle.copy())
+		for seat in played.seats:
+			var again := BattleRun.Seat.new(seat.team, seat.commander, seat.every)
+			again.wait = seat.wait
+			copied.add_seat(again)
+		var before := _state(played.battle)
+		copied.run_for(60.0)
+		_check(_state(played.battle) == before, "fighting a copy of %s leaves the battle as it was" % id)
+		played.run_for(60.0)
+		_check(_state(copied.battle) == _state(played.battle), "a copy of %s fights on as the battle does" % id)
+
+
+## What a battle is at this moment, to the bit.
+func _state(b: Battle) -> PackedByteArray:
+	return var_to_bytes([b.time, b.resolve, b.killed, b.flags, b.rng.state, b.regiments.map(func(r): return [r.pos, r.facing, r.soldiers, r.morale, r.wound, r.stamina, r.state, r.waypoints])])
 
 
 func _test_battles(quick: bool) -> void:

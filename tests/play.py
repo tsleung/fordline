@@ -10,7 +10,7 @@ import sys
 from collections import defaultdict
 from statistics import mean, median
 
-LADDER = ["idle", "slow", "standard", "sharp", "reserve", "hills"]
+LADDER = ["idle", "person", "standard", "sharp", "reserve", "hills"]
 
 
 def load(paths):
