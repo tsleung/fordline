@@ -356,10 +356,9 @@ its order of battle.
 ## Play over time
 
 What the game should feel like at each time horizon, as measures the
-studies compute and targets they are judged against. The frame is the
-owner's, from the weapon-target game (2026-10-13): decisions matter,
-aren't monotonous, and their consequences are long lasting yet, with
-effort, reversible; "killing isnt everything".
+studies compute and targets they are judged against. The frame: decisions
+should matter and not be monotonous, and their consequences should last
+yet be reversible with effort; and killing is not everything.
 
 Every measure is read from a battle's trace (one sample a second) and its
 order log, fought through the same loop the game uses. A target is a band

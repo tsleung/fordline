@@ -3,6 +3,30 @@
 Fordline is a Godot 4.5 real-time tactics game (GDScript). Read
 `docs/DESIGN.md` first, then `README.md`.
 
+## Documentation
+
+`docs/README.md` maps the docs: `docs/DESIGN.md` (the game, and what was
+measured), `docs/ARCHITECTURE.md` (the engine and how it grows),
+`docs/HISTORY.md` (what was built when, and why). Keep them current in the
+same commit as the change they describe.
+
+## Private paths
+
+`notes/prompts.md` is the owner's verbatim prompt log about Fordline. On his
+machine it is a gitignored symlink into his private notebook
+(`~/github/terranleung.com/notes/fordline/prompts.md`), so what is written
+here lands there; on any other machine it is absent. This repo is public:
+the log is never committed here, and `test.sh` fails if it is tracked.
+
+- When the path exists, append each of the owner's prompts about Fordline
+  verbatim (typos and all) under a dated one-line context, the format the
+  file already uses. Never create the path where it does not exist.
+- Before you finish, if you appended to it, commit it in the notebook with
+  `npm --prefix ~/github/terranleung.com run commit-logs`. It commits the
+  logs there and nothing else.
+- Nothing else from the notebook is copied into this repo unless the owner
+  says so.
+
 ## Rules for editing
 
 - **One writer.** `scripts/battle.gd` is the only code that writes battle

@@ -345,8 +345,7 @@ honest ceiling for balance, and the teacher a learner would need later.
 ## Air: a worked example
 
 How drones, missiles and interceptors would enter, to check the contract
-before it is built. Drawn from the research in the owner's notebook
-(`notes/wartech/`, `notes/ideas.md`, `notes/wta-game/`).
+before it is built.
 
 **Air is things in flight between ground units, never units in the air.**
 Every drone, missile, shell and interceptor is fired from the ground at a
@@ -360,9 +359,9 @@ ground decision, and the one-tap orders stay enough:
 - what to fire at what, and when to spend the expensive round;
 - whether to be somewhere else when the countdown ends.
 
-**Weapons are values, not special cases.** As `ideas.md` puts it, every
-weapon sits on a few shared axes: speed, homing, area, whether it can be
-shot down, warning time, cost. The counters follow from the numbers.
+**Weapons are values, not special cases.** Every weapon sits on a few
+shared axes: speed, homing, area, whether it can be shot down, warning
+time, cost. The counters follow from the numbers.
 
 | In flight | Fired by | Speed and warning | Can be stopped by | Notes |
 |---|---|---|---|---|
@@ -379,9 +378,9 @@ tags it can engage, the fastest thing it can catch, how many flights it can
 engage at once, how long each one takes, and a magazine. A flight it can
 engage inside its ring is stopped once it has been engaged for that long.
 Too many at once and the rest get through. So failure is "I can't kill
-those fast enough", never "I can't kill that" (`wta_game_concept.md`),
-saturation and decoys work by themselves, and the dice stay out of it,
-which both the WTA findings and Fordline's own luck study argue for. A
+those fast enough", never "I can't kill that"; saturation and decoys work
+by themselves, and the dice stay out of it, which Fordline's own luck
+study argues for. A
 slower interceptor catches a faster flight only while it is still coming
 in, which puts pickets forward.
 
@@ -411,8 +410,8 @@ the other side's arrivals come slower by day, as German reserves did in
 Normandy.
 
 **Effects lean to nerve.** A strike costs more morale and stamina than men,
-so air shapes where blocks will stand rather than deleting them; the WTA
-siege showed air that removes a garrison makes the fight a walk.
+so air shapes where blocks will stand rather than deleting them: air that
+removes a garrison would make a siege a walk.
 
 **What it takes:** from the core, flights with an `ext` slot, each side's
 home edge and abilities, layers, and kinds as data (drone teams, anti-air,
@@ -426,8 +425,8 @@ a strike or set a wing's mission.
 - Aircraft you steer, and dogfights. A wing is given a mission, not flown.
 - Seeing and being seen. The map shows everything; reconnaissance drones
   and fog of war are not planned.
-- Cost exchange as an economy. It is the scoreboard, not the fun
-  (`ideas.md`). At most, magazines carry over between campaign battles.
+- Cost exchange as an economy. It is the scoreboard, not the fun. At
+  most, magazines carry over between campaign battles.
 - Real flight times. Warning is scaled to seconds of play: a grand battle's
   hour is 78 seconds.
 
