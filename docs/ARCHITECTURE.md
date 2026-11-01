@@ -386,6 +386,17 @@ beats the heuristics but is too slow to ship. Then learning has one job:
 distilling the planner into a policy fast enough for a phone, learned from
 the planner's choices rather than from wins and losses.
 
+The data for that job is written by `tests/plan_examples.gd`: a row per
+re-plan with 33 numbers for what the side sees (per flag: owner, capture
+progress, each side's strength there; then the clock, resolve and each
+arm's strength), the rollout score of each of the four choices, the one
+taken, and the outcome. Two scores fit it: per-decision regret (the best
+choice's rollout score minus the chosen one's), a pure function over the
+file; and the win rate with the learned chooser fought as a commander,
+which only the simulator can give. A learned chooser has to run in GDScript
+in a single-threaded web build, with the heuristic allotment as its
+fallback when it is unsure.
+
 ## Air: a worked example
 
 How drones, missiles and interceptors would enter, to check the contract

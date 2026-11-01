@@ -538,18 +538,18 @@ three dice by 16 of 25. In Hammer and Anvil it is still beaten by just
 over half: there a plan places only the two foot blocks, the player's
 three horse fight under the AI whatever the plan, and they decide it.
 
-**Against the yardstick** (`tests/versus.gd`): every quick scenario and
-campaign battle, four dice, the AI as the player against the yardstick as
-the enemy and the other way round, and the yardstick against itself for
-the base rate. The player wins 61% of the yardstick's own battles; with
-the AI as the player, 46%; with the AI as the enemy, 46%. So it is 15
-points harder as the enemy and 15 points weaker as the player: as strong
-over all, stronger in the role each scenario gives the enemy, weaker as
-the balanced player. In mirror Skirmishes over six fields of each era
-(`--job=scenario:skirmish --draws=6 --dice=2`, and `skirmish_shot`), where
-both sides are the same army and persona, it beats the yardstick in 31 of
-48 (15 of 24 as the player, 16 of 24 as the enemy): where neither side
-has a role to play, it is the stronger commander.
+**Against the yardstick** (`tests/versus.gd`): the AI as the player
+against the yardstick as the enemy and the other way round, and the
+yardstick against itself for the base rate. On the designed battles (eight
+dice for each quick scenario, two draws of four for each campaign battle;
+256 battles from the two ends) the player wins 61% of the yardstick's own
+battles; with the AI as the player 45%, with the AI as the enemy 48%. So it
+is about as strong over all (49% ±6 from both ends), stronger in the role
+each scenario gives the enemy, weaker as the balanced player. In mirror
+Skirmishes over twenty fields of each era (`--job=scenario:skirmish
+--draws=20 --dice=2`, and `skirmish_shot`), where both sides are the same
+army and persona, it wins 88 of 160, 55% ±8: no clear edge. (Six fields
+had read 31 of 48; twenty say that was the luck of the fields.)
 
 Taking out one change at a time, on a version one shooter tweak away from
 this one (eleven quick scenarios, 88 battles each): with everything it won
@@ -561,8 +561,8 @@ its place is Hold the Fords' audit above.
 ARCHITECTURE.md) tries, every 20 s, the AI's allotment and the whole line
 to each flag, each on copies of the battle fought 30 s ahead, and keeps
 the best. On the quick scenarios (four dice each; Skirmish one draw) it
-wins 69%, 36 of 52, where on the same battles standard wins 41%, sharp
-48% and person 57%. It does no worse than standard anywhere, and wins
+wins 69%, 36 of 52 (±13 points on that many), where on the same battles
+standard wins 41%, sharp 48% and person 57%. It does no worse than standard anywhere, and wins
 Riders at Dawn and the Great Battery three times in four, where no
 commander on the ladder wins one. It is the same AI giving the same kinds
 of order; only where the line goes is chosen by looking ahead.
@@ -588,12 +588,19 @@ So:
   carrying it out. It costs about ten battles' worth of steps per battle,
   fine for the studies and too slow to run live as it stands.
 
-What to expect next, each measured by these studies: line blocks that keep
-their flag through a threshold's wavering without a slower clock (the
-reversals), pikes that face horse, the general behind the main body rather
-than the middle of a split line, more dice for the ladder (eight to a cell
-reads in eighths), and the planner as a hard enemy once its look ahead can
-be spread over the frames of a battle.
+Tried since, and not kept (2 November 2026, the larger benchmark: 256
+designed battles and 160 mirror Skirmishes from both ends): leaning each of
+the allotment's choices to what is already under way cut the foot's
+reversals by 43% and the allotment's changes of mind from 23% of looks to
+14%, and the general keeping behind the main body rather than the middle
+of a split line was sound, but neither made the AI stronger (46–52% and
+46–51% against the PR's 49% and 55%, all within the noise). What the
+studies point to instead is the planner: its lead over the AI it is built
+on is the one large gain measured, so the next step is making its choice
+cheap enough to run, by a shorter, time-sliced look ahead or by a small
+model trained on its choices (`tests/plan_examples.gd`). Also open: pikes
+that face horse, and more dice for the ladder (eight to a cell reads in
+eighths).
 
 ## Score
 

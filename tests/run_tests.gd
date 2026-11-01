@@ -40,6 +40,7 @@ func _run() -> void:
 	await _test_grand(quick)
 	_test_replay()
 	_test_copy()
+	_test_plan_examples()
 	_test_battles(quick)
 	if not quick:
 		_test_budget()
@@ -610,6 +611,21 @@ func _test_copy() -> void:
 	var before := _state(b)
 	planner.decide(b, 0)
 	_check(_state(b) == before and planner.choice >= -1 and planner.choice < b.flags.size(), "a planner looks ahead on copies and picks one of its ways")
+
+
+## The planner's choices written as data (PlannerData) come out the same
+## to the byte when the battle is fought again, a row per re-plan with a
+## score for every choice it could take.
+func _test_plan_examples() -> void:
+	var spec := Scenarios.resolve("hold", 1)
+	var settings := {"replan": 20.0, "horizon": 2.0, "samples": 1, "length": 45.0}
+	var rows := []
+	for k in 2:
+		var fought := PlannerData.fight(Scenarios.make_battle(spec, 1), 0, AI.PERSONAS.balanced, AI.PERSONAS[spec.persona], 1, "hold:test:0", settings)
+		rows.append(JSON.stringify(fought))
+	var first: Array = JSON.parse_string(rows[0])
+	_check(first.size() == 3 and rows[0] == rows[1], "the planner's choices as data come out the same twice (%d rows)" % first.size())
+	_check(first.all(func(r): return r.state.size() == PlannerData.feature_names().size() and r.legal == [0.0, 1.0, 2.0, 3.0] and r.rollout.size() == 4), "each row has every feature and a score for every choice")
 
 
 ## What a battle is at this moment, to the bit.

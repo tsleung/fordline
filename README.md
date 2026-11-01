@@ -96,6 +96,10 @@ Studies, all fought through the game's loop:
   November 2026 kept in `tests/ai_baseline.gd`, from both ends of every
   battle; `tests/play.py` reports it. A change to the AI is better when
   it beats the yardstick from both ends.
+- `tests/plan_examples.gd` writes the planner's choices as a dataset
+  (`spec.json` and `examples.jsonl`, `tests/planner_data.gd`): at each
+  re-plan, what its side could see, each choice's rollout score, the
+  choice it took, and how the battle came out. Rerun, the same bytes.
 
 See "Play over time" in [docs/DESIGN.md](docs/DESIGN.md).
 

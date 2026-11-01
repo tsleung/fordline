@@ -130,6 +130,10 @@ class PlannerCommander extends AICommander:
 	var horizon := 30.0
 	var samples := 2
 	var choice := -1
+	## Called at each re-plan with the battle, the side, each choice's score
+	## (choice to lead) and the choice taken: a study's window on the
+	## planner, which changes nothing.
+	var on_choice := Callable()
 	var _replan_at := 0.0
 
 	func _init(with_persona: Dictionary, blows_rally: bool, rival_persona: Dictionary) -> void:
@@ -147,20 +151,26 @@ class PlannerCommander extends AICommander:
 
 	func think(b: Battle, team: int, ids: Array[int] = []) -> Dictionary:
 		if b.time >= _replan_at:
-			choice = best_choice(b, team)
+			var scores := try_all(b, team)
+			choice = best_of(scores)
+			if on_choice.is_valid():
+				on_choice.call(b, team, scores, choice)
 			_replan_at = b.time + replan
 		return plan_for(b, team, persona, choice, ids)
 
-	## The choice in hand is tried first, so one no better doesn't replace it.
-	func best_choice(b: Battle, team: int) -> int:
-		var best := choice
-		var best_score := ahead(b, team, choice)
+	## Each way of sending the line, tried ahead: choice to its score.
+	func try_all(b: Battle, team: int) -> Dictionary:
+		var out := {}
 		for c in range(-1, b.flags.size()):
-			if c == choice:
-				continue
-			var score := ahead(b, team, c)
-			if score > best_score:
-				best_score = score
+			out[c] = ahead(b, team, c)
+		return out
+
+	## The best-scoring choice; on a tie the one in hand, so a choice no
+	## better doesn't replace it.
+	func best_of(scores: Dictionary) -> int:
+		var best := choice
+		for c in scores:
+			if scores[c] > scores[best]:
 				best = c
 		return best
 

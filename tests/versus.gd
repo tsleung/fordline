@@ -7,8 +7,9 @@ extends SceneTree
 ## stronger when, against the same opponent, it wins more as the player
 ## than the yardstick does and loses less as the enemy.
 ##   Godot --headless --path . -s tests/versus.gd -- --job=scenario:hold --dice=4
-##   --job=battle:2 --draws=2 fights a campaign battle; --pairs=ai-base,base-ai
-##   leaves out the base rate.
+##   --job=battle:2 --draws=2 fights a campaign battle; --first=5 starts at the
+##   sixth draw, to split a long run; --pairs=ai-base,base-ai leaves out the
+##   base rate.
 ## Prints one VS line of JSON per battle for tests/play.py --versus.
 
 const PAIRS := [["base", "base"], ["ai", "base"], ["base", "ai"]]
@@ -29,6 +30,7 @@ func _initialize() -> void:
 	var job := "scenario:hold"
 	var dice := 4
 	var draws := 1
+	var first := 0
 	var pairs: Array = PAIRS
 	for arg in OS.get_cmdline_user_args():
 		var value := arg.get_slice("=", 1)
@@ -38,13 +40,15 @@ func _initialize() -> void:
 			dice = int(value)
 		elif arg.begins_with("--draws="):
 			draws = int(value)
+		elif arg.begins_with("--first="):
+			first = int(value)
 		elif arg.begins_with("--pairs="):
 			pairs = Array(value.split(",")).map(func(p): return p.split("-"))
 	var kind := job.get_slice(":", 0)
 	var what := job.get_slice(":", 1)
 	# Only a campaign battle or a Skirmish draws its field and armies anew.
 	var drawn := kind == "battle" or what.begins_with("skirmish")
-	for draw in (draws if drawn else 1):
+	for draw in range(first, first + (draws if drawn else 1)):
 		for die in dice:
 			for pair in pairs:
 				print("VS ", JSON.stringify(_fight(kind, what, draw, die, pair[0], pair[1])))
