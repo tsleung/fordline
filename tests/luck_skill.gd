@@ -18,7 +18,7 @@ func _initialize() -> void:
 	var battle_index := 0
 	var draws := 6
 	var dice := 3
-	var chosen := PackedStringArray(Fights.POLICIES.keys())
+	var chosen := PackedStringArray(Fights.POLICIES.keys().filter(func(k): return not Fights.POLICIES[k].has("plans")))
 	var scenario := ""
 	var impact := 0
 	for arg in OS.get_cmdline_user_args():

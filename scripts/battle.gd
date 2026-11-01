@@ -151,6 +151,14 @@ func copy() -> Battle:
 	return c
 
 
+## The battle's random numbers from here on drawn afresh from `seed_value`:
+## a copy fought on as one of the futures the battle might have rather than
+## the one it will. A planner trying plans ahead uses it, since it can't
+## know where the guns' shot will fall.
+func reseed(seed_value: int) -> void:
+	rng.seed = seed_value
+
+
 ## Every script variable of `from` onto `to` but those in `skip`, arrays
 ## (packed ones too, which Godot passes by reference) and dictionaries
 ## copied through rather than shared.

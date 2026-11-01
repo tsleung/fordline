@@ -50,6 +50,22 @@ func _init(b: Battle) -> void:
 	trace.start(b)
 
 
+## A copy of the run as it stands, to fight on without changing this one:
+## the battle copied (Battle.copy) and each seat with a copy of its
+## commander, so it fights on as this run would. Its log and trace start
+## afresh.
+func copy() -> BattleRun:
+	var c := BattleRun.new(battle.copy())
+	for seat in seats:
+		var s := Seat.new(seat.team, seat.commander.copy() if seat.commander != null else null, seat.every, seat.whole_side)
+		s.ids = seat.ids.duplicate()
+		s.logged = seat.logged
+		s.wait = seat.wait
+		c.add_seat(s)
+	c.tick = tick
+	return c
+
+
 func add_seat(seat: Seat) -> int:
 	seats.append(seat)
 	return seats.size() - 1

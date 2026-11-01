@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Measures of play against DESIGN.md's "Play over time" targets. Reads the
 ROW lines tests/luck_skill.gd prints and reports, per battle and commander,
-each horizon's measure.
+each horizon's measure; and the VS lines tests/versus.gd prints, the AI
+against its yardstick from both ends.
 
     python3 tests/play.py build/play/*.txt
 """
@@ -10,17 +11,39 @@ import sys
 from collections import defaultdict
 from statistics import mean, median
 
-LADDER = ["idle", "person", "standard", "sharp", "reserve", "hills"]
+LADDER = ["idle", "person", "standard", "sharp", "reserve", "hills", "planner"]
 
 
-def load(paths):
+def load(paths, tag="ROW "):
     rows = []
     for path in paths:
         with open(path) as f:
             for line in f:
-                if line.startswith("ROW "):
-                    rows.append(json.loads(line[4:]))
+                if line.startswith(tag):
+                    rows.append(json.loads(line[len(tag):]))
     return rows
+
+
+def versus(rows):
+    """The player's win rate for each pairing, player's AI against the
+    enemy's; and what the AI changes against the yardstick's base rate."""
+    by = defaultdict(list)
+    for r in rows:
+        by[(r["job"], r["player"], r["enemy"])].append(r["won"])
+    pairs = [("base", "base"), ("ai", "base"), ("base", "ai")]
+    print(f"{'battle':24s} " + " ".join(f"{p + ' v ' + e:>12s}" for p, e in pairs) + "    n")
+    pooled = defaultdict(list)
+    for job in sorted({r["job"] for r in rows}):
+        cells = []
+        for pe in pairs:
+            won = by.get((job,) + pe, [])
+            pooled[pe] += won
+            cells.append(f"{mean(won):12.0%}" if won else f"{'-':>12s}")
+        print(f"{job:24s} " + " ".join(cells) + f" {len(by.get((job, 'ai', 'base'), [])):4d}")
+    rate = {pe: mean(w) if w else float("nan") for pe, w in pooled.items()}
+    print(f"{'all':24s} " + " ".join(f"{rate.get(pe, float('nan')):12.0%}" for pe in pairs))
+    print(f"the AI as the player wins {rate[('ai', 'base')] - rate[('base', 'base')]:+.0%} against the yardstick's base rate; "
+          f"as the enemy it holds the player to {rate[('base', 'ai')] - rate[('base', 'base')]:+.0%}")
 
 
 def report(rows):
@@ -54,4 +77,9 @@ def report(rows):
 
 
 if __name__ == "__main__":
-    report(load(sys.argv[1:]))
+    rows, vs = load(sys.argv[1:]), load(sys.argv[1:], "VS ")
+    if rows:
+        report(rows)
+    if vs:
+        print()
+        versus(vs)

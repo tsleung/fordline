@@ -568,9 +568,10 @@ func _test_replay() -> void:
 	_check(not same.call(played.battle, other.battle), "the same log without the first orders fights another battle")
 
 
-## A copy of a battle fought on by the same commanders fights the same
-## battle to the man, a castle's gates and all, and leaves the battle it
-## was copied from as it was.
+## A copy of a battle and its commanders (BattleRun.copy) fights on as the
+## battle does, to the man, a castle's gates and all, and leaves the battle
+## it was copied from as it was. A planner's look ahead on copies changes
+## nothing but the plan it picks.
 func _test_copy() -> void:
 	for id in ["hold", "last_keep"]:
 		var spec := Scenarios.resolve(id, 1)
@@ -579,16 +580,19 @@ func _test_copy() -> void:
 			played.add_seat(seat)
 		played.begin()
 		played.run_for(30.0)
-		var copied := BattleRun.new(played.battle.copy())
-		for seat in played.seats:
-			var again := BattleRun.Seat.new(seat.team, seat.commander, seat.every)
-			again.wait = seat.wait
-			copied.add_seat(again)
+		var copied := played.copy()
 		var before := _state(played.battle)
 		copied.run_for(60.0)
 		_check(_state(played.battle) == before, "fighting a copy of %s leaves the battle as it was" % id)
 		played.run_for(60.0)
 		_check(_state(copied.battle) == _state(played.battle), "a copy of %s fights on as the battle does" % id)
+	var b := Scenarios.make_battle(Scenarios.resolve("hold", 1), 1)
+	b.begin()
+	var planner := Commander.PlannerCommander.new(AI.PERSONAS.balanced, false, AI.PERSONAS.aggressive)
+	planner.horizon = 2.0
+	var before := _state(b)
+	planner.decide(b, 0)
+	_check(_state(b) == before and planner.choice >= -1 and planner.choice < b.flags.size(), "a planner looks ahead on copies and picks one of its ways")
 
 
 ## What a battle is at this moment, to the bit.

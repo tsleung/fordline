@@ -5,11 +5,13 @@ extends RefCounted
 ## through the same loop the game uses.
 
 ## Player commanders of rising skill (idle, person, standard, sharp), then
-## sharp with one change each (reserve, hills). every: seconds between
-## decisions (0 never decides). persona: the AI persona it plays with.
-## rally: whether it blows the horn when regiments near the general break.
-## per_look: at most this many orders each decision, the most urgent first:
-## a person's pace, the ladder's stand-in for a player.
+## sharp with one change each (reserve, hills), then the planner. every:
+## seconds between decisions (0 never decides). persona: the AI persona it
+## plays with. rally: whether it blows the horn when regiments near the
+## general break. per_look: at most this many orders each decision, the
+## most urgent first: a person's pace, the ladder's stand-in for a player.
+## plans: thinks ahead, trying plans on copies of the battle; it fights
+## about ten times as long, so the studies run it only when asked.
 const POLICIES := {
 	"idle": {"every": 0.0, "persona": {"hold": 8.0, "flank": false}, "rally": false},
 	"person": {"every": 2.0, "persona": AI.PERSONAS["balanced"], "rally": false, "per_look": 1},
@@ -17,16 +19,20 @@ const POLICIES := {
 	"sharp": {"every": 0.4, "persona": AI.PERSONAS["balanced"], "rally": true},
 	"reserve": {"every": 0.4, "persona": AI.PERSONAS["reserve"], "rally": true},
 	"hills": {"every": 0.4, "persona": AI.PERSONAS["hills"], "rally": true},
+	"planner": {"every": 0.75, "persona": AI.PERSONAS["balanced"], "rally": false, "plans": true},
 }
 ## A quick battle may not run longer than this; a grand one runs to dusk.
 const TIME_CAP := 600.0
 
 
-## The player's seat for `policy`.
-static func player_seat(policy: String) -> BattleRun.Seat:
+## The player's seat for `policy`, against an enemy that fights as
+## `enemy_persona` (a planner reads it in the briefing).
+static func player_seat(policy: String, enemy_persona: Dictionary) -> BattleRun.Seat:
 	var p: Dictionary = POLICIES[policy]
 	if p.every <= 0.0:
 		return BattleRun.Seat.new(0, Commander.new())
+	if p.has("plans"):
+		return BattleRun.Seat.new(0, Commander.PlannerCommander.new(p.persona, p.rally, enemy_persona), p.every)
 	if p.has("per_look"):
 		return BattleRun.Seat.new(0, Commander.PacedCommander.new(p.persona, p.rally, p.per_look), p.every)
 	return BattleRun.Seat.new(0, Commander.AICommander.new(p.persona, p.rally), p.every)
@@ -55,12 +61,17 @@ static func fight(b: Battle, enemy_persona: Dictionary, policy: String, logged :
 ## fight different battles: on the knife edge a few steps is another
 ## battle. Die 0 has both look at once.
 static func seats(enemy_persona: Dictionary, policy: String, die := 0) -> Array:
-	var out: Array = [BattleRun.Seat.new(1, Commander.AICommander.new(enemy_persona)), player_seat(policy)]
+	var out: Array = [BattleRun.Seat.new(1, Commander.AICommander.new(enemy_persona)), player_seat(policy, enemy_persona)]
 	for i in out.size():
-		var seat: BattleRun.Seat = out[i]
-		var steps := maxi(1, roundi(seat.every / Battle.STEP))
-		seat.wait = (die * (3 + 2 * i)) % steps * Battle.STEP
+		first_look(out[i], i, die)
 	return out
+
+
+## Seat `seat`, the `index`th to decide in a step, first looks a few steps
+## into its think, by `die`.
+static func first_look(seat: BattleRun.Seat, index: int, die: int) -> void:
+	var steps := maxi(1, roundi(seat.every / Battle.STEP))
+	seat.wait = (die * (3 + 2 * index)) % steps * Battle.STEP
 
 
 static func length(b: Battle) -> float:
