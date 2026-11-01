@@ -75,6 +75,7 @@ func _test_combat() -> void:
 	_check(_duel(1.0, 0.2) == "first", "fresh swords beat tired swords")
 	_test_muskets()
 	_test_squares()
+	_test_fixes()
 
 
 ## A volley of shot goes through armour, drops men all at once, and costs
@@ -208,6 +209,18 @@ func _test_routes() -> void:
 	var second: Vector2 = r.pos + Vector2(-260.0, 20.0)
 	_tap(screen, r.pos)
 	_check(screen.selected == [r.id], "tapping a banner selects it")
+	# A tap on the top bar, through the real input path (in the viewport's
+	# own coordinates), is not an order.
+	var before_route: Vector2 = screen.route_end(r)
+	for pressed in [true, false]:
+		var tap := InputEventMouseButton.new()
+		tap.button_index = MOUSE_BUTTON_LEFT
+		tap.pressed = pressed
+		tap.position = Vector2(400, 12)
+		root.push_input(tap, true)
+	await process_frame
+	# No route before, none after: route_end is NaN both times.
+	_check(str(screen.route_end(r)) == str(before_route) and screen.selected == [r.id], "a tap on the top bar sends no one anywhere")
 	_tap(screen, first)
 	_check(screen.route_end(r).distance_to(first) < 1.0, "tapping the field sends it there")
 	_tap(screen, first)
@@ -335,6 +348,31 @@ func _test_squares() -> void:
 	caught.begin()
 	caught.step(Battle.STEP)
 	_check(not line.square, "horse already on a line catches it before it can form square")
+
+
+## Bugs found and fixed, each kept fixed.
+func _test_fixes() -> void:
+	# A general who breaks and is then cut down is mourned once.
+	var b := Battle.new(Terrain.generate("woods", 4), 1)
+	var general := b.add_regiment(0, K.GENERAL, 10, Vector2(650, 500), -PI * 0.5, 0, {})
+	b.add_regiment(1, K.SWORDS, 48, Vector2(650, 300), PI * 0.5, 0, {})
+	b.begin()
+	b._rout(general)
+	var after_rout: float = b.resolve[0]
+	b._kill(general, range(general.men()), null, 1.0)
+	_check(b.take_events().filter(func(e): return e.type == "general").size() == 1, "a general who routed and then fell is mourned once")
+	_check(after_rout - b.resolve[0] <= Battle.DESTROYED_COST + 0.01, "and his death costs only what a routed regiment's does")
+	# Two Narrow Bridges needs both bridges, not a bridge and the field.
+	var spec := Scenarios.resolve("bridges", 1)
+	for held in [[0, 1], [1, 2]]:
+		var dusk := Scenarios.make_battle(spec, 1)
+		dusk.begin()
+		for i in dusk.flags.size():
+			dusk.flags[i].owner = 0 if i in held else 1
+		dusk.time = dusk.deadline
+		dusk.step(Battle.STEP)
+		var won := dusk.broken_team == 1
+		_check(won == (held == [1, 2]), "holding flags %s at dusk %s Two Narrow Bridges" % [held, "wins" if won else "loses"])
 
 
 func _test_fortress() -> void:

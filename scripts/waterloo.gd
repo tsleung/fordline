@@ -205,5 +205,5 @@ const SPEC := {
 	"veterancy": [0, 2],
 	"start": START, "arrivals": ARRIVALS,
 	"goal": "Hold Mont-Saint-Jean at dusk (21:00), or break their army.",
-	"stars": [{"hold": LA_HAYE_SAINTE, "noun": "La Haye Sainte"}, {"hold": PLANCENOIT, "noun": "Plancenoit"}],
+	"stars": [{"hold": LA_HAYE_SAINTE, "noun": "La Haye Sainte"}, {"hold": PLANCENOIT, "noun": "Plancenoit", "verb": "Have taken"}],
 }

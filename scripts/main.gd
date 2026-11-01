@@ -6,6 +6,12 @@ extends Node
 const K := UnitTypes.Kind
 const BattleScreen := preload("res://scripts/battle_screen.gd")
 const MapPreview := preload("res://scripts/map_preview.gd")
+## Lines of a scenario's brief shown on its card in a list.
+const CARD_BRIEF_LINES := 2
+## The open rules' box, as a share of the screen's height.
+const RULES_HEIGHT := 0.32
+## Seconds within which a second tap abandons the campaign.
+const ABANDON_WINDOW := 3.0
 ## Where progress is kept; tests point it at a file of their own.
 var save_path := "user://fordline.cfg"
 
@@ -46,7 +52,14 @@ func show_title() -> void:
 	col.add_child(_button("New campaign", _start_run, true))
 	col.add_child(_button("Quick battle", show_scenarios))
 	col.add_child(_button("Grand battles", show_grand))
-	var rules := _panel_text(_how_to_play())
+	# The rules scroll inside a box a third of the screen tall, so the title
+	# column still fits a landscape phone with them open.
+	var rules := ScrollContainer.new()
+	rules.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rules.custom_minimum_size = Vector2(0, get_viewport().get_visible_rect().size.y * RULES_HEIGHT)
+	var rules_text := _panel_text(_how_to_play())
+	rules_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rules.add_child(rules_text)
 	rules.visible = false
 	col.add_child(_button("How to play", func(): rules.visible = not rules.visible))
 	col.add_child(rules)
@@ -72,6 +85,9 @@ func show_scenarios(era_id := "") -> void:
 	for e in Scenarios.ERAS:
 		var tab := _button(e.name, show_scenarios.bind(e.id), e.id == era_id)
 		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		# The chosen tab is coloured like a primary button, but keeps the
+		# tabs' one size of lettering.
+		tab.remove_theme_font_size_override("font_size")
 		tabs.add_child(tab)
 	col.add_child(tabs)
 	for spec in Scenarios.of_era(era_id):
@@ -115,6 +131,9 @@ func _scenario_card(spec: Dictionary) -> Button:
 	words.add_child(title)
 	var brief := _text(spec.brief, 15, Palette.INK_DIM, false)
 	brief.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# A card is as tall as its map, so a long brief shows its first lines
+	# rather than running into the next card. The briefing has all of it.
+	brief.max_lines_visible = CARD_BRIEF_LINES
 	words.add_child(brief)
 	var thumb := MapPreview.new()
 	thumb.custom_minimum_size = Vector2(thumb_w, thumb_w * aspect)
@@ -147,7 +166,7 @@ func show_scenario(id: String, seed_value := -1) -> void:
 	col.add_child(_text(spec.name, 40, Palette.INK, false))
 	col.add_child(_text(spec.brief, 18, Palette.INK_DIM, false))
 	col.add_child(_map(Scenarios.make_battle(spec, seed_value), spec.name))
-	if id == "skirmish":
+	if Scenarios.is_random(id):
 		col.add_child(_button("New field", show_scenario.bind(id)))
 	col.add_child(_inline("GOAL", 14, Palette.BRASS))
 	col.add_child(_text(Scenarios.goal_text(spec), 18, Palette.INK, false))
@@ -252,7 +271,7 @@ func _scenario_over(b: Battle, spec: Dictionary) -> void:
 	if stars > before:
 		lines.append("New best for this scenario")
 	col.add_child(_panel_text("\n".join(lines)))
-	col.add_child(_button("Again" if spec.id != "skirmish" else "Another field", show_scenario.bind(spec.id), true))
+	col.add_child(_button("Another field" if Scenarios.is_random(spec.id) else "Again", show_scenario.bind(spec.id), true))
 	col.add_child(_button("Grand battles" if Scenarios.is_grand(spec) else "Scenarios", show_grand if Scenarios.is_grand(spec) else show_scenarios))
 
 
@@ -307,6 +326,22 @@ func show_briefing(rewards: Array) -> void:
 	col.add_child(_text("YOUR ARMY", 14, Palette.BRASS, false))
 	col.add_child(_roster())
 	col.add_child(march)
+	col.add_child(_abandon_button())
+
+
+## Leaving between battles gives the run up; it asks for a second tap.
+func _abandon_button() -> Button:
+	var b := _button("Abandon the campaign", func(): pass)
+	var armed := {"until": 0.0}
+	b.pressed.connect(func():
+		var now := Time.get_ticks_msec() / 1000.0
+		if now <= armed.until:
+			show_title()
+		else:
+			armed.until = now + ABANDON_WINDOW
+			b.text = "Tap again to abandon it"
+			Sfx.play("click"))
+	return b
 
 
 func _start_battle(reward: Variant) -> void:
@@ -630,9 +665,14 @@ func _load(section: String, key: String, default: Variant) -> Variant:
 
 ## Read, change one value, write back: the file holds the campaign's best
 ## score and every scenario's stars together.
+## Write one value, keeping the rest. A save file that exists but will not
+## read is set aside as `.damaged` rather than written over, so whatever
+## could be recovered from it is not lost.
 func _save(section: String, key: String, value: Variant) -> void:
 	var cfg := ConfigFile.new()
-	cfg.load(save_path)
+	if cfg.load(save_path) != OK and FileAccess.file_exists(save_path):
+		DirAccess.rename_absolute(save_path, save_path + ".damaged")
+		cfg = ConfigFile.new()
 	cfg.set_value(section, key, value)
 	cfg.save(save_path)
 

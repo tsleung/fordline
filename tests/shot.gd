@@ -6,7 +6,8 @@ extends Node
 ## With --menus it instead saves the title and the first briefing; with
 ## --routes, a paused battle with one regiment given a two-stop route;
 ## with --arrow, a paused battle with an arrow being dragged for two regiments;
-## with --scenarios, the Pike and Shot scenario list and one briefing.
+## with --scenarios, the Pike and Shot scenario list and one briefing; with
+## --grand, the grand battles list and Waterloo's briefing.
 ## --scenario=<id> plays that quick battle instead of a campaign battle; a
 ## grand battle runs at 4× and saves the opening, a close look and the whole
 ## field at GRAND_SHOTS instead.
@@ -34,7 +35,7 @@ func _ready() -> void:
 		elif arg.begins_with("--out="):
 			_out = arg.get_slice("=", 1)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://" + _out.get_base_dir()))
-	if "--menus" in OS.get_cmdline_user_args() or "--scenarios" in OS.get_cmdline_user_args():
+	if "--menus" in OS.get_cmdline_user_args() or "--scenarios" in OS.get_cmdline_user_args() or "--grand" in OS.get_cmdline_user_args():
 		_main = Main.instantiate()
 		_main.save_path = "user://shot.cfg"
 		add_child(_main)
@@ -60,6 +61,17 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_frames += 1
+	if _main != null and "--grand" in OS.get_cmdline_user_args():
+		if _frames == 60:
+			_main.show_grand()
+		elif _frames == 80:
+			_save(_out + "-grand.png")
+			_main.show_scenario("waterloo")
+		elif _frames == 100:
+			set_process(false)
+			_save(_out + "-grand-briefing.png")
+			get_tree().quit()
+		return
 	if _main != null and "--scenarios" in OS.get_cmdline_user_args():
 		if _frames == 60:
 			_main.show_scenarios("pike_shot")

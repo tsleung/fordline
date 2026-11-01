@@ -257,8 +257,8 @@ func _intents(b: Battle, p: float) -> Dictionary:
 	for e in b.regiments:
 		if e.team != 1 or not e.fighting() or UnitTypes.is_ranged(e.kind) or not e.contacts.is_empty():
 			continue
-		var t := b.get_regiment(e.target_id) if e.target_id >= 0 else null
-		if t != null and t.alive() and t.team == 0:
+		var t := Telemetry.closing_on(b, e)
+		if t != null:
 			var d := e.pos.distance_to(t.pos)
 			if d > THREAT_RANGE:
 				continue

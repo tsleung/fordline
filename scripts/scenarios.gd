@@ -64,6 +64,8 @@ const LIST := [
 		"player": [[K.SWORDS, 1], [K.SWORDS, 0], [K.SWORDS, 0], [K.PIKES, 0], [K.ARCHERS, 0], [K.ARCHERS, 0], [K.CANNONS, 0], [K.CANNONS, 0]],
 		"enemy": [[K.SWORDS, 0], [K.SWORDS, 0], [K.PIKES, 1], [K.PIKES, 0], [K.ARCHERS, 0], [K.ARCHERS, 0], [K.CANNONS, 0], [K.CAVALRY, 0]],
 		"deadline": 300.0, "hold_needed": 2,
+		## Flag 0 is the field between them, flags 1 and 2 the bridges.
+		"deadline_flags": [1, 2],
 		"stars": [{"time": 200.0}, {"losses": 0.35}],
 	},
 	{
@@ -173,6 +175,11 @@ static func get_spec(id: String) -> Dictionary:
 	return {}
 
 
+## A scenario whose field and armies are drawn afresh each time.
+static func is_random(id: String) -> bool:
+	return get_spec(id).get("map", "") == "random"
+
+
 static func is_grand(spec: Dictionary) -> bool:
 	return spec.get("mode", "") == "grand"
 
@@ -218,6 +225,7 @@ static func make_battle(spec: Dictionary, dice: int) -> Battle:
 	b.apply_orders(AI.deploy_orders(b, 1))
 	b.deadline = spec.get("deadline", 0.0)
 	b.hold_needed = spec.get("hold_needed", 1)
+	b.deadline_flags.assign(spec.get("deadline_flags", []))
 	b.flag_drain = spec.get("flag_drain", Battle.FLAG_DRAIN)
 	for team in 2:
 		if spec.get("own_flags" if team == 0 else "enemy_flags", false):
@@ -299,7 +307,7 @@ static func condition_text(c: Dictionary) -> String:
 	if c.has("flags"):
 		return "Hold %d %s at the end" % [c.flags, c.get("noun", "crossings")]
 	if c.has("hold"):
-		return "Hold %s at the end" % c.noun
+		return "%s %s at the end" % [c.get("verb", "Hold"), c.noun]
 	return ""
 
 

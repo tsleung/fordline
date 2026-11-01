@@ -41,11 +41,13 @@ func _ready() -> void:
 	add_child(_overlay)
 	_top = TopBar.new()
 	_top.screen = screen
-	_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_top.mouse_filter = Control.MOUSE_FILTER_PASS
+	_top.gui_input.connect(_take_press.bind(_top))
 	add_child(_top)
 	_bottom_bg = Panel.new()
 	_bottom_bg.add_theme_stylebox_override("panel", _bar_style())
-	_bottom_bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	_bottom_bg.mouse_filter = Control.MOUSE_FILTER_PASS
+	_bottom_bg.gui_input.connect(_take_press.bind(_bottom_bg))
 	add_child(_bottom_bg)
 	_bottom = HBoxContainer.new()
 	_bottom.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -285,6 +287,14 @@ func _morale_word(r: Regiment) -> String:
 	if m > 0.33:
 		return "shaken"
 	return "wavering"
+
+
+## A bar takes a press on it, so a tap on the resolve bars or the clock is
+## not a tap on the field; a drag that only passes over a bar, or ends on
+## it, still reaches the field.
+func _take_press(event: InputEvent, bar: Control) -> void:
+	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.pressed:
+		bar.accept_event()
 
 
 func ping(at: Vector2, team: int) -> void:

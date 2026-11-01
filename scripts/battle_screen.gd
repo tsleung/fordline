@@ -267,6 +267,19 @@ func _send_to_flag(sp: Vector2) -> bool:
 	return false
 
 
+## What the flag at `index` is called: its name on a grand battle's field,
+## else a crossing on a river map, else a flag.
+func _flag_word(index: int) -> String:
+	if index < battle.terrain.flag_names.size():
+		return battle.terrain.flag_names[index]
+	return "Crossing" if battle.terrain.has_river else "Flag"
+
+
+func _flag_noun(count: int) -> String:
+	var noun := "crossing" if battle.terrain.has_river else "flag"
+	return noun if count == 1 else noun + "s"
+
+
 ## The flag a block under its own command is taking, by name, or "".
 func objective_name(r: Regiment) -> String:
 	if not r.id in delegated or r.objectives.is_empty():
@@ -314,6 +327,8 @@ func leaving_costs() -> bool:
 
 
 func leave_label() -> String:
+	if grand:
+		return "Back to grand battles"
 	if quick:
 		return "Back to scenarios"
 	if battle.phase == "deploy":
@@ -402,6 +417,9 @@ func to_screen(world_pos: Vector2) -> Vector2:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# A finger lifted while the menu is open is still lifted.
+	if event is InputEventScreenTouch and not event.pressed:
+		_touches.erase(event.index)
 	if demo or (menu_open and not event is InputEventKey):
 		return
 	if grand and _camera_input(event):
@@ -732,7 +750,7 @@ func _arrow_from(d: Dictionary) -> Vector2:
 
 ## The arrow being dragged, start and tip, or empty when no arrow is.
 func preview_arrow() -> PackedVector2Array:
-	if drag.is_empty() or drag.mode == "box" or drag.mode == "end" or selected.is_empty():
+	if drag.is_empty() or drag.mode in ["box", "end", "pan"] or selected.is_empty():
 		return PackedVector2Array()
 	if drag.start_screen.distance_to(drag.now_screen) <= TAP_SLOP:
 		return PackedVector2Array()
@@ -826,10 +844,8 @@ func _react(events: Array[Dictionary]) -> void:
 			"flag":
 				var owner: int = e.owner
 				_sound("flag", -6.0)
-				if owner == 0:
-					_toast("Crossing taken", 0)
-				elif owner == 1:
-					_toast("Crossing lost", 1)
+				if owner >= 0:
+					_toast("%s %s" % [_flag_word(e.index), "taken" if owner == 0 else "lost"], owner)
 			"horn":
 				units_view.add_fx("ring", e.pos, 1.0, {"size": Battle.RALLY_RADIUS})
 				_sound("horn", -3.0)
@@ -843,8 +859,14 @@ func _react(events: Array[Dictionary]) -> void:
 				_toast("Your army breaks..." if e.team == 0 else "The enemy army breaks!", e.team)
 				_sound("lose" if e.team == 0 else "win", 0.0)
 			"deadline":
+				# The battle has already decided who it broke.
+				var won := battle.broken_team == 1
 				var held: int = e.held
-				_toast("Time! You hold %d %s." % [held, "crossing" if held == 1 else "crossings"], 0 if held >= battle.hold_needed else 1)
+				var text := "Time! You hold %d %s." % [held, _flag_noun(held)]
+				if not battle.deadline_flags.is_empty():
+					var names: Array = battle.deadline_flags.map(func(i): return _flag_word(i))
+					text = "Time! %s %s." % [" and ".join(names), ("held" if won else "not held")]
+				_toast(text, 0 if won else 1)
 			"begin":
 				_sound("horn", -2.0, 0.9)
 

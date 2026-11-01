@@ -12,11 +12,14 @@ var screen
 var _terrain: Node2D
 var _marks: Marks
 var _since := 0.0
+## A press began on the minimap and is still held: only then does dragging
+## over it move the view. A drag from the field that crosses it passes on.
+var _pressing := false
 
 
 func _ready() -> void:
 	clip_contents = true
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_filter = Control.MOUSE_FILTER_PASS
 	_terrain = TerrainView.new()
 	add_child(_terrain)
 	_terrain.show_terrain(screen.battle.terrain, hash(screen.title))
@@ -58,9 +61,15 @@ func _process(delta: float) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
-	var press: bool = event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_pressing = true
+		elif _pressing:
+			_pressing = false
+			accept_event()
+			return
 	var held: bool = event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_LEFT != 0
-	if press or held:
+	if _pressing and ((event is InputEventMouseButton and event.pressed) or held):
 		screen.look_at(event.position / field_scale())
 		_marks.queue_redraw()
 		accept_event()

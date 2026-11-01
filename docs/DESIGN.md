@@ -127,7 +127,7 @@ Map details and the exact enemy roster vary per run from a seed.
 
 After a win, every regiment gets back 40% of its missing men, and you pick
 one of three rewards: a new regiment, a full muster, an ability, or a
-doctrine (longbows, iron shot, steel, warhorses, old banners).
+doctrine (longbows, iron shot, steel, warhorses, old banners, drill).
 
 ## Quick battle
 
@@ -227,7 +227,7 @@ ground.
 **The scale.** A block is a brigade, not a regiment; the rules are the
 same. The field is 3200 × 2200, about 2.5 × 2.7 quick-battle fields,
 drawn by hand from the real ground. The clock shows the hour of the
-historical day (an hour is 78 seconds), and dusk ends it.
+historical day (an hour is 78 seconds at Gettysburg, 90 at Waterloo), and dusk ends it.
 
 **The pace.** Fights are stretched to fit the day: volleys do 0.4 of
 their damage and nerve comes back at 0.4 of its rate, so a brigade
@@ -435,10 +435,14 @@ Against the targets:
 - **The AI commands like no person can.** The standard commander gives
   40–180 orders a minute; a person gives perhaps 10–30. "Standard wins"
   says what an untiring micro-manager can do, not what a player will.
-- **Warning is under-measured.** A third to a half of blows land with no
-  regiment having been aimed at the one it hits, because the AI closes with
-  move orders rather than attack orders; the screen's red arrows read
-  movement too, so the measure needs to as well.
+- **You see it coming.** A blow counts as announced when its attacker was
+  closing on your side beforehand, by the rule the screen draws its red
+  arrows by (`Telemetry.closing_on`: the regiment it is ordered to attack,
+  or the one where its march ends). Measured that way, nearly every blow
+  is announced, with a median warning of 6–20 s against a target of 4. (A
+  first version of the measure counted only blows on the very regiment an
+  arrow pointed at, and called a third to a half of blows unannounced; in a
+  line the blow often lands on that regiment's neighbour.)
 
 ### The AI audit
 
