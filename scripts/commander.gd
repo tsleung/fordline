@@ -5,7 +5,9 @@ extends RefCounted
 ## anything else that commands a seat extends it.
 
 
-func decide(_b: Battle, _team: int) -> Array:
+## Orders for `team`, or, with `ids`, for those of its regiments only: the
+## part of the side the seat commands (see BattleRun.Seat).
+func decide(_b: Battle, _team: int, _ids: Array[int] = []) -> Array:
 	return []
 
 
@@ -48,18 +50,18 @@ class AICommander extends Commander:
 		c._rethink_at = _rethink_at
 		return c
 
-	func decide(b: Battle, team: int) -> Array:
+	func decide(b: Battle, team: int, ids: Array[int] = []) -> Array:
 		if b.time >= _rethink_at:
-			plan = think(b, team)
+			plan = think(b, team, ids)
 			_rethink_at = b.time + rethink
-		var orders := AI.decide(b, team, persona, plan)
+		var orders := AI.decide(b, team, persona, plan, ids)
 		if rally and team == 0 and should_rally(b):
 			orders.append({"type": "rally"})
 		return orders
 
-	## The plan: where the AI allots the line now.
-	func think(b: Battle, team: int) -> Dictionary:
-		return AI.allot(b, team, persona)
+	## The plan: where the AI allots the line (of `ids`, when given) now.
+	func think(b: Battle, team: int, ids: Array[int] = []) -> Dictionary:
+		return AI.allot(b, team, persona, ids)
 
 	## The horn is ready, the general stands, and a regiment within his
 	## reach is running but worth saving, or close to running.
@@ -94,8 +96,8 @@ class PacedCommander extends AICommander:
 	func copy() -> Commander:
 		return _with_plan_of(PacedCommander.new(persona, rally, per_look))
 
-	func decide(b: Battle, team: int) -> Array:
-		var keyed := super.decide(b, team).map(func(o): return [urgency(b, team, o), o])
+	func decide(b: Battle, team: int, ids: Array[int] = []) -> Array:
+		var keyed := super.decide(b, team, ids).map(func(o): return [urgency(b, team, o), o])
 		keyed.sort_custom(func(x, y): return x[0] < y[0])
 		return keyed.slice(0, per_look).map(func(k): return k[1])
 
@@ -143,11 +145,11 @@ class PlannerCommander extends AICommander:
 		c._replan_at = _replan_at
 		return _with_plan_of(c)
 
-	func think(b: Battle, team: int) -> Dictionary:
+	func think(b: Battle, team: int, ids: Array[int] = []) -> Dictionary:
 		if b.time >= _replan_at:
 			choice = best_choice(b, team)
 			_replan_at = b.time + replan
-		return plan_for(b, team, persona, choice)
+		return plan_for(b, team, persona, choice, ids)
 
 	## The choice in hand is tried first, so one no better doesn't replace it.
 	func best_choice(b: Battle, team: int) -> int:
@@ -163,9 +165,9 @@ class PlannerCommander extends AICommander:
 		return best
 
 	## The plan `c` stands for: the AI's allotment, or every block of the
-	## line to flag `c`.
-	static func plan_for(b: Battle, team: int, with_persona: Dictionary, c: int) -> Dictionary:
-		var out := AI.allot(b, team, with_persona)
+	## line (of `ids`, when given) to flag `c`.
+	static func plan_for(b: Battle, team: int, with_persona: Dictionary, c: int, ids: Array[int] = []) -> Dictionary:
+		var out := AI.allot(b, team, with_persona, ids)
 		if c >= 0:
 			for id in out:
 				out[id] = c

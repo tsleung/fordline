@@ -132,10 +132,13 @@ static func _interleave(foot: Array[Regiment]) -> Array:
 ## persona otherwise. `plan` says where blocks of the line go, by id to
 ## flag index: the allotment a commander thought out last (allot), or a
 ## planner's choice. Blocks it doesn't name go where the AI allots them now.
-static func decide(b: Battle, team: int, persona: Dictionary, plan := {}) -> Array:
+## `only` (block ids) is the part of the side a seat commands, a division
+## the player sent off on its own; it forms its lines among its own blocks.
+## Empty: the whole side.
+static func decide(b: Battle, team: int, persona: Dictionary, plan := {}, only: Array[int] = []) -> Array:
 	if b.terrain.holder == team:
 		persona = persona.merged(PERSONAS.garrison, true)
-	var mine := _fighting(b, team)
+	var mine := _commanded(b, team, only)
 	var foes := _fighting(b, 1 - team)
 	var orders: Array = []
 	if mine.is_empty() or foes.is_empty():
@@ -191,7 +194,7 @@ static func decide(b: Battle, team: int, persona: Dictionary, plan := {}) -> Arr
 					var back := home
 					if not r.objectives.is_empty():
 						# Unlimber short of the objective on the way in.
-						aims = [_objective(b, team, r.objectives)] as Array[Vector2]
+						aims = [_objective(b, team, r.objectives) as Vector2] as Array[Vector2]
 						back = (r.pos - aims[0]).normalized()
 					o = _gun(b, r, foes, aims, back)
 			K.CAVALRY:
@@ -205,11 +208,12 @@ static func decide(b: Battle, team: int, persona: Dictionary, plan := {}) -> Arr
 
 ## Where the line goes, thought out on its own: the plan a commander keeps
 ## and hands back to decide() until it thinks again. By id to flag index;
-## a garrison's line has none, it stands across the gateway.
-static func allot(b: Battle, team: int, persona: Dictionary) -> Dictionary:
+## a garrison's line has none, it stands across the gateway. `only` as
+## for decide().
+static func allot(b: Battle, team: int, persona: Dictionary, only: Array[int] = []) -> Dictionary:
 	if b.terrain.holder == team or persona.get("garrison", false):
 		return {}
-	var mine := _fighting(b, team)
+	var mine := _commanded(b, team, only)
 	var foes := _fighting(b, 1 - team)
 	if mine.is_empty() or foes.is_empty():
 		return {}
@@ -225,6 +229,12 @@ static func _line(mine: Array[Regiment], reserve: Array[int]) -> Array[Regiment]
 			line.append(r)
 	line.sort_custom(func(a, c): return a.pos.x < c.pos.x)
 	return line
+
+
+## The side's fighting regiments, or of them those in `only`.
+static func _commanded(b: Battle, team: int, only: Array[int]) -> Array[Regiment]:
+	var mine := _fighting(b, team)
+	return mine if only.is_empty() else mine.filter(func(r): return r.id in only)
 
 
 static func _fighting(b: Battle, team: int) -> Array[Regiment]:
@@ -256,35 +266,46 @@ static func _line_spot(line: Array[Regiment], i: int, goals: Array[Vector2]) -> 
 
 
 ## Where a line regiment stands: in a division's line across its goal,
-## beside the blocks of its formation going to the same place. A block's
-## goal is its own objective (a grand battle's division, or a plan's), or
-## else the flag its side allotted it. A line with no allotment (a
-## garrison's, across its gateway) takes its share of the front.
+## beside the blocks of its formation under the same orders. A block's
+## goal is its own objective (a grand battle's division, or a flag the
+## player sent it to on its own command), or else the flag its side
+## allotted it. A line with no allotment (a garrison's, across its
+## gateway) takes its share of the front.
+##
+## Under the same orders, not merely of the same division: a block the
+## player sends off alone forms its line by itself on the flag, not at
+## the end of a line with the blocks still in the player's hands, which
+## would stand it outside the flag's ring for good.
 static func _spot(b: Battle, team: int, r: Regiment, line: Array[Regiment], goals: Array[Vector2], allotted: Dictionary) -> Vector2:
 	var goal: Variant = _goal(b, team, r, allotted)
 	if goal == null:
 		return _line_spot(line, line.find(r), goals)
 	var division: Array[Regiment] = []
 	for o in line:
-		if o.formation == r.formation and _goal(b, team, o, allotted) == goal:
+		if o.formation == r.formation and o.objectives == r.objectives and allotted.get(o.id) == allotted.get(r.id):
 			division.append(o)
 	return _division_spot(b, team, r, division, goal)
 
 
+## Where a block is going: its objective, else its allotted flag, else
+## nowhere (null).
 static func _goal(b: Battle, team: int, r: Regiment, allotted: Dictionary) -> Variant:
-	if not r.objectives.is_empty():
-		return _objective(b, team, r.objectives)
-	return allotted.get(r.id)
+	var objective: Variant = _objective(b, team, r.objectives)
+	return objective if objective != null else allotted.get(r.id)
 
 
 ## A division forms side by side across its objective, square to the way
 ## it is going; once there, square to the nearest enemy. Each block keeps
-## its place from left to right, so their routes don't cross.
+## its place from left to right, so their routes don't cross. `r` stands
+## in the line whether or not `division` names it.
 static func _division_spot(b: Battle, team: int, r: Regiment, division: Array[Regiment], objective: Vector2) -> Vector2:
+	var order := division.duplicate()
+	if not r in order:
+		order.append(r)
 	var centre := Vector2.ZERO
-	for o in division:
+	for o in order:
 		centre += o.pos
-	centre /= division.size()
+	centre /= order.size()
 	var ahead := objective - centre
 	if ahead.length() < DIVISION_THERE:
 		var nearest := INF
@@ -294,15 +315,17 @@ static func _division_spot(b: Battle, team: int, r: Regiment, division: Array[Re
 				nearest = d
 				ahead = f.pos - objective
 	var across := ahead.normalized().orthogonal() if ahead.length() > 1.0 else Vector2.RIGHT
-	var order := division.duplicate()
 	order.sort_custom(func(x, y): return x.pos.dot(across) < y.pos.dot(across))
 	var k := order.find(r)
 	return objective + across * (k - (order.size() - 1) * 0.5) * DIVISION_GAP
 
 
 ## A division's objectives are flags to take in order: the first it
-## doesn't hold. Once it holds them all it stays on the last.
-static func _objective(b: Battle, team: int, objectives: PackedVector2Array) -> Vector2:
+## doesn't hold. Once it holds them all it stays on the last. With none,
+## null.
+static func _objective(b: Battle, team: int, objectives: PackedVector2Array) -> Variant:
+	if objectives.is_empty():
+		return null
 	for p in objectives:
 		for f in b.flags:
 			if f.pos.distance_to(p) < Battle.FLAG_RADIUS and f.owner != team:

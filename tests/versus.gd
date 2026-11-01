@@ -21,7 +21,7 @@ class Baseline extends Commander:
 	func _init(with_persona: Dictionary) -> void:
 		persona = with_persona
 
-	func decide(b: Battle, team: int) -> Array:
+	func decide(b: Battle, team: int, _ids: Array[int] = []) -> Array:
 		return AIBaseline.decide(b, team, persona)
 
 

@@ -12,7 +12,8 @@ extends RefCounted
 ## A commander over some of a side's regiments. With no commander, the seat
 ## is a person's, whose orders come through give(). A seat for the whole
 ## side commands every regiment of it that no other seat has claimed;
-## otherwise it commands only its `ids` (a division on its own command).
+## otherwise it commands only its `ids` (a division on its own command),
+## and its commander decides for those alone.
 class Seat:
 	var team := 0
 	var commander: Commander
@@ -96,7 +97,10 @@ func advance() -> void:
 		if seat.wait > 0.0:
 			continue
 		seat.wait = seat.every
-		var orders := _claimed(i, seat.commander.decide(battle, seat.team))
+		var ids: Array[int] = []
+		if not seat.whole_side:
+			ids = seat.ids
+		var orders := _claimed(i, seat.commander.decide(battle, seat.team, ids))
 		trace.note_orders(seat.team, orders.size())
 		if seat.logged:
 			give(i, orders, true)
@@ -198,7 +202,7 @@ class Replayed extends Commander:
 		_run = weakref(of_run)
 		_turns = turns
 
-	func decide(_b: Battle, _team: int) -> Array:
+	func decide(_b: Battle, _team: int, _ids: Array[int] = []) -> Array:
 		var tick: int = _run.get_ref().tick
 		var out: Array = []
 		while _next < _turns.size() and _turns[_next].tick <= tick:

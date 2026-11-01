@@ -537,6 +537,23 @@ func _test_grand(quick: bool) -> void:
 	w.begin()
 	var ids: Array = AI.decide(w, 1, AI.PERSONAS.aggressive).map(func(o): return o.get("id", -1))
 	_check(not guard.id in ids and w.regiments.any(func(r): return r.formation == "Jérôme's Division" and r.holds_until > 0.0), "nobody moves before their hour")
+	# A brigade the player hands to its own command forms its line among the
+	# blocks of that command only, not at the end of a line with the
+	# brigades still in the player's hands, which would leave it outside
+	# the flag's ring: sent to its division's own objective, on a seat of
+	# its own; and sent to another flag.
+	var alten := w.team_regiments(0).filter(func(r): return r.formation == "Alten's Division" and r.kind == K.LINE)
+	var halkett: Regiment = alten[0]
+	var mont_saint_jean: Vector2 = Waterloo.FLAGS[Waterloo.MONT_SAINT_JEAN].at
+	var whole := AI._line(AI._fighting(w, 0), [] as Array[int])
+	var own := AI._line(AI._commanded(w, 0, [halkett.id] as Array[int]), [] as Array[int])
+	_check(alten.size() >= 3 and AI._spot(w, 0, halkett, whole, [] as Array[Vector2], {}).distance_to(mont_saint_jean) > Battle.FLAG_RADIUS, "Halkett's place in Alten's whole line is off Mont-Saint-Jean's ring")
+	_check(AI._spot(w, 0, halkett, own, [] as Array[Vector2], {}).distance_to(mont_saint_jean) < Battle.FLAG_RADIUS, "on a seat of its own, a brigade lines up among that seat's blocks only")
+	var hougoumont: Vector2 = Waterloo.FLAGS[Waterloo.HOUGOUMONT].at
+	w.apply_orders([{"type": "objective", "id": halkett.id, "at": hougoumont}])
+	whole = AI._line(AI._fighting(w, 0), [] as Array[int])
+	_check(AI._spot(w, 0, halkett, whole, [] as Array[Vector2], {}).distance_to(hougoumont) < Battle.FLAG_RADIUS, "a brigade sent to another flag takes its place on that flag")
+	_check(AI._objective(w, 0, PackedVector2Array()) == null and AI._division_spot(w, 0, halkett, [] as Array[Regiment], hougoumont) == hougoumont, "with no objectives there is no objective, and a block alone stands on its own")
 	if quick:
 		return
 	var day := Fights.fight(Scenarios.make_battle(spec, 3), AI.PERSONAS.aggressive, "standard").battle
