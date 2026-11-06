@@ -113,7 +113,13 @@ static func _sum_power(regs: Array) -> float:
 
 ## Fight `b` with the planner as side `team` against the AI as `enemy`, and
 ## return a row per re-plan: {episode, step, t, state, legal, rollout,
-## rollout_n, label, outcome}. `settings` may set the planner's replan,
+## rollout_n, ended, decided, label, outcome}, where `ended` counts, for
+## each choice, its rollouts that ended the battle inside the look ahead
+## (their score is then 2 or -2, won or lost), and `decided` is whether
+## every legal choice's did. With settings.eval = N, also rollout_eval: each
+## choice's mean score over N rollouts the planner never saw (its own
+## scores chose the label, so regret on them is nothing by construction),
+## and rollout_eval_n. `settings` may also set the planner's replan,
 ## horizon, samples and budget, and the battle's length. The battle and its
 ## seats are as the luck study's,
 ## `die` setting when each first looks.
@@ -125,20 +131,36 @@ static func fight(b: Battle, team: int, persona: Dictionary, enemy: Dictionary, 
 	planner.budget = settings.get("budget", planner.budget)
 	var rows: Array[Dictionary] = []
 	var samples := planner.samples
-	planner.on_choice = func(at: Battle, side: int, scores: Dictionary, chosen: int) -> void:
+	var evals: int = settings.get("eval", 0)
+	# The window holds the planner weakly: the planner holds the window.
+	var held: WeakRef = weakref(planner)
+	planner.on_choice = func(at: Battle, side: int, scores: Dictionary, chosen: int, ended: Dictionary) -> void:
 		var legal: Array[int] = []
 		var rollout: Array = []
+		var ended_n: Array = []
+		var rollout_eval: Array = []
+		var fielded := [Telemetry.fielded(at, 0), Telemetry.fielded(at, 1)]
 		for i in MAX_FLAGS + 1:
 			var c := i - 1
 			rollout.append(snappedf(scores[c], 0.0001) if scores.has(c) else null)
+			ended_n.append(ended[c] if scores.has(c) else null)
 			if scores.has(c):
 				legal.append(i)
-		var state := features(at, side)
-		rows.append({
+			if evals > 0:
+				var total := 0.0
+				for j in evals:
+					total += held.get_ref().evaluate(at, side, c, j, fielded) if scores.has(c) else 0.0
+				rollout_eval.append(snappedf(total / evals, 0.0001) if scores.has(c) else null)
+		var row := {
 			"episode": episode, "step": rows.size(), "t": snappedf(at.time, 0.01),
-			"state": Array(state).map(func(x): return snappedf(x, 0.0001)),
+			"state": Array(features(at, side)).map(func(x): return snappedf(x, 0.0001)),
 			"legal": legal, "rollout": rollout, "rollout_n": samples, "label": chosen + 1,
-		})
+			"ended": ended_n, "decided": legal.all(func(i): return ended_n[i] == samples),
+		}
+		if evals > 0:
+			row.rollout_eval = rollout_eval
+			row.rollout_eval_n = evals
+		rows.append(row)
 	var run := BattleRun.new(b)
 	var seats := [BattleRun.Seat.new(1 - team, Commander.AICommander.new(enemy)), BattleRun.Seat.new(team, planner)]
 	for i in seats.size():

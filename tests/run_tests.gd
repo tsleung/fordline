@@ -622,8 +622,8 @@ func _test_copy() -> void:
 		p.horizon = 8.0
 		p.samples = 1
 	sliced.budget = 80
-	whole.on_choice = func(_at, _side, scores, _c): at_once.merge(scores)
-	sliced.on_choice = func(_at, _side, scores, _c): spread.merge(scores)
+	whole.on_choice = func(_at, _side, scores, _c, _ended): at_once.merge(scores)
+	sliced.on_choice = func(_at, _side, scores, _c, _ended): spread.merge(scores)
 	whole.decide(b.copy(), 0)
 	var later := BattleRun.new(b.copy())
 	later.add_seat(BattleRun.Seat.new(1, Commander.AICommander.new(AI.PERSONAS.aggressive)))
@@ -650,7 +650,9 @@ func _test_plan_examples() -> void:
 		rows.append(JSON.stringify(fought))
 	var first: Array = JSON.parse_string(rows[0])
 	_check(first.size() == 3 and rows[0] == rows[1], "the planner's choices as data come out the same twice (%d rows)" % first.size())
-	_check(first.all(func(r): return r.state.size() == PlannerData.feature_names().size() and r.legal == [0.0, 1.0, 2.0, 3.0] and r.rollout.size() == 4), "each row has every feature and a score for every choice")
+	_check(first.all(func(r): return r.state.size() == PlannerData.feature_names().size() and r.legal == [0.0, 1.0, 2.0, 3.0] and r.rollout.size() == 4 and r.ended.size() == 4 and r.decided is bool), "each row has every feature and a score for every choice")
+	var checked := PlannerData.fight(Scenarios.make_battle(spec, 1), 0, AI.PERSONAS.balanced, AI.PERSONAS[spec.persona], 1, "hold:test:0", settings.merged({"eval": 2}))
+	_check(checked.size() == 3 and checked.all(func(r): return r.rollout_eval.size() == 4 and r.rollout_eval_n == 2) and JSON.stringify(checked.map(func(r): return r.label)) == JSON.stringify(first.map(func(r): return int(r.label))), "scoring each choice afresh changes nothing the planner chose")
 
 
 ## What a battle is at this moment, to the bit.
