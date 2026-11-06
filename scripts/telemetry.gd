@@ -3,6 +3,33 @@ extends RefCounted
 ## Read-only measures of a battle, for the tests and the balance studies.
 
 
+## A march that ends this near a regiment of the other side is closing on it.
+const CLOSING_REACH := 60.0
+
+
+## The regiment of the other side that `e` is closing on, or null: the one it
+## is ordered to attack, or failing that the one standing where its march
+## ends. The screen draws a red arrow for it, and the studies time the
+## warning by it, so what is measured is what is shown.
+static func closing_on(b: Battle, e: Regiment) -> Regiment:
+	if e.target_id >= 0:
+		var t := b.get_regiment(e.target_id)
+		if t != null and t.alive() and t.team != e.team:
+			return t
+	if e.waypoints.is_empty():
+		return null
+	var end := e.waypoints[e.waypoints.size() - 1]
+	var best: Regiment = null
+	var best_d := CLOSING_REACH
+	for r in b.regiments:
+		if r.team != e.team and r.fighting():
+			var d := r.pos.distance_to(end)
+			if d < best_d:
+				best_d = d
+				best = r
+	return best
+
+
 ## A team's standing soldiers as a share of what it brought onto the field.
 static func strength(b: Battle, team: int, fielded: int) -> float:
 	var standing := 0
@@ -65,10 +92,12 @@ class Trace:
 	var _counts := {}
 	var _orders := [0, 0]
 	## Blows by the side that took them: for each new clash, the seconds its
-	## attacker had been aimed at that regiment, or -1 when no one had aimed
-	## (two regiments walked into each other).
+	## attacker had been closing on that side (Telemetry.closing_on, what the
+	## screen draws an arrow for; in a line, the blow may land on the
+	## neighbour of the regiment the arrow points at), or -1 when neither was
+	## closing on the other side.
 	var blows := [[], []]
-	## Regiment id -> [the regiment it aims at, since when].
+	## Regiment id -> since when it has been closing on the other side.
 	var _aimed := {}
 	var _pairs := {}
 
@@ -107,10 +136,10 @@ class Trace:
 
 	func _note_blows(b: Battle) -> void:
 		for r in b.regiments:
-			if not r.fighting() or r.target_id < 0:
+			if not r.fighting() or Telemetry.closing_on(b, r) == null:
 				_aimed.erase(r.id)
-			elif not _aimed.has(r.id) or _aimed[r.id][0] != r.target_id:
-				_aimed[r.id] = [r.target_id, b.time]
+			elif not _aimed.has(r.id):
+				_aimed[r.id] = b.time
 		var now := {}
 		for r in b.regiments:
 			if not r.fighting():
@@ -127,8 +156,8 @@ class Trace:
 				for pair in [[r, other], [other, r]]:
 					var by: Regiment = pair[0]
 					var at: Regiment = pair[1]
-					if _aimed.has(by.id) and _aimed[by.id][0] == at.id:
-						blows[at.team].append(b.time - _aimed[by.id][1])
+					if _aimed.has(by.id):
+						blows[at.team].append(b.time - _aimed[by.id])
 						announced = true
 				if not announced:
 					blows[0].append(-1.0)

@@ -572,7 +572,7 @@ func _hold_contact(r: Regiment, dt: float) -> void:
 
 func _on_impact(r: Regiment, enemy: Regiment) -> void:
 	var z := Combat.zone(enemy.pos, enemy.facing, r.pos)
-	if z != Combat.Zone.FRONT and enemy.fighting():
+	if z != Combat.Zone.FRONT and enemy.fighting() and not enemy.square:
 		_emit({"type": "flank", "zone": z, "pos": enemy.pos, "team": r.team, "kind": enemy.kind})
 	if not UnitTypes.is_mounted(r.kind) or r.last_speed < r.speed * 0.6 or r.stamina < Combat.CHARGE_STAMINA:
 		return
@@ -1017,7 +1017,8 @@ func _destroy(e: Regiment) -> void:
 	var was_routed := e.routed_once
 	e.state = S.GONE
 	resolve[e.team] -= (DESTROYED_COST + (0.0 if was_routed else ROUT_COST)) * rout_scale
-	if e.kind == K.GENERAL:
+	# A general who routed was already mourned (and charged) when he broke.
+	if e.kind == K.GENERAL and not was_routed:
 		_lose_general(e.team)
 	_emit({"type": "destroyed", "pos": e.pos, "team": e.team, "kind": e.kind})
 
@@ -1121,7 +1122,7 @@ func _flags(dt: float) -> void:
 			owner = -1
 		if owner != f.owner:
 			f.owner = owner
-			_emit({"type": "flag", "pos": f.pos, "owner": owner})
+			_emit({"type": "flag", "pos": f.pos, "owner": owner, "index": flags.find(f)})
 
 
 func _drain(dt: float) -> void:

@@ -6,7 +6,8 @@ a ford, flanks and broken morale. Five battles make a campaign of about
 twenty minutes. Godot 4.5, GDScript, no art or audio files (everything is
 drawn and synthesised in code).
 
-Design and rules: [docs/DESIGN.md](docs/DESIGN.md).
+Design and rules: [docs/DESIGN.md](docs/DESIGN.md). Every doc, by the
+question it answers: [docs/README.md](docs/README.md).
 
 ## Play
 

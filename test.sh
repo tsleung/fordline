@@ -5,6 +5,12 @@
 set -u
 GODOT="${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
 cd "$(dirname "$0")"
+# Private paths are never tracked: the owner's prompt log lives in his
+# notebook (CLAUDE.md, "Private paths").
+if [ -n "$(git ls-files notes/prompts.md 2>/dev/null)" ]; then
+  echo "FAILED: notes/prompts.md is tracked; it must stay a gitignored symlink"
+  exit 1
+fi
 "$GODOT" --headless --path . --import >/dev/null 2>&1
 out=$("$GODOT" --headless --path . -s tests/run_tests.gd -- "$@" 2>&1)
 status=$?
