@@ -38,10 +38,8 @@ const RESERVE_REACH := 450.0
 ## they cover.
 const HOLD_SHORT := 50.0
 const BATTERY_BACK := 170.0
-## Foot holding a flag of their own fight what comes this near where they
-## stand. A block keeps the enemy it is closing on unless another scores
-## this much better.
-const HOLD_REACH := 130.0
+## A block keeps the enemy it is closing on unless another scores this much
+## better.
 const TARGET_STICK := 40.0
 ## Archers step back from foot this close; muskets only from foot about to
 ## strike, since a musket on the move doesn't fire and its range is short.
@@ -177,8 +175,7 @@ static func decide(b: Battle, team: int, persona: Dictionary, plan := {}, only: 
 				if r.id in reserve:
 					o = _reserve_foot(b, r, line, foot_foes, home_y)
 				else:
-					var held: bool = flag_of.has(r.id) and b.flags[flag_of[r.id]].owner == team
-					o = _foot(r, foot_foes, advancing, _spot(b, team, r, line, goals, allotted), home, held)
+					o = _foot(r, foot_foes, advancing, _spot(b, team, r, line, goals, allotted), home)
 			K.RIFLES, K.LINE:
 				o = _rifle(r, foes, advancing, _spot(b, team, r, line, goals, allotted), home)
 			K.ARCHERS, K.MUSKETS:
@@ -503,23 +500,21 @@ static func _nearest_flag(b: Battle, p: Vector2, radius: float) -> int:
 
 
 ## Fight what comes within reach; otherwise take the goal, or while
-## holding, stand just short of it on our own side. A flag already ours
-## (`held`) is held on our side of it: the block fights only what comes to
-## it there (HOLD_REACH), so the enemy has to cross to it. A block in melee
-## fights whoever it is fighting: pointed at another, it would turn to
-## face it and give its flank to the one in front. One closing on an enemy
-## keeps it unless another is clearly better (TARGET_STICK), and one that
-## takes its place faces the nearest enemy, not the way it walked.
-static func _foot(r: Regiment, foes: Array[Regiment], advancing: bool, goal: Vector2, home: Vector2, held := false) -> Variant:
+## holding, stand just short of it on our own side. A block in melee fights
+## whoever it is fighting: pointed at another, it would turn to face it and
+## give its flank to the one in front. One closing on an enemy keeps it
+## unless another is clearly better (TARGET_STICK), and one that takes its
+## place faces the nearest enemy, not the way it walked.
+static func _foot(r: Regiment, foes: Array[Regiment], advancing: bool, goal: Vector2, home: Vector2) -> Variant:
 	if not r.contacts.is_empty():
 		return null
 	var reach := 220.0 if r.kind == K.PIKES else 170.0
-	var stand := goal + home * HOLD_SHORT if held or not advancing else goal
+	var stand := goal + home * HOLD_SHORT if not advancing else goal
 	var best: Regiment = null
 	var best_score := INF
 	for f in foes:
 		var d := r.pos.distance_to(f.pos)
-		if d > reach or (held and f.pos.distance_to(stand) > HOLD_REACH):
+		if d > reach:
 			continue
 		var score := d - 60.0 * (Combat.type_mult(r.kind, f.kind) - 1.0)
 		score -= 50.0 if not f.contacts.is_empty() else 0.0

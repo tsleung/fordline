@@ -359,6 +359,16 @@ tried from the same moment), so no frame carries it, and the choice lands as
 long after that moment as the search took: 10 s at twelve rollout steps a
 step, 20 s at six. Distilling the planner is the way to a phone.
 
+Whether it would make a harder enemy (7 November 2026, the designed battles
+and mirror Skirmishes, 208 battles a column, ±7): barely, and not once it
+fits a frame. The person-paced player wins 48% against the AI and 43%
+against the planner, the AI as the player 40% and 34%. On a budget it is no
+harder than the AI: 50% and 43% at twelve rollout steps a step, 53% and 37%
+at six. The same search is worth 30 points as the player (DESIGN.md, the AI
+audit); why so much less as the enemy is not measured. So the game keeps the
+AI as its enemy, and offers no planner as a hard setting; this is the current
+reading, open to what play shows.
+
 **What would make it cheaper**, most value for least cost first:
 
 1. **Soldiers as a view, not the simulation.** Today each soldier is
