@@ -334,10 +334,9 @@ days of computer per experiment.
   in strength than it saved, so the AI thinks at every look.
 - **The planner.** `Commander.PlannerCommander`: every 20 s it tries the
   AI's own allotment and the whole line sent to each flag, each on a copy
-  fought 30 s ahead, twice with the commanders looking a few steps apart,
-  and keeps the one that leaves it furthest ahead. It fights about ten
-  battles' worth of steps per battle: fine for studies, too slow to run
-  live on a phone at 4×.
+  fought 30 s ahead, and keeps the one that leaves it furthest ahead. It
+  fights about seven battles' worth of steps per battle: fine for studies,
+  too slow to run live on a phone at 4×.
 
 **What it found.** On the quick scenarios, four dice each, the planner
 wins 69% (36 of 52) where the standard commander, the same AI without the
@@ -354,10 +353,11 @@ but a 10 s look ahead wins 44%, no better than none. The planner has to see
 about 30 s on, which is four rollouts of 900 steps every 20 s: some six
 rollout steps for each step of the battle, so the battle costs about seven
 times as much. On a desktop at 1× that is a few milliseconds a frame; on a
-phone at 4× it is too much. A `budget` spreads the search over the looks it
-takes (the suite checks the same plans are tried from the same moment); a
-smooth frame needs the work spread over every step, not every look, which a
-commander cannot do yet. Distilling the planner is the way to a phone.
+phone at 4× it is too much. A `budget` spreads the search over every step of
+the battle (`Commander.between_looks`; the suite checks the same plans are
+tried from the same moment), so no frame carries it, and the choice lands as
+long after that moment as the search took: 10 s at twelve rollout steps a
+step, 20 s at six. Distilling the planner is the way to a phone.
 
 **What would make it cheaper**, most value for least cost first:
 

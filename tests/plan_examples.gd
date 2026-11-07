@@ -6,7 +6,7 @@ extends SceneTree
 ##   Godot --headless --path . -s tests/plan_examples.gd -- --scenarios=hold,riders --dice=4 --out=build/plan_examples/a
 ##   --draws=N fights N fields of a Skirmish; --commit=SHA records the code it came from;
 ##   --replan=, --horizon= (seconds), --samples= and --budget= (rollout steps a
-##   look) set the planner's look ahead; --first-die=N starts at die N (a
+##   step of the battle) set the planner's look ahead; --first-die=N starts at die N (a
 ##   training set on dice a test set never uses); --eval=N scores every
 ##   choice afresh N times the planner never saw (rollout_eval).
 
@@ -68,7 +68,7 @@ func _initialize() -> void:
 		"generator": "tests/plan_examples.gd", "commit": commit,
 		"godot": "%d.%d.%d" % [info.major, info.minor, info.patch], "platform": OS.get_name(),
 		"scenarios": Array(scenarios), "seeds": seeds, "side": "player (team 0), the enemy at its scenario's persona",
-		"planner": {"replan_s": planner.replan, "horizon_s": planner.horizon, "rollout_reseeds_per_choice": planner.samples, "budget_steps_per_look": planner.budget},
+		"planner": {"replan_s": planner.replan, "horizon_s": planner.horizon, "rollout_reseeds_per_choice": planner.samples, "budget_steps_per_step": planner.budget},
 		"features": Array(names).map(func(n): return {"name": n, "unit": units[_unit_key(n)]}),
 		"choices": Array(PlannerData.choice_names()),
 		"outcome": "1 the side won, 0 lost, 0.5 undecided at the time cap",

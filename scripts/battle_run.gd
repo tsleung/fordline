@@ -95,6 +95,7 @@ func advance() -> void:
 			continue
 		seat.wait -= Battle.STEP
 		if seat.wait > 0.0:
+			seat.commander.between_looks(seat.team)
 			continue
 		seat.wait = seat.every
 		var ids: Array[int] = []

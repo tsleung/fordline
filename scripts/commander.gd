@@ -18,6 +18,12 @@ func copy() -> Commander:
 	return self
 
 
+## Called at each step between looks: a commander may go on thinking. It
+## gives no orders here and changes nothing but itself.
+func between_looks(_team: int) -> void:
+	pass
+
+
 ## The core AI with a persona. `rally` blows the Rally horn when regiments
 ## near the general are breaking or broken, as a sharp player does.
 ##
@@ -119,23 +125,24 @@ class PacedCommander extends AICommander:
 ## the enemy fights), and keeps the one that leaves it furthest ahead on
 ## average (Telemetry.lead). Each is fought `samples` times, the commanders
 ## looking a few steps apart each time and the guns' scatter drawn afresh,
-## since on the knife edge one fight ahead says little, and the planner
-## can't see the battle's own dice to come. The ways: the AI's own
-## allotment (`choice` -1), or the whole line to one flag (its index).
-## Between, the AI carries out the one it chose. This is the plan search of
-## the AI audit, done during the battle.
+## since the planner can't see the battle's own dice to come. The ways: the
+## AI's own allotment (`choice` -1), or the whole line to one flag (its
+## index). Between, the AI carries out the one it chose. This is the plan
+## search of the AI audit, done during the battle.
 ##
 ## With a `budget` it fights only that many steps of its look ahead at each
-## look, so no frame carries the whole search, and the choice lands the
-## looks it took after the moment it was tried from. The budget is counted
-## in steps of the battle, not time on the clock, so a replay comes out the
-## same.
+## step of the battle, so no frame carries the search, and the choice lands
+## as long after the moment it was tried from as the search took. The budget
+## is counted in steps of the battle, not time on the clock, so a replay
+## comes out the same.
 class PlannerCommander extends AICommander:
 	var rival: Dictionary
 	var replan := 20.0
 	var horizon := 30.0
-	var samples := 2
-	## Rollout steps fought at each look; 0, the whole search at once.
+	## One rollout of each choice wins as much as two (DESIGN.md, the AI audit).
+	var samples := 1
+	## Rollout steps fought at each step of the battle; 0, the whole search at
+	## once, at a look.
 	var budget := 0
 	var choice := -1
 	## Called as each search ends with the battle as it was when the search
@@ -190,6 +197,10 @@ class PlannerCommander extends AICommander:
 		if _from != null:
 			_work(team, budget if budget > 0 else -1)
 		return plan_for(b, team, persona, choice, ids)
+
+	func between_looks(team: int) -> void:
+		if _from != null and budget > 0:
+			_work(team, budget)
 
 	func _begin(b: Battle) -> void:
 		_from = b.copy()

@@ -658,9 +658,9 @@ func _test_copy() -> void:
 	var before := _state(b)
 	planner.decide(b, 0)
 	_check(_state(b) == before and planner.choice >= -1 and planner.choice < b.flags.size(), "a planner looks ahead on copies and picks one of its ways")
-	# With a budget it fights the same look ahead over several looks: the
-	# same plans tried from the same moment, the same scores, the choice
-	# landing later.
+	# With a budget it fights the same look ahead over the steps between
+	# several looks: the same plans tried from the same moment, the same
+	# scores, the choice landing later.
 	var at_once := {}
 	var spread := {}
 	var whole := Commander.PlannerCommander.new(AI.PERSONAS.balanced, false, AI.PERSONAS.aggressive)
@@ -668,7 +668,7 @@ func _test_copy() -> void:
 	for p in [whole, sliced]:
 		p.horizon = 8.0
 		p.samples = 1
-	sliced.budget = 80
+	sliced.budget = 8
 	whole.on_choice = func(_at, _side, scores, _c, _ended): at_once.merge(scores)
 	sliced.on_choice = func(_at, _side, scores, _c, _ended): spread.merge(scores)
 	whole.decide(b.copy(), 0)
