@@ -22,8 +22,9 @@ Start with the question you have.
 | `scripts/combat.gd` | The rules, as pure functions |
 | `scripts/campaign.gd` | The campaign: run state in, new run state out |
 | `scripts/terrain.gd` | Maps (seeded, castles, hand-drawn) and the questions asked of them |
-| `scripts/scenarios.gd` | Quick and grand battles: specs, eras, building a battle |
-| `scripts/gettysburg.gd`, `scripts/waterloo.gd` | The grand battles, as data |
+| `scripts/scenarios.gd` | Looking a scenario up, checking it, building its battle |
+| `packs/registry.gd` | The content packs, and what a pack and a scenario hold |
+| `packs/medieval.gd`, `pike_shot.gd`, `sieges.gd`, `gettysburg.gd`, `waterloo.gd` | The packs: eras and scenarios, as data |
 | `scripts/unit_types.gd`, `scripts/regiment.gd` | Kinds of regiment and one regiment's state |
 | `scripts/telemetry.gd` | Read-only measures of a battle, and its trace |
 | `scripts/main.gd` | The menus |

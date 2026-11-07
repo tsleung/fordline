@@ -236,8 +236,8 @@ const PACK := {
 
 Packs are listed in `packs/registry.gd` (a web build cannot scan folders).
 `menu` says where a pack's scenarios appear: the campaign, quick battle by
-era, or grand battles. A scenario's keys are read through one checked
-accessor, so a misspelt or unowned key is an error naming it, and its map
+era, or grand battles. A scenario's keys are checked when its battle is
+built, so a misspelt or unowned key is an error naming it, and its map
 kind must be a core one or one its modules provide. If a pack's module is
 not loaded, the pack is left out of the menus and the suite says so.
 
@@ -253,17 +253,22 @@ not loaded, the pack is left out of the menus and the suite says so.
   different battle: on 1 November 2026, 21 of 44 battles came out
   differently on CI's Linux than on macOS. So each platform keeps its own
   recording, and the studies, which measure many battles, are what holds
-  across platforms, including the web build players run. A change that moves any of them fails until the
-  file is updated in the same commit, so every balance change is a visible,
-  deliberate diff.
+  across platforms, including the web build players run. The platform
+  includes the system's maths library, so CI runs on a pinned image
+  (Ubuntu 24.04): on 7 November 2026 `ubuntu-latest` moved to 26.04 and 18
+  of the 44 came out differently with no change to the code. Moving to a
+  new image is a deliberate re-recording. A change that moves any of them
+  fails until the file is updated in the same commit, so every balance
+  change is a visible, deliberate diff.
 - **Modules don't leak.** A pack that lists a module whose data its
   scenarios don't use must fight exactly as the core does; and the packs
   that use several modules are recorded together, so modules are tested in
   company.
 - **Every scenario is built** with its pack's modules and every commander.
-- **A time budget.** The suite times the step on the largest battle and
-  fails past a budget, worst step as well as average, so a phone stays
-  smooth at 4×.
+- **A time budget.** The suite times the step on the largest battle and,
+  on CI, fails past a budget, worst step as well as average, so a phone
+  stays smooth at 4×. On a dev machine it only reports the time: other work
+  there inflates it tenfold.
 - **Each module tests itself** in `modules/<id>/test.gd`.
 
 ## Migration
@@ -272,7 +277,10 @@ Each step is one commit that keeps every check the same and can be
 reverted alone. A step that must move recorded battles says so, and moves
 them once, deliberately.
 
-Steps 1 and 2 are done (1 November 2026).
+Steps 1, 2 and 5 are done, with the small parts of step 4 that touch only
+the specs and the order dispatch (6 November 2026). Packs went ahead of
+kinds on purpose: the better-AI branch owns `ai.gd` and the studies, and
+kinds as data rewrite them, so steps 3 and the rest of 4 wait for it to land.
 
 1. **One clock and one loop.** The commander loop and seats in the core,
    stepping at `Battle.STEP`; the screen, the suite and the balance studies
@@ -285,9 +293,9 @@ Steps 1 and 2 are done (1 November 2026).
 3. **Kinds as data**, with roles, traits and looks; doctrine keyed by kind
    id; the build-time check that every role is handled.
 4. **The dormant rules, one commit each**: formation shape; one list of
-   flights; each side's home and abilities; held flags written one way
-   (`own_flags` a list in every spec); unknown orders an error; the checked
-   spec accessor.
+   flights; each side's home and abilities. Done: held flags written one way
+   (`own_flags` and `their_flags`, lists in every spec); unknown orders an
+   error; a scenario's keys checked when its battle is built.
 5. **Packs**: scenarios and eras into pack files and the registry; the
    menus and briefings read packs.
 6. **The contract**: `Module`, effects, `TerrainFeature`, layers, the hook

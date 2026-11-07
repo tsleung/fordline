@@ -39,6 +39,7 @@ func _run() -> void:
 	await _test_screens()
 	_test_scenarios()
 	await _test_grand(quick)
+	await _test_screen_fixes()
 	_test_replay()
 	_test_first_looks()
 	_test_copy()
@@ -63,7 +64,8 @@ func _check(ok: bool, what: String) -> void:
 func _test_classes_come_from_the_source() -> void:
 	for c in ProjectSettings.get_global_class_list():
 		var path: String = c.path
-		_check(path.begins_with("res://scripts/") or path.begins_with("res://tests/"), "class %s comes from the source, not %s" % [c.class, path])
+		var source := ["res://scripts/", "res://packs/", "res://tests/"].any(func(d): return path.begins_with(d))
+		_check(source, "class %s comes from the source, not %s" % [c.class, path])
 
 
 func _test_combat() -> void:
@@ -88,6 +90,7 @@ func _test_combat() -> void:
 	_test_muskets()
 	_test_squares()
 	_test_fixes()
+	_test_packs()
 
 
 ## A volley of shot goes through armour, drops men all at once, and costs
@@ -323,14 +326,21 @@ func _test_screens() -> void:
 		await process_frame
 		await process_frame
 	_check(main.get_child_count() == 1, "one screen on stage after walking the screens")
+	# The campaign briefing's way out asks twice.
+	main._start_run()
+	await process_frame
+	var abandon: Button = main._abandon_button()
+	abandon.pressed.emit()
+	_check(abandon.text.begins_with("Tap again"), "abandoning a campaign asks for a second tap")
+	abandon.pressed.emit()
+	await process_frame
+	abandon.free()
+	_check(main.get_child_count() == 1, "and the second tap leaves for the title")
 	_check(main._load("ui", "era", "") == "pike_shot", "the scenario list remembers its era")
 	main.free()
 	DirAccess.remove_absolute("user://test_screens.cfg")
 
 
-## The castle: routes go round stone and through gates, a shut gate stops
-## the besieger until it is battered down, no blades cross a wall, and the
-## wall-walk gives height and cover.
 ## Napoleonic line infantry forms square against horse while it stands:
 ## no flank, a charge that doesn't land, and horse that does little; it
 ## forms line to march, and horse that reaches it first catches it in line.
@@ -362,6 +372,116 @@ func _test_squares() -> void:
 	_check(not line.square, "horse already on a line catches it before it can form square")
 
 
+## Input and on-screen text: bugs found and fixed, each kept fixed. Input
+## goes through the real path, in the viewport's own coordinates.
+func _test_screen_fixes() -> void:
+	var spec := Scenarios.resolve("gettysburg", 1)
+	var screen = preload("res://scripts/battle_screen.gd").new()
+	screen.setup(Scenarios.make_battle(spec, 1), spec.persona, spec.name)
+	screen.grand = true
+	screen.quick = true
+	screen.clock = func(t: float) -> String: return Scenarios.hour_text(spec, t)
+	screen.cam_centre = spec.view
+	root.add_child(screen)
+	await process_frame
+	_check(screen.leave_label() == "Back to grand battles", "a grand battle's menu goes back to the grand battles")
+	screen.cam_zoom = 0.6
+	screen.look_at(Vector2(1200, 1000))
+	var gamble: Regiment = screen.battle.team_regiments(0).filter(func(r): return r.name == "Gamble's Brigade")[0]
+	screen._select([gamble.id] as Array[int])
+	# A drag from the field that crosses the minimap is still that drag.
+	var map_rect: Rect2 = screen.hud._minimap.get_global_rect()
+	var over: Vector2 = map_rect.get_center()
+	var camera: Vector2 = screen.cam_centre
+	_mouse(Vector2(map_rect.position.x - 150.0, map_rect.end.y + 150.0), true)
+	_motion(over, MOUSE_BUTTON_MASK_LEFT)
+	await process_frame
+	_check(screen.cam_centre == camera, "a drag from the field across the minimap leaves the view alone")
+	_check(not screen.drag.is_empty() and screen.drag.now_screen == over, "and the drag still follows the finger")
+	_mouse(over, false)
+	await process_frame
+	_check(screen.drag.is_empty(), "and it can end over the minimap")
+	# A press that starts on the minimap looks there, and drags with it.
+	var corner: Vector2 = map_rect.position + Vector2(8.0, map_rect.size.y - 8.0)
+	_mouse(corner, true)
+	await process_frame
+	var looked: Vector2 = screen.cam_centre
+	_check(looked != camera and screen.drag.is_empty(), "a press on the minimap looks there and is no order")
+	_motion(map_rect.end - Vector2(8.0, 8.0), MOUSE_BUTTON_MASK_LEFT)
+	await process_frame
+	_check(screen.cam_centre != looked, "and dragging on it moves the view")
+	_mouse(map_rect.end - Vector2(8.0, 8.0), false)
+	await process_frame
+	# A middle-drag pan with blocks selected is a pan: no arrow, no error.
+	_mouse(Vector2(300, 300), true, MOUSE_BUTTON_MIDDLE)
+	_motion(Vector2(340, 300), MOUSE_BUTTON_MASK_MIDDLE)
+	await process_frame
+	_check(screen.drag.get("mode", "") == "pan" and screen.preview_arrow().is_empty() and screen.preview_slots().is_empty(), "a middle-drag pan draws no order arrow")
+	_mouse(Vector2(340, 300), false, MOUSE_BUTTON_MIDDLE)
+	await process_frame
+	# A finger lifted while the menu is open is lifted.
+	var touch := InputEventScreenTouch.new()
+	touch.index = 3
+	touch.pressed = true
+	screen._unhandled_input(touch)
+	screen.open_menu()
+	var lift := InputEventScreenTouch.new()
+	lift.index = 3
+	screen._unhandled_input(lift)
+	screen.close_menu()
+	_check(not screen._touches.has(3), "a finger lifted while the menu is open is not still down")
+	# Notices say what the flag is, and who won at the deadline.
+	_check(screen._flag_word(Gettysburg.CEMETERY) == "Cemetery Hill", "a grand battle's flag notice names the place")
+	screen._react([
+		{"type": "flag", "owner": 0, "index": Gettysburg.CEMETERY, "pos": Vector2.ZERO},
+		{"type": "deadline", "held": 1},
+	])
+	screen.free()
+	for pair in [["hold", "Crossing", "crossings"], ["storm", "Flag", "flags"]]:
+		var quick_spec := Scenarios.resolve(pair[0], 1)
+		var other = preload("res://scripts/battle_screen.gd").new()
+		other.setup(Scenarios.make_battle(quick_spec, 1), quick_spec.persona, quick_spec.name)
+		_check(other._flag_word(0) == pair[1] and other._flag_noun(2) == pair[2], "on %s a flag is a %s" % [pair[0], pair[1]])
+		other.free()
+
+
+func _mouse(at: Vector2, pressed: bool, button := MOUSE_BUTTON_LEFT) -> void:
+	var e := InputEventMouseButton.new()
+	e.button_index = button
+	e.pressed = pressed
+	e.position = at
+	root.push_input(e, true)
+
+
+func _motion(at: Vector2, held: int) -> void:
+	var e := InputEventMouseMotion.new()
+	e.position = at
+	e.button_mask = held
+	root.push_input(e, true)
+
+
+## The packs: every scenario is well formed and has one home, every quick
+## one has an era, and a mistake in one is named when its battle is built.
+func _test_packs() -> void:
+	var ids := {}
+	for pack in Packs.ALL:
+		_check(pack.menu in ["quick", "grand"] and pack.has("modules"), "pack %s says where it goes and what it needs" % pack.id)
+		for spec in pack.scenarios:
+			_check(not ids.has(spec.id), "scenario %s is in one pack only" % spec.id)
+			ids[spec.id] = true
+			_check(Scenarios.check(spec).is_empty(), "scenario %s is well formed: %s" % [spec.id, Scenarios.check(spec)])
+			_check(Scenarios.is_grand(spec) == (pack.menu == "grand"), "scenario %s is on the right list" % spec.id)
+	_check(Packs.eras().map(func(e): return e.id) == ["medieval", "pike_shot"], "the eras come oldest first")
+	_check(Scenarios.of_era("medieval").map(func(q): return q.id).slice(-2) == ["storm", "last_keep"], "a pack's scenarios join their era's list")
+	_check(Scenarios.grand().map(func(q): return q.id) == ["gettysburg", "waterloo"], "the grand battles are listed")
+	var misspelt := Scenarios.get_spec("hold").duplicate()
+	misspelt["hold_neded"] = 2
+	misspelt.map = "swamp"
+	misspelt.era = "bronze"
+	var wrong := "; ".join(Scenarios.check(misspelt))
+	_check(wrong.contains("hold_neded") and wrong.contains("swamp") and wrong.contains("bronze"), "a misspelt key, an unknown map and an unknown era are named")
+
+
 ## Bugs found and fixed, each kept fixed.
 func _test_fixes() -> void:
 	# A general who breaks and is then cut down is mourned once.
@@ -374,6 +494,35 @@ func _test_fixes() -> void:
 	b._kill(general, range(general.men()), null, 1.0)
 	_check(b.take_events().filter(func(e): return e.type == "general").size() == 1, "a general who routed and then fell is mourned once")
 	_check(after_rout - b.resolve[0] <= Battle.DESTROYED_COST + 0.01, "and his death costs only what a routed regiment's does")
+	# A square has no flank to call out, even struck from behind.
+	var sq := Battle.new(Terrain.generate("woods", 4), 1)
+	var foot := sq.add_regiment(0, K.LINE, 40, Vector2(650, 500), PI * 0.5, 0, {})
+	var horse := sq.add_regiment(1, K.CAVALRY, 24, Vector2(650, 290), PI * 0.5, 0, {})
+	sq.begin()
+	sq.step(Battle.STEP)
+	sq.apply_orders([{"type": "attack", "id": horse.id, "target": foot.id}])
+	var flanked := false
+	var met := false
+	for i in 150:
+		sq.step(Battle.STEP)
+		met = met or not foot.contacts.is_empty()
+		flanked = flanked or sq.take_events().any(func(e): return e.type == "flank")
+	_check(foot.square and met and not flanked, "horse behind a square calls out no flank")
+	_check(Scenarios.is_random("skirmish") and Scenarios.is_random("skirmish_shot") and not Scenarios.is_random("hold"), "both Skirmishes draw a new field")
+	# A save file that won't read is set aside, not written over.
+	var path := "user://test_damaged.cfg"
+	var broken := FileAccess.open(path, FileAccess.WRITE)
+	broken.store_string("[stars]\nkept=3\n[broken\nnot a config file")
+	broken.close()
+	var main: Node = load("res://scenes/main.tscn").instantiate()
+	main.save_path = path
+	main._save("stars", "new", 2)
+	_check(FileAccess.file_exists(path + ".damaged"), "a damaged save is set aside")
+	_check(FileAccess.get_file_as_string(path + ".damaged").contains("kept=3"), "with what it held")
+	_check(main._load("stars", "new", 0) == 2, "and saving carries on in a good file")
+	main.free()
+	DirAccess.remove_absolute(path)
+	DirAccess.remove_absolute(path + ".damaged")
 	# Two Narrow Bridges needs both bridges, not a bridge and the field.
 	var spec := Scenarios.resolve("bridges", 1)
 	for held in [[0, 1], [1, 2]]:
@@ -387,6 +536,9 @@ func _test_fixes() -> void:
 		_check(won == (held == [1, 2]), "holding flags %s at dusk %s Two Narrow Bridges" % [held, "wins" if won else "loses"])
 
 
+## The castle: routes go round stone and through gates, a shut gate stops
+## the besieger until it is battered down, no blades cross a wall, and the
+## wall-walk gives height and cover.
 func _test_fortress() -> void:
 	var t := Terrain.generate("fortress", 3)
 	var outside := Vector2(650, 700)
@@ -450,7 +602,7 @@ func _test_fortress() -> void:
 ## Every scenario builds, deploys on dry ground and finishes in time with
 ## the AI as the player; the hold scenario's clock decides on the flags.
 func _test_scenarios() -> void:
-	for spec in Scenarios.LIST:
+	for spec in Packs.scenarios("quick"):
 		for s in [1, 2]:
 			var resolved := Scenarios.resolve(spec.id, s)
 			var b := Scenarios.make_battle(resolved, s)
@@ -805,4 +957,8 @@ func _test_budget() -> void:
 	var p99: int = times[int(times.size() * 0.99)]
 	print("  Waterloo  winner %s at %s  step %d us mean, %d us p99" % [
 		"Allies" if run.battle.winner == 0 else "French", Scenarios.hour_text(spec, run.battle.time), mean, p99])
-	_check(mean <= STEP_BUDGET_MEAN and p99 <= STEP_BUDGET_P99, "Waterloo's step is within budget (%d us mean, %d us p99)" % [mean, p99])
+	# Wall-clock time means something only on a machine the suite has to
+	# itself: CI, which gates every deploy. On a busy dev machine other work
+	# inflates it tenfold, so there it is reported, not judged.
+	if OS.has_environment("CI"):
+		_check(mean <= STEP_BUDGET_MEAN and p99 <= STEP_BUDGET_P99, "Waterloo's step is within budget (%d us mean, %d us p99)" % [mean, p99])

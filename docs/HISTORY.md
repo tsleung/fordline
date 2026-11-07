@@ -52,6 +52,20 @@ The docs map ([`README.md`](README.md)) and this history. The owner's
 prompt log moved to his private notebook, reached here through a
 gitignored symlink, the way his other projects share with it.
 
+## 7 November: tests for every fix, and packs
+
+Tests for the fixes that had none, through the real input path where that
+is the point. Scenarios and eras moved out of the code into `packs/`, with a
+registry the menus read: a first step of the architecture's migration that
+keeps clear of the better-AI branch's files. A misspelt scenario key, an
+unknown map or era, and an unknown order type are now loud errors, and the
+suite fails on any of them. No recorded battle moves.
+
+The same day CI's `ubuntu-latest` moved from Ubuntu 24.04 to 26.04, and its
+maths library moved 18 of the 44 Linux recordings with no change to the
+code. CI now runs on a pinned 24.04; a new image is a deliberate
+re-recording, like a balance change.
+
 ## 7 November: a stronger line, and what the planner is worth
 
 The studies run from one command (`tests/studies.sh`), on eight dice. Foot
@@ -61,10 +75,10 @@ only what crosses to them: against the AI of 1 November the AI wins 55% of
 recorded battles moved (12 changed winner). Eleven other changes to the
 line's rules, the AI at a person's pace at three speeds, and an attacker
 that keeps to its plan longer, measured within the noise and were not
-kept. The planner thinks between its looks on a
-budget; as the enemy it is barely harder than the AI. The suite now fails
-when a class name is taken by a stray copy: an old probe of the AI under
-`build/` had taken it, and the suite fought the probe.
+kept. The planner thinks between its looks on a budget; as the enemy it is
+barely harder than the AI. The suite now fails when a class name is taken
+by a stray copy: an old probe of the AI under `build/` had taken it, and
+the suite fought the probe.
 
 Decisions: a change to the AI is kept only when it beats the AI it would
 replace from both ends beyond the noise; a rule that measures as neither
@@ -74,5 +88,6 @@ stays; the game's enemy stays the AI, not the planner.
 
 - A better AI (line concentration, holding ground, a person-paced
   commander, an in-battle planner): `tsleung/fordline` pull request 1.
-- The architecture's migration past step 2 (kinds as data, packs,
-  fortifications as the first module): `ARCHITECTURE.md`, "Migration".
+- The rest of the architecture's migration (kinds as data once the AI
+  branch lands, the module contract, fortifications as the first module):
+  `ARCHITECTURE.md`, "Migration".

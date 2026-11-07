@@ -72,13 +72,14 @@ prove the simulation deterministic, then fights the campaign, every quick
 scenario and the grand battles AI against AI, through the same loop the
 game uses (`scripts/battle_run.gd`). Each battle must come out exactly as
 recorded for the platform the suite runs on (`tests/golden-macos.txt`,
-`tests/golden-linux.txt`, which CI uses); after a deliberate change to how
+`tests/golden-linux.txt`, which CI uses on a pinned Ubuntu 24.04); after a deliberate change to how
 battles come out, `./test.sh --record` records them again for this
 platform, in the same commit. The other platform's file is then updated
 from CI's report of what it got: each line it fails on says what it was
 and what it now is.
-Fails on any failed check, any script error, a battle past its time, or
-Waterloo's step over budget. `./test.sh --quick` fights one seed and skips
+Fails on any failed check, any script error or `push_error`, a battle past
+its time, or (on CI, where the machine is its own) Waterloo's step over
+budget. `./test.sh --quick` fights one seed and skips
 the long battles.
 
 Studies, all fought through the game's loop:
@@ -122,6 +123,8 @@ scripts/combat.gd       the fighting rules, pure functions
 scripts/terrain.gd      seeded maps and the questions the sim asks of them
 scripts/ai.gd           a commander: battle in, orders out
 scripts/campaign.gd     the run: pure functions over run state
+scripts/scenarios.gd    looks up, checks and builds a scenario's battle
+packs/                  the content: eras and scenarios, as data
 scripts/battle_screen.gd  input, fixed-step loop, events into effects
 scripts/*_view.gd, hud.gd, glyphs.gd, palette.gd   drawing
 scripts/main.gd         title, briefing, results, final screens
