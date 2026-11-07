@@ -30,6 +30,7 @@ func _initialize() -> void:
 ## enter the tree.
 func _run() -> void:
 	var quick := "--quick" in OS.get_cmdline_user_args()
+	_test_classes_come_from_the_source()
 	_test_combat()
 	_test_terrain()
 	_test_fortress()
@@ -54,6 +55,14 @@ func _check(ok: bool, what: String) -> void:
 	if not ok:
 		_failures += 1
 		print("FAIL: ", what)
+
+
+## Godot gives a class name to one file: a stale copy elsewhere can take it,
+## and the suite would quietly test the copy.
+func _test_classes_come_from_the_source() -> void:
+	for c in ProjectSettings.get_global_class_list():
+		var path: String = c.path
+		_check(path.begins_with("res://scripts/") or path.begins_with("res://tests/"), "class %s comes from the source, not %s" % [c.class, path])
 
 
 func _test_combat() -> void:

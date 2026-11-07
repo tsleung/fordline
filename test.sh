@@ -11,6 +11,10 @@ if [ -n "$(git ls-files notes/prompts.md 2>/dev/null)" ]; then
   echo "FAILED: notes/prompts.md is tracked; it must stay a gitignored symlink"
   exit 1
 fi
+# What is built is not source: scanned, a stale copy of a script under build/
+# could take its class's name, and the suite would test the copy.
+mkdir -p build
+touch build/.gdignore
 "$GODOT" --headless --path . --import >/dev/null 2>&1
 out=$("$GODOT" --headless --path . -s tests/run_tests.gd -- "$@" 2>&1)
 status=$?
