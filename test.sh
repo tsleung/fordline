@@ -15,7 +15,7 @@ fi
 out=$("$GODOT" --headless --path . -s tests/run_tests.gd -- "$@" 2>&1)
 status=$?
 printf '%s\n' "$out" | grep -v '^Godot Engine'
-if printf '%s' "$out" | grep -q 'SCRIPT ERROR\|Parse Error'; then
+if printf '%s' "$out" | grep -q 'SCRIPT ERROR\|Parse Error\|at: push_error'; then
   echo "FAILED: script errors"
   exit 1
 fi

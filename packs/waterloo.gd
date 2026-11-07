@@ -193,7 +193,7 @@ const ARRIVALS := [
 ]
 
 const SPEC := {
-	"id": "waterloo", "era": "napoleonic", "mode": "grand", "name": "Waterloo",
+	"id": "waterloo", "era": "napoleonic", "name": "Waterloo",
 	"brief": "18 June 1815. Wellington's army holds the ridge of Mont-Saint-Jean, with Hougoumont and La Haye Sainte out in front. Napoleon attacks all afternoon. The Prussians are on the march from Wavre. Hold the ridge until they come, and until night.",
 	"plan": PLAN, "persona": "aggressive", "abilities": ["rally"],
 	"view": Vector2(1600, 1100),
@@ -206,4 +206,10 @@ const SPEC := {
 	"start": START, "arrivals": ARRIVALS,
 	"goal": "Hold Mont-Saint-Jean at dusk (21:00), or break their army.",
 	"stars": [{"hold": LA_HAYE_SAINTE, "noun": "La Haye Sainte"}, {"hold": PLANCENOIT, "noun": "Plancenoit", "verb": "Have taken"}],
+}
+
+const PACK := {
+	"id": "waterloo", "name": "Waterloo", "menu": "grand",
+	"modules": [],
+	"scenarios": [SPEC],
 }

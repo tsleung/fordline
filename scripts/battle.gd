@@ -198,6 +198,8 @@ func apply_orders(orders: Array) -> void:
 				_order_bombard(o)
 			"objective":
 				_order_objective(o)
+			_:
+				push_error("unknown order type: %s" % o.type)
 
 
 func _commandable(id: int) -> Regiment:

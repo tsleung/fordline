@@ -160,7 +160,7 @@ const ARRIVALS := [
 
 
 const SPEC := {
-	"id": "gettysburg", "era": "rifles", "mode": "grand", "name": "Gettysburg, the First Day",
+	"id": "gettysburg", "era": "rifles", "name": "Gettysburg, the First Day",
 	"brief": "1 July 1863. Buford's troopers hold the ridges west of town against Heth's division. Your two corps are on the roads from the south; theirs are coming from the west and the north. Hold Cemetery Hill when night falls.",
 	"plan": PLAN, "persona": "aggressive", "abilities": ["rally"],
 	## Where the camera opens: the ridges west of town, where it begins.
@@ -173,4 +173,10 @@ const SPEC := {
 	"start": START, "arrivals": ARRIVALS,
 	"goal": "Hold Cemetery Hill at dusk (19:30), or break their army.",
 	"stars": [{"hold": SEMINARY, "noun": "Seminary Ridge"}, {"losses": 0.45}],
+}
+
+const PACK := {
+	"id": "gettysburg", "name": "Gettysburg", "menu": "grand",
+	"modules": [],
+	"scenarios": [SPEC],
 }

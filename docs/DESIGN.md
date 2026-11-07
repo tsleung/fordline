@@ -501,7 +501,8 @@ under three minutes. Best score is kept on the device.
 - `scripts/terrain.gd` builds a seeded map, or a grand battle's map from
   a hand-drawn plan (`Terrain.from_plan`), and answers queries about it.
   Each map has its own size.
-- `scripts/gettysburg.gd` and `scripts/waterloo.gd` are grand battles as
+- `packs/` holds the content as data: `medieval`, `pike_shot` and `sieges`
+  are quick battles, and `packs/gettysburg.gd` and `packs/waterloo.gd` are grand battles as
   pure data: the ground, who starts where, when each corps goes in, and
   who comes up which road when. `Scenarios` builds the
   battle from it; the battle raises each arrival at its hour.

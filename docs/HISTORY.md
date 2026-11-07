@@ -52,9 +52,19 @@ The docs map ([`README.md`](README.md)) and this history. The owner's
 prompt log moved to his private notebook, reached here through a
 gitignored symlink, the way his other projects share with it.
 
+## 7 November: tests for every fix, and packs
+
+Tests for the fixes that had none, through the real input path where that
+is the point. Scenarios and eras moved out of the code into `packs/`, with a
+registry the menus read: a first step of the architecture's migration that
+keeps clear of the better-AI branch's files. A misspelt scenario key, an
+unknown map or era, and an unknown order type are now loud errors, and the
+suite fails on any of them. No recorded battle moves.
+
 ## Open
 
 - A better AI (line concentration, holding ground, a person-paced
   commander, an in-battle planner): `tsleung/fordline` pull request 1.
-- The architecture's migration past step 2 (kinds as data, packs,
-  fortifications as the first module): `ARCHITECTURE.md`, "Migration".
+- The rest of the architecture's migration (kinds as data once the AI
+  branch lands, the module contract, fortifications as the first module):
+  `ARCHITECTURE.md`, "Migration".

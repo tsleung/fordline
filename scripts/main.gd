@@ -72,9 +72,9 @@ func show_title() -> void:
 func show_scenarios(era_id := "") -> void:
 	Sfx.play("click")
 	if Scenarios.era(era_id).is_empty():
-		era_id = _load("ui", "era", Scenarios.ERAS[0].id)
+		era_id = _load("ui", "era", Packs.eras()[0].id)
 		if Scenarios.era(era_id).is_empty():
-			era_id = Scenarios.ERAS[0].id
+			era_id = Packs.eras()[0].id
 	_save("ui", "era", era_id)
 	var col := _page()
 	col.add_child(_inline("QUICK BATTLE", 15, Palette.BRASS))
@@ -82,7 +82,7 @@ func show_scenarios(era_id := "") -> void:
 	col.add_child(_text("One battle each, three to five minutes. Earn up to three stars.", 18, Palette.INK_DIM, false))
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 10)
-	for e in Scenarios.ERAS:
+	for e in Packs.eras():
 		var tab := _button(e.name, show_scenarios.bind(e.id), e.id == era_id)
 		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		# The chosen tab is coloured like a primary button, but keeps the
@@ -102,7 +102,7 @@ func show_grand() -> void:
 	col.add_child(_inline("GRAND BATTLES", 15, Palette.BRASS))
 	col.add_child(_text("Historical days", 40, Palette.INK, false))
 	col.add_child(_text("A whole day's battle on a field several screens across, with armies arriving by road. About fifteen minutes; drag the field to look around.", 18, Palette.INK_DIM, false))
-	for spec in Scenarios.GRAND:
+	for spec in Scenarios.grand():
 		col.add_child(_scenario_card(spec))
 	col.add_child(_button("Back", show_title))
 
