@@ -83,13 +83,30 @@ budget. `./test.sh --quick` fights one seed and skips
 the long battles.
 
 Studies, all fought through the game's loop:
-- `tests/luck_skill.gd` fights a battle under a ladder of commanders and
-  prints one row per battle; `tests/luck_skill.py` splits the outcome
-  into skill and luck, `tests/play.py` reports the measures of play
-  (length, lead changes, comebacks, quiet, warning, orders a minute,
-  and with `--impact=N` how far one dropped order carries).
+- `tests/luck_skill.gd` fights a battle under a ladder of commanders
+  (idle, person-paced, standard, sharp; `--policies=planner` adds the
+  planner, which tries plans ahead on copies of the battle and fights
+  about ten times as long) and prints one row per battle;
+  `tests/luck_skill.py` splits the outcome into skill and luck,
+  `tests/play.py` reports the measures of play (length, lead changes,
+  comebacks, quiet, warning, orders a minute, and with `--impact=N` how
+  far one dropped order carries). Each die is the battle's random numbers
+  and when each commander first looks.
 - `tests/plans.gd` searches fixed plans against the enemy AI: the
   ceiling, and how much a plan is worth.
+- `tests/versus.gd` fights the AI against its yardstick, the AI of 1
+  November 2026 kept in `tests/ai_baseline.gd`, from both ends of every
+  battle; `tests/play.py` reports it. A change to the AI is better when
+  it beats the yardstick from both ends.
+- `tests/plan_examples.gd` writes the planner's choices as a dataset
+  (`spec.json` and `examples.jsonl`, `tests/planner_data.gd`): at each
+  re-plan, what its side could see, each choice's rollout score, the
+  choice it took, and how the battle came out. Rerun, the same bytes.
+
+`tests/studies.sh NAME ladder plans versus planner` runs any of these in
+parallel, as DESIGN.md measures them, from a copy of the tree (so editing
+doesn't disturb a long run), into `build/studies/NAME`, with `tests/play.py`'s
+report and DESIGN.md's table in its `report.txt`.
 
 See "Play over time" in [docs/DESIGN.md](docs/DESIGN.md).
 

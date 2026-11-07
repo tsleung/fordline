@@ -128,6 +128,51 @@ func add_regiment(
 	return r
 
 
+## A copy of the battle as it stands, to fight on without changing this
+## one: a planner trying a plan a little way ahead. Every field is copied
+## and each regiment with it, down to the battle's random numbers, so the
+## copy given the same orders fights the same battle. The map is shared,
+## since nothing in a battle changes it but a castle's gates, and a
+## castle's map is copied for gates of its own.
+func copy() -> Battle:
+	var map := terrain
+	if not terrain.gates.is_empty():
+		map = Terrain.new()
+		_copy_vars(terrain, map, [])
+	var c := Battle.new(map, 0)
+	_copy_vars(self, c, ["terrain", "rng", "regiments", "_by_id"])
+	c.rng.seed = rng.seed
+	c.rng.state = rng.state
+	for r in regiments:
+		var rc := Regiment.new()
+		_copy_vars(r, rc, [])
+		c.regiments.append(rc)
+		c._by_id[rc.id] = rc
+	return c
+
+
+## The battle's random numbers from here on drawn afresh from `seed_value`:
+## a copy fought on as one of the futures the battle might have rather than
+## the one it will. A planner trying plans ahead uses it, since it can't
+## know where the guns' shot will fall.
+func reseed(seed_value: int) -> void:
+	rng.seed = seed_value
+
+
+## Every script variable of `from` onto `to` but those in `skip`, arrays
+## (packed ones too, which Godot passes by reference) and dictionaries
+## copied through rather than shared.
+static func _copy_vars(from: Object, to: Object, skip: Array) -> void:
+	for p in from.get_property_list():
+		if p.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and not p.name in skip:
+			var v: Variant = from.get(p.name)
+			if v is Array or v is Dictionary:
+				v = v.duplicate(true)
+			elif typeof(v) >= TYPE_PACKED_BYTE_ARRAY and typeof(v) <= TYPE_PACKED_VECTOR4_ARRAY:
+				v = v.duplicate()
+			to.set(p.name, v)
+
+
 func get_regiment(id: int) -> Regiment:
 	return _by_id.get(id)
 

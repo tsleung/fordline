@@ -38,16 +38,32 @@ const RESERVE_REACH := 450.0
 ## they cover.
 const HOLD_SHORT := 50.0
 const BATTERY_BACK := 170.0
+## A block keeps the enemy it is closing on unless another scores this much
+## better.
+const TARGET_STICK := 40.0
 ## Archers step back from foot this close; muskets only from foot about to
 ## strike, since a musket on the move doesn't fire and its range is short.
 const ARCHERS_SHY := 110.0
 const MUSKETS_SHY := 60.0
+## Shooters keep behind pikes within this of them rather than other foot.
+const PIKE_COVER := 300.0
 ## A division within this of its objective is there, and faces the enemy;
 ## its blocks stand this far apart, centre to centre.
 const DIVISION_THERE := 220.0
 const DIVISION_GAP := 120.0
 ## Horse whose orders start later still rides at an enemy this near.
 const HORSE_WAKE := 500.0
+## The line's allotment: an enemy block within THREAT_REACH of a flag is
+## coming for the nearest; a flag is taken with TAKE_MARGIN times the
+## weight of its defenders; TAKE_SPAN of distance counts as much as
+## defenders as strong as the whole line, in choosing which to take.
+const THREAT_REACH := 400.0
+const TAKE_MARGIN := 1.3
+const TAKE_SPAN := 800.0
+## An enemy block is judged by where it will be this many seconds on.
+const THREAT_LEAD := 6.0
+## Idle horse take a flag no enemy stands within this of.
+const FREE_REACH := 200.0
 
 
 ## Place orders that set out a team's regiments in its deployment zone:
@@ -111,11 +127,16 @@ static func _interleave(foot: Array[Regiment]) -> Array:
 
 
 ## Whichever side holds a castle fights as its garrison, whatever its
-## persona otherwise.
-static func decide(b: Battle, team: int, persona: Dictionary) -> Array:
+## persona otherwise. `plan` says where blocks of the line go, by id to
+## flag index: the allotment a commander thought out last (allot), or a
+## planner's choice. Blocks it doesn't name go where the AI allots them now.
+## `only` (block ids) is the part of the side a seat commands, a division
+## the player sent off on its own; it forms its lines among its own blocks.
+## Empty: the whole side.
+static func decide(b: Battle, team: int, persona: Dictionary, plan := {}, only: Array[int] = []) -> Array:
 	if b.terrain.holder == team:
 		persona = persona.merged(PERSONAS.garrison, true)
-	var mine := _fighting(b, team)
+	var mine := _commanded(b, team, only)
 	var foes := _fighting(b, 1 - team)
 	var orders: Array = []
 	if mine.is_empty() or foes.is_empty():
@@ -136,11 +157,11 @@ static func decide(b: Battle, team: int, persona: Dictionary) -> Array:
 		if not garrison or b.terrain.inside(f.pos):
 			foot_foes.append(f)
 	var shooters := mine.filter(func(r): return UnitTypes.is_ranged(r.kind))
-	var line: Array[Regiment] = []
-	for r in mine:
-		if (r.kind == K.SWORDS or r.kind == K.PIKES or r.kind == K.RIFLES or r.kind == K.LINE) and not r.id in reserve:
-			line.append(r)
-	line.sort_custom(func(a, c): return a.pos.x < c.pos.x)
+	var line := _line(mine, reserve)
+	var flag_of := {} if garrison else _allot(b, team, line, foes, plan)
+	var allotted := {}
+	for id in flag_of:
+		allotted[id] = b.flags[flag_of[id]].pos
 	for r in mine:
 		var o: Variant = null
 		# A block whose orders start later in the day keeps to its ground
@@ -154,14 +175,14 @@ static func decide(b: Battle, team: int, persona: Dictionary) -> Array:
 				if r.id in reserve:
 					o = _reserve_foot(b, r, line, foot_foes, home_y)
 				else:
-					o = _foot(r, foot_foes, advancing, _spot(b, team, r, line, goals), home)
+					o = _foot(r, foot_foes, advancing, _spot(b, team, r, line, goals, allotted), home)
 			K.RIFLES, K.LINE:
-				o = _rifle(r, foes, advancing, _spot(b, team, r, line, goals), home)
+				o = _rifle(r, foes, advancing, _spot(b, team, r, line, goals, allotted), home)
 			K.ARCHERS, K.MUSKETS:
 				if garrison:
 					o = _man_wall(b, r, foes, shooters.find(r))
 				else:
-					o = _archer(b, r, mine, foes, home_y, advancing, persona.get("terrain", false))
+					o = _archer(b, r, mine, foes, home_y, persona.get("terrain", false))
 			K.CANNONS:
 				if garrison:
 					o = _man_wall(b, r, foes, shooters.find(r))
@@ -170,7 +191,7 @@ static func decide(b: Battle, team: int, persona: Dictionary) -> Array:
 					var back := home
 					if not r.objectives.is_empty():
 						# Unlimber short of the objective on the way in.
-						aims = [_objective(b, team, r.objectives)] as Array[Vector2]
+						aims = [_objective(b, team, r.objectives) as Vector2] as Array[Vector2]
 						back = (r.pos - aims[0]).normalized()
 					o = _gun(b, r, foes, aims, back)
 			K.CAVALRY:
@@ -180,6 +201,37 @@ static func decide(b: Battle, team: int, persona: Dictionary) -> Array:
 		if o != null:
 			orders.append(o)
 	return orders
+
+
+## Where the line goes, thought out on its own: the plan a commander keeps
+## and hands back to decide() until it thinks again. By id to flag index;
+## a garrison's line has none, it stands across the gateway. `only` as
+## for decide().
+static func allot(b: Battle, team: int, persona: Dictionary, only: Array[int] = []) -> Dictionary:
+	if b.terrain.holder == team or persona.get("garrison", false):
+		return {}
+	var mine := _commanded(b, team, only)
+	var foes := _fighting(b, 1 - team)
+	if mine.is_empty() or foes.is_empty():
+		return {}
+	return _allot(b, team, _line(mine, _reserve(mine, persona.get("reserve", 0))), foes, {})
+
+
+## The foot and rifles that stand in the line, left to right: all but the
+## reserve.
+static func _line(mine: Array[Regiment], reserve: Array[int]) -> Array[Regiment]:
+	var line: Array[Regiment] = []
+	for r in mine:
+		if (r.kind == K.SWORDS or r.kind == K.PIKES or r.kind == K.RIFLES or r.kind == K.LINE) and not r.id in reserve:
+			line.append(r)
+	line.sort_custom(func(a, c): return a.pos.x < c.pos.x)
+	return line
+
+
+## The side's fighting regiments, or of them those in `only`.
+static func _commanded(b: Battle, team: int, only: Array[int]) -> Array[Regiment]:
+	var mine := _fighting(b, team)
+	return mine if only.is_empty() else mine.filter(func(r): return r.id in only)
 
 
 static func _fighting(b: Battle, team: int) -> Array[Regiment]:
@@ -210,27 +262,47 @@ static func _line_spot(line: Array[Regiment], i: int, goals: Array[Vector2]) -> 
 	return goals[g] + Vector2((k - (group.size() - 1) * 0.5) * 85.0, 0.0)
 
 
-## Where a line regiment stands: its share of the front. A block with
-## objectives of its own (a grand battle's division) has its place in its
-## division's line instead.
-static func _spot(b: Battle, team: int, r: Regiment, line: Array[Regiment], goals: Array[Vector2]) -> Vector2:
-	if r.objectives.is_empty():
+## Where a line regiment stands: in a division's line across its goal,
+## beside the blocks of its formation under the same orders. A block's
+## goal is its own objective (a grand battle's division, or a flag the
+## player sent it to on its own command), or else the flag its side
+## allotted it. A line with no allotment (a garrison's, across its
+## gateway) takes its share of the front.
+##
+## Under the same orders, not merely of the same division: a block the
+## player sends off alone forms its line by itself on the flag, not at
+## the end of a line with the blocks still in the player's hands, which
+## would stand it outside the flag's ring for good.
+static func _spot(b: Battle, team: int, r: Regiment, line: Array[Regiment], goals: Array[Vector2], allotted: Dictionary) -> Vector2:
+	var goal: Variant = _goal(b, team, r, allotted)
+	if goal == null:
 		return _line_spot(line, line.find(r), goals)
 	var division: Array[Regiment] = []
 	for o in line:
-		if o.formation == r.formation:
+		if o.formation == r.formation and o.objectives == r.objectives and allotted.get(o.id) == allotted.get(r.id):
 			division.append(o)
-	return _division_spot(b, team, r, division, _objective(b, team, r.objectives))
+	return _division_spot(b, team, r, division, goal)
+
+
+## Where a block is going: its objective, else its allotted flag, else
+## nowhere (null).
+static func _goal(b: Battle, team: int, r: Regiment, allotted: Dictionary) -> Variant:
+	var objective: Variant = _objective(b, team, r.objectives)
+	return objective if objective != null else allotted.get(r.id)
 
 
 ## A division forms side by side across its objective, square to the way
 ## it is going; once there, square to the nearest enemy. Each block keeps
-## its place from left to right, so their routes don't cross.
+## its place from left to right, so their routes don't cross. `r` stands
+## in the line whether or not `division` names it.
 static func _division_spot(b: Battle, team: int, r: Regiment, division: Array[Regiment], objective: Vector2) -> Vector2:
+	var order := division.duplicate()
+	if not r in order:
+		order.append(r)
 	var centre := Vector2.ZERO
-	for o in division:
+	for o in order:
 		centre += o.pos
-	centre /= division.size()
+	centre /= order.size()
 	var ahead := objective - centre
 	if ahead.length() < DIVISION_THERE:
 		var nearest := INF
@@ -240,15 +312,17 @@ static func _division_spot(b: Battle, team: int, r: Regiment, division: Array[Re
 				nearest = d
 				ahead = f.pos - objective
 	var across := ahead.normalized().orthogonal() if ahead.length() > 1.0 else Vector2.RIGHT
-	var order := division.duplicate()
 	order.sort_custom(func(x, y): return x.pos.dot(across) < y.pos.dot(across))
 	var k := order.find(r)
 	return objective + across * (k - (order.size() - 1) * 0.5) * DIVISION_GAP
 
 
 ## A division's objectives are flags to take in order: the first it
-## doesn't hold. Once it holds them all it stays on the last.
-static func _objective(b: Battle, team: int, objectives: PackedVector2Array) -> Vector2:
+## doesn't hold. Once it holds them all it stays on the last. With none,
+## null.
+static func _objective(b: Battle, team: int, objectives: PackedVector2Array) -> Variant:
+	if objectives.is_empty():
+		return null
 	for p in objectives:
 		for f in b.flags:
 			if f.pos.distance_to(p) < Battle.FLAG_RADIUS and f.owner != team:
@@ -281,10 +355,161 @@ static func _flag_goals(b: Battle, team: int) -> Array[Vector2]:
 	return out
 
 
+## A block's weight in a fight: its men, how much each takes to kill and
+## how hard he hits, worn down by fatigue and failing nerve.
+static func _power(r: Regiment) -> float:
+	return r.men() * r.hp * r.atk * Combat.fatigue_hit(r.stamina) * (0.5 + 0.5 * r.morale / r.morale_max)
+
+
+## Where the line goes: in strength to the flags that matter, as the plans
+## that beat it do, rather than spread over every flag. The needs, most
+## pressing first: each flag this side holds that the enemy is coming for,
+## enough to outweigh what comes; then each flag it could take, the least
+## held and nearest first, TAKE_MARGIN times its defenders and at least
+## one block. A need the line hasn't the strength left to meet gets nobody,
+## rather than blocks sent one at a time to be beaten in turn. Blocks left
+## over stand behind the first need met while time is on this side, and
+## otherwise go for the flag it most wants, since waiting loses. A block
+## bound for a flag that still needs it keeps it, so blocks don't trade
+## places as the enemy moves; then each need takes the nearest free blocks
+## for what it lacks. An enemy block is coming for the flag nearest where
+## it is headed (_lead), within THREAT_REACH. Blocks with objectives of
+## their own are not the side's to send, and blocks in `plan` go where it
+## sends them. Returns each block's flag index, by id.
+static func _allot(b: Battle, team: int, line: Array[Regiment], foes: Array[Regiment], plan: Dictionary) -> Dictionary:
+	var allotted := {}
+	var free: Array[Regiment] = []
+	for r in line:
+		if plan.has(r.id):
+			allotted[r.id] = plan[r.id]
+		elif r.objectives.is_empty():
+			free.append(r)
+	if free.is_empty() or b.flags.is_empty():
+		return allotted
+	var threat: Array[float] = []
+	threat.resize(b.flags.size())
+	threat.fill(0.0)
+	for f in foes:
+		var i := _nearest_flag(b, _lead(b, f), THREAT_REACH)
+		if i >= 0 and f.kind != K.GENERAL:
+			threat[i] += _power(f)
+	var spare := 0.0
+	var centre := Vector2.ZERO
+	for r in free:
+		spare += _power(r)
+		centre += r.pos
+	centre /= free.size()
+	var defend: Array[int] = []
+	var take: Array[int] = []
+	for i in b.flags.size():
+		if b.flags[i].owner != team:
+			take.append(i)
+		elif threat[i] > 0.0:
+			defend.append(i)
+	defend.sort_custom(func(x, y): return threat[x] > threat[y])
+	var cost := func(i: int) -> float: return threat[i] / spare + centre.distance_to(b.flags[i].pos) / TAKE_SPAN
+	take.sort_custom(func(x, y): return cost.call(x) < cost.call(y))
+	var needs: Array = defend.map(func(i): return [i, threat[i]])
+	needs.append_array(take.map(func(i): return [i, threat[i] * TAKE_MARGIN]))
+	# A flag the line can't make good gets nobody, rather than blocks sent
+	# one at a time to be beaten in turn; what it can't win there it keeps
+	# for where it can.
+	var met: Array = []
+	var left := spare
+	for need in needs:
+		if need[1] <= left:
+			met.append(need)
+			left -= need[1]
+	var given: Array[float] = []
+	given.resize(b.flags.size())
+	given.fill(0.0)
+	# Blocks already bound for a flag that needs them stay; then each need,
+	# in turn, takes the nearest free blocks for what it still lacks.
+	for keep in [true, false]:
+		for need in met:
+			var i: int = need[0]
+			while given[i] == 0.0 or given[i] < need[1]:
+				var r := _nearest_to(b.flags[i].pos, free.filter(func(c): return not keep or _bound_flag(b, c) == i), INF)
+				if r == null:
+					break
+				free.erase(r)
+				allotted[r.id] = i
+				given[i] += _power(r)
+	# Blocks left over: while time is on this side, behind the first need it
+	# met; otherwise waiting loses, so at the flag it most wants to take,
+	# even one it can't yet make good.
+	var main := -1
+	if not _time_on_side(b, team) and not take.is_empty():
+		main = take[0]
+	elif not met.is_empty():
+		main = met[0][0]
+	elif not needs.is_empty():
+		main = needs[0][0]
+	for r in free:
+		allotted[r.id] = main if main >= 0 else _nearest_flag(b, r.pos, INF)
+	return allotted
+
+
+## Whether waiting wins for `team` as things stand: the clock would end
+## the battle its way before the flags' drain breaks it; or, with no clock,
+## the flags drain the enemy and not it.
+static func _time_on_side(b: Battle, team: int) -> bool:
+	var ahead := b.flags_held(team) - b.flags_held(1 - team)
+	if b.deadline <= 0.0:
+		return ahead > 0
+	var player_holds := b.flags_held(0) >= b.hold_needed
+	if not b.deadline_flags.is_empty():
+		player_holds = b.deadline_flags.all(func(i): return b.flags[i].owner == 0)
+	if player_holds != (team == 0):
+		return false
+	if ahead >= 0 or b.flag_drain <= 0.0:
+		return true
+	return b.resolve[team] / (b.flag_drain * -ahead) > b.deadline - b.time
+
+
+## Where a block will be in THREAT_LEAD seconds if it keeps on: toward the
+## enemy it is attacking, or along its way.
+static func _lead(b: Battle, r: Regiment) -> Vector2:
+	var to := _bound_for(r)
+	var t := b.get_regiment(r.target_id)
+	if t != null:
+		to = t.pos
+	return r.pos + (to - r.pos).limit_length(r.speed * THREAT_LEAD)
+
+
+## The end of a block's way, or where it stands.
+static func _bound_for(r: Regiment) -> Vector2:
+	return r.waypoints[r.waypoints.size() - 1] if not r.waypoints.is_empty() else r.pos
+
+
+## The flag a block is bound for or stands at, or -1.
+static func _bound_flag(b: Battle, r: Regiment) -> int:
+	return _nearest_flag(b, _bound_for(r), DIVISION_THERE)
+
+
+## The flag nearest `p` within `radius`, or -1.
+static func _nearest_flag(b: Battle, p: Vector2, radius: float) -> int:
+	var best := -1
+	var best_d := radius
+	for i in b.flags.size():
+		var d := p.distance_to(b.flags[i].pos)
+		if d < best_d:
+			best_d = d
+			best = i
+	return best
+
+
 ## Fight what comes within reach; otherwise take the goal, or while
-## holding, stand just short of it on our own side.
+## holding, stand just short of it on our own side. A block in melee fights
+## whoever it is fighting: pointed at another, it would turn to face it and
+## give its flank to the one in front. One closing on an enemy keeps it
+## unless another is clearly better (TARGET_STICK), and one that takes its
+## place faces the nearest enemy, not the way it walked.
 static func _foot(r: Regiment, foes: Array[Regiment], advancing: bool, goal: Vector2, home: Vector2) -> Variant:
+	if not r.contacts.is_empty():
+		return null
 	var reach := 220.0 if r.kind == K.PIKES else 170.0
+	var stand := goal + home * HOLD_SHORT if not advancing else goal
 	var best: Regiment = null
 	var best_score := INF
 	for f in foes:
@@ -293,6 +518,7 @@ static func _foot(r: Regiment, foes: Array[Regiment], advancing: bool, goal: Vec
 			continue
 		var score := d - 60.0 * (Combat.type_mult(r.kind, f.kind) - 1.0)
 		score -= 50.0 if not f.contacts.is_empty() else 0.0
+		score -= TARGET_STICK if f.id == r.target_id else 0.0
 		if r.kind == K.PIKES and UnitTypes.is_mounted(f.kind):
 			score -= 120.0
 		if score < best_score:
@@ -300,9 +526,11 @@ static func _foot(r: Regiment, foes: Array[Regiment], advancing: bool, goal: Vec
 			best = f
 	if best != null:
 		return _attack(r, best)
-	if not advancing:
-		return _move(r, goal + home * HOLD_SHORT)
-	return _move(r, goal)
+	var facing := NAN
+	var near := _nearest_to(stand, foes, INF)
+	if near != null:
+		facing = (near.pos - stand).angle()
+	return _move(r, stand, facing)
 
 
 ## The foot held back: the last `count` by id, always leaving two in line.
@@ -354,8 +582,11 @@ static func _reserve_foot(b: Battle, r: Regiment, line: Array[Regiment], foes: A
 
 
 ## Archers and muskets: step back from foot closing on them, else shoot
-## at the nearest in reach, else keep behind the line.
-static func _archer(b: Battle, r: Regiment, mine: Array[Regiment], foes: Array[Regiment], home_y: float, advancing: bool, use_hills: bool) -> Variant:
+## at the nearest in reach, else keep behind the line, behind pikes where
+## there are any near (PIKE_COVER), since horse won't ride at shooters
+## pikes stand by. They keep with the line while it holds too, so a line
+## that steps up to its flags doesn't leave them behind for horse to take.
+static func _archer(b: Battle, r: Regiment, mine: Array[Regiment], foes: Array[Regiment], home_y: float, use_hills: bool) -> Variant:
 	var shy := ARCHERS_SHY if r.kind == K.ARCHERS else MUSKETS_SHY
 	for f in foes:
 		if UnitTypes.is_ranged(f.kind) or not f.contacts.is_empty():
@@ -368,9 +599,9 @@ static func _archer(b: Battle, r: Regiment, mine: Array[Regiment], foes: Array[R
 	var target := _nearest(r, foes, reach)
 	if target != null:
 		return _attack(r, target)
-	if not advancing:
-		return null
-	var anchor := _nearest_kind(r, mine, [K.SWORDS, K.PIKES])
+	var anchor := _nearest_kind(r, mine, [K.PIKES])
+	if anchor == null or anchor.pos.distance_to(r.pos) > PIKE_COVER:
+		anchor = _nearest_kind(r, mine, [K.SWORDS, K.PIKES])
 	if anchor == null:
 		return null
 	var back := 1.0 if home_y > 0.0 else -1.0
@@ -471,7 +702,28 @@ static func _horse(b: Battle, r: Regiment, foes: Array[Regiment], advancing: boo
 	var near := _nearest(r, foes, 130.0)
 	if near != null and near.kind != K.PIKES:
 		return _attack(r, near)
+	if r.objectives.is_empty():
+		var flag := _free_flag(b, r, foes)
+		if flag >= 0:
+			return _move(r, b.flags[flag].pos)
 	return null
+
+
+## Horse with nothing to ride at takes the nearest flag not yet its side's
+## that no enemy stands near (FREE_REACH): it gets there first, and a flag
+## is held by whoever stands on it alone. -1 when there is none.
+static func _free_flag(b: Battle, r: Regiment, foes: Array[Regiment]) -> int:
+	var best := -1
+	var best_d := INF
+	for i in b.flags.size():
+		var at: Vector2 = b.flags[i].pos
+		if b.flags[i].owner == r.team or _nearest_to(at, foes, FREE_REACH) != null:
+			continue
+		var d := r.pos.distance_to(at)
+		if d < best_d:
+			best_d = d
+			best = i
+	return best
 
 
 static func _general(r: Regiment, mine: Array[Regiment], foes: Array[Regiment], home_y: float) -> Variant:
@@ -493,10 +745,14 @@ static func _general(r: Regiment, mine: Array[Regiment], foes: Array[Regiment], 
 
 
 static func _nearest(r: Regiment, among: Array[Regiment], radius: float) -> Regiment:
+	return _nearest_to(r.pos, among, radius)
+
+
+static func _nearest_to(p: Vector2, among: Array[Regiment], radius: float) -> Regiment:
 	var best: Regiment = null
 	var best_d := radius
 	for f in among:
-		var d := r.pos.distance_to(f.pos)
+		var d := p.distance_to(f.pos)
 		if d < best_d:
 			best_d = d
 			best = f
@@ -545,9 +801,12 @@ static func _horse_near(r: Regiment, foes: Array[Regiment], radius: float) -> bo
 	return foes.any(func(f): return UnitTypes.is_mounted(f.kind) and f.pos.distance_to(r.pos) < radius)
 
 
-## Move only when it changes where the regiment is going.
-static func _move(r: Regiment, to: Vector2) -> Variant:
+## Move only when it changes where the regiment is going; with a
+## `facing`, it turns that way once there.
+static func _move(r: Regiment, to: Vector2, facing := NAN) -> Variant:
 	var heading_to := r.waypoints[r.waypoints.size() - 1] if not r.waypoints.is_empty() else r.pos
 	if heading_to.distance_to(to) < 30.0 and r.target_id < 0:
 		return null
-	return {"type": "move", "id": r.id, "to": to}
+	if is_nan(facing):
+		return {"type": "move", "id": r.id, "to": to}
+	return {"type": "move", "id": r.id, "to": to, "facing": facing}

@@ -30,6 +30,7 @@ func _initialize() -> void:
 ## enter the tree.
 func _run() -> void:
 	var quick := "--quick" in OS.get_cmdline_user_args()
+	_test_classes_come_from_the_source()
 	_test_combat()
 	_test_terrain()
 	_test_fortress()
@@ -40,6 +41,9 @@ func _run() -> void:
 	await _test_grand(quick)
 	await _test_screen_fixes()
 	_test_replay()
+	_test_first_looks()
+	_test_copy()
+	_test_plan_examples()
 	_test_battles(quick)
 	if not quick:
 		_test_budget()
@@ -53,6 +57,15 @@ func _check(ok: bool, what: String) -> void:
 	if not ok:
 		_failures += 1
 		print("FAIL: ", what)
+
+
+## Godot gives a class name to one file: a stale copy elsewhere can take it,
+## and the suite would quietly test the copy.
+func _test_classes_come_from_the_source() -> void:
+	for c in ProjectSettings.get_global_class_list():
+		var path: String = c.path
+		var source := ["res://scripts/", "res://packs/", "res://tests/"].any(func(d): return path.begins_with(d))
+		_check(source, "class %s comes from the source, not %s" % [c.class, path])
 
 
 func _test_combat() -> void:
@@ -725,6 +738,23 @@ func _test_grand(quick: bool) -> void:
 	w.begin()
 	var ids: Array = AI.decide(w, 1, AI.PERSONAS.aggressive).map(func(o): return o.get("id", -1))
 	_check(not guard.id in ids and w.regiments.any(func(r): return r.formation == "Jérôme's Division" and r.holds_until > 0.0), "nobody moves before their hour")
+	# A brigade the player hands to its own command forms its line among the
+	# blocks of that command only, not at the end of a line with the
+	# brigades still in the player's hands, which would leave it outside
+	# the flag's ring: sent to its division's own objective, on a seat of
+	# its own; and sent to another flag.
+	var alten := w.team_regiments(0).filter(func(r): return r.formation == "Alten's Division" and r.kind == K.LINE)
+	var halkett: Regiment = alten[0]
+	var mont_saint_jean: Vector2 = Waterloo.FLAGS[Waterloo.MONT_SAINT_JEAN].at
+	var whole := AI._line(AI._fighting(w, 0), [] as Array[int])
+	var own := AI._line(AI._commanded(w, 0, [halkett.id] as Array[int]), [] as Array[int])
+	_check(alten.size() >= 3 and AI._spot(w, 0, halkett, whole, [] as Array[Vector2], {}).distance_to(mont_saint_jean) > Battle.FLAG_RADIUS, "Halkett's place in Alten's whole line is off Mont-Saint-Jean's ring")
+	_check(AI._spot(w, 0, halkett, own, [] as Array[Vector2], {}).distance_to(mont_saint_jean) < Battle.FLAG_RADIUS, "on a seat of its own, a brigade lines up among that seat's blocks only")
+	var hougoumont: Vector2 = Waterloo.FLAGS[Waterloo.HOUGOUMONT].at
+	w.apply_orders([{"type": "objective", "id": halkett.id, "at": hougoumont}])
+	whole = AI._line(AI._fighting(w, 0), [] as Array[int])
+	_check(AI._spot(w, 0, halkett, whole, [] as Array[Vector2], {}).distance_to(hougoumont) < Battle.FLAG_RADIUS, "a brigade sent to another flag takes its place on that flag")
+	_check(AI._objective(w, 0, PackedVector2Array()) == null and AI._division_spot(w, 0, halkett, [] as Array[Regiment], hougoumont) == hougoumont, "with no objectives there is no objective, and a block alone stands on its own")
 	if quick:
 		return
 	var day := Fights.fight(Scenarios.make_battle(spec, 3), AI.PERSONAS.aggressive, "standard").battle
@@ -754,6 +784,93 @@ func _test_replay() -> void:
 	changed[0].orders.clear()
 	var other := BattleRun.replay(make, seats, changed, Fights.length(played.battle))
 	_check(not same.call(played.battle, other.battle), "the same log without the first orders fights another battle")
+
+
+## The dice set when each seat first looks: die 0 has both look at once,
+## and no two dice of the first think's-worth squared look at the same pair
+## of moments, so in a battle without guns each is a battle of its own.
+func _test_first_looks() -> void:
+	var steps := roundi(AI.THINK_EVERY / Battle.STEP)
+	var pairs := {}
+	for die in steps * steps:
+		var seats := Fights.seats(AI.PERSONAS.balanced, "standard", die)
+		pairs["%d,%d" % [roundi(seats[0].wait / Battle.STEP), roundi(seats[1].wait / Battle.STEP)]] = true
+	var first := Fights.seats(AI.PERSONAS.balanced, "standard", 0)
+	_check(first[0].wait == 0.0 and first[1].wait == 0.0 and pairs.size() == steps * steps, "the dice look at %d pairs of moments in %d" % [pairs.size(), steps * steps])
+
+
+## A copy of a battle and its commanders (BattleRun.copy) fights on as the
+## battle does, to the man, a castle's gates and all, and leaves the battle
+## it was copied from as it was. A planner's look ahead on copies changes
+## nothing but the plan it picks.
+func _test_copy() -> void:
+	for id in ["hold", "last_keep"]:
+		var spec := Scenarios.resolve(id, 1)
+		var played := BattleRun.new(Scenarios.make_battle(spec, 1))
+		for seat in Fights.seats(AI.PERSONAS[spec.persona], "standard", 1):
+			played.add_seat(seat)
+		played.begin()
+		played.run_for(30.0)
+		var copied := played.copy()
+		var before := _state(played.battle)
+		copied.run_for(60.0)
+		_check(_state(played.battle) == before, "fighting a copy of %s leaves the battle as it was" % id)
+		played.run_for(60.0)
+		_check(_state(copied.battle) == _state(played.battle), "a copy of %s fights on as the battle does" % id)
+	var b := Scenarios.make_battle(Scenarios.resolve("hold", 1), 1)
+	b.begin()
+	var planner := Commander.PlannerCommander.new(AI.PERSONAS.balanced, false, AI.PERSONAS.aggressive)
+	planner.horizon = 2.0
+	var before := _state(b)
+	planner.decide(b, 0)
+	_check(_state(b) == before and planner.choice >= -1 and planner.choice < b.flags.size(), "a planner looks ahead on copies and picks one of its ways")
+	# With a budget it fights the same look ahead over the steps between
+	# several looks: the same plans tried from the same moment, the same
+	# scores, the choice landing later.
+	var at_once := {}
+	var spread := {}
+	var whole := Commander.PlannerCommander.new(AI.PERSONAS.balanced, false, AI.PERSONAS.aggressive)
+	var sliced := Commander.PlannerCommander.new(AI.PERSONAS.balanced, false, AI.PERSONAS.aggressive)
+	for p in [whole, sliced]:
+		p.horizon = 8.0
+		p.samples = 1
+	sliced.budget = 8
+	whole.on_choice = func(_at, _side, scores, _c, _ended): at_once.merge(scores)
+	sliced.on_choice = func(_at, _side, scores, _c, _ended): spread.merge(scores)
+	whole.decide(b.copy(), 0)
+	var later := BattleRun.new(b.copy())
+	later.add_seat(BattleRun.Seat.new(1, Commander.AICommander.new(AI.PERSONAS.aggressive)))
+	later.add_seat(BattleRun.Seat.new(0, sliced))
+	var looks := 0
+	while spread.is_empty() and looks < 100:
+		later.run_for(AI.THINK_EVERY)
+		looks += 1
+	whole.on_choice = Callable()
+	sliced.on_choice = Callable()
+	var differ := at_once.values().any(func(v): return v != at_once.values()[0])
+	_check(differ and spread == at_once and looks > 3, "a planner on a budget tries the same plans from the same moment, over %d looks" % looks)
+
+
+## The planner's choices written as data (PlannerData) come out the same
+## to the byte when the battle is fought again, a row per re-plan with a
+## score for every choice it could take.
+func _test_plan_examples() -> void:
+	var spec := Scenarios.resolve("hold", 1)
+	var settings := {"replan": 20.0, "horizon": 2.0, "samples": 1, "length": 45.0}
+	var rows := []
+	for k in 2:
+		var fought := PlannerData.fight(Scenarios.make_battle(spec, 1), 0, AI.PERSONAS.balanced, AI.PERSONAS[spec.persona], 1, "hold:test:0", settings)
+		rows.append(JSON.stringify(fought))
+	var first: Array = JSON.parse_string(rows[0])
+	_check(first.size() == 3 and rows[0] == rows[1], "the planner's choices as data come out the same twice (%d rows)" % first.size())
+	_check(first.all(func(r): return r.state.size() == PlannerData.feature_names().size() and r.legal == [0.0, 1.0, 2.0, 3.0] and r.rollout.size() == 4 and r.ended.size() == 4 and r.decided is bool), "each row has every feature and a score for every choice")
+	var checked := PlannerData.fight(Scenarios.make_battle(spec, 1), 0, AI.PERSONAS.balanced, AI.PERSONAS[spec.persona], 1, "hold:test:0", settings.merged({"eval": 2}))
+	_check(checked.size() == 3 and checked.all(func(r): return r.rollout_eval.size() == 4 and r.rollout_eval_n == 2) and JSON.stringify(checked.map(func(r): return r.label)) == JSON.stringify(first.map(func(r): return int(r.label))), "scoring each choice afresh changes nothing the planner chose")
+
+
+## What a battle is at this moment, to the bit.
+func _state(b: Battle) -> PackedByteArray:
+	return var_to_bytes([b.time, b.resolve, b.killed, b.flags, b.rng.state, b.regiments.map(func(r): return [r.pos, r.facing, r.soldiers, r.morale, r.wound, r.stamina, r.state, r.waypoints])])
 
 
 func _test_battles(quick: bool) -> void:
