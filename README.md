@@ -102,6 +102,11 @@ Studies, all fought through the game's loop:
   re-plan, what its side could see, each choice's rollout score, the
   choice it took, and how the battle came out. Rerun, the same bytes.
 
+`tests/studies.sh NAME ladder plans versus planner` runs any of these in
+parallel, as DESIGN.md measures them, from a copy of the tree (so editing
+doesn't disturb a long run), into `build/studies/NAME`, with `tests/play.py`'s
+report and DESIGN.md's table in its `report.txt`.
+
 See "Play over time" in [docs/DESIGN.md](docs/DESIGN.md).
 
 `tests/shot.tscn` plays a battle on autopilot in a real window and saves

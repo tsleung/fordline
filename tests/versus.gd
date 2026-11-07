@@ -9,7 +9,9 @@ extends SceneTree
 ##   Godot --headless --path . -s tests/versus.gd -- --job=scenario:hold --dice=4
 ##   --job=battle:2 --draws=2 fights a campaign battle; --first=5 starts at the
 ##   sixth draw, to split a long run; --pairs=ai-base,base-ai leaves out the
-##   base rate.
+##   base rate. A pair is player-enemy, each of ai, base, plan (the planner,
+##   its look ahead set by --horizon= and --budget=) or, as the player, person
+##   (the ladder's person-paced commander).
 ## Prints one VS line of JSON per battle for tests/play.py --versus.
 
 const PAIRS := [["base", "base"], ["ai", "base"], ["base", "ai"]]
@@ -32,6 +34,7 @@ func _initialize() -> void:
 	var draws := 1
 	var first := 0
 	var pairs: Array = PAIRS
+	var settings := {}
 	for arg in OS.get_cmdline_user_args():
 		var value := arg.get_slice("=", 1)
 		if arg.begins_with("--job="):
@@ -44,6 +47,10 @@ func _initialize() -> void:
 			first = int(value)
 		elif arg.begins_with("--pairs="):
 			pairs = Array(value.split(",")).map(func(p): return p.split("-"))
+		elif arg.begins_with("--horizon="):
+			settings.horizon = float(value)
+		elif arg.begins_with("--budget="):
+			settings.budget = int(value)
 	var kind := job.get_slice(":", 0)
 	var what := job.get_slice(":", 1)
 	# Only a campaign battle or a Skirmish draws its field and armies anew.
@@ -51,11 +58,11 @@ func _initialize() -> void:
 	for draw in range(first, first + (draws if drawn else 1)):
 		for die in dice:
 			for pair in pairs:
-				print("VS ", JSON.stringify(_fight(kind, what, draw, die, pair[0], pair[1])))
+				print("VS ", JSON.stringify(_fight(kind, what, draw, die, pair[0], pair[1], settings)))
 	quit()
 
 
-func _fight(kind: String, what: String, draw: int, die: int, player: String, enemy: String) -> Dictionary:
+func _fight(kind: String, what: String, draw: int, die: int, player: String, enemy: String, settings: Dictionary) -> Dictionary:
 	var b: Battle
 	var enemy_persona: Dictionary
 	if kind == "scenario":
@@ -73,8 +80,8 @@ func _fight(kind: String, what: String, draw: int, die: int, player: String, ene
 		enemy_persona = AI.PERSONAS[Campaign.BATTLES[index].persona]
 	var fought := BattleRun.new(b)
 	var seats := [
-		BattleRun.Seat.new(1, _commander(enemy, enemy_persona)),
-		BattleRun.Seat.new(0, _commander(player, AI.PERSONAS.balanced)),
+		BattleRun.Seat.new(1, _commander(enemy, enemy_persona, AI.PERSONAS.balanced, settings)),
+		BattleRun.Seat.new(0, _commander(player, AI.PERSONAS.balanced, enemy_persona, settings), Fights.POLICIES.person.every if player == "person" else AI.THINK_EVERY),
 	]
 	for i in seats.size():
 		Fights.first_look(seats[i], i, die)
@@ -87,5 +94,17 @@ func _fight(kind: String, what: String, draw: int, die: int, player: String, ene
 	}
 
 
-func _commander(which: String, persona: Dictionary) -> Commander:
-	return Commander.AICommander.new(persona) if which == "ai" else Baseline.new(persona)
+## A commander of `persona`; a planner reads in the briefing that its rival
+## fights as `rival`.
+func _commander(which: String, persona: Dictionary, rival: Dictionary, settings: Dictionary) -> Commander:
+	match which:
+		"ai":
+			return Commander.AICommander.new(persona)
+		"person":
+			return Commander.PacedCommander.new(persona, false, Fights.POLICIES.person.per_look)
+		"plan":
+			var planner := Commander.PlannerCommander.new(persona, false, rival)
+			planner.horizon = settings.get("horizon", planner.horizon)
+			planner.budget = settings.get("budget", planner.budget)
+			return planner
+	return Baseline.new(persona)
