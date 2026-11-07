@@ -61,6 +61,11 @@ keeps clear of the better-AI branch's files. A misspelt scenario key, an
 unknown map or era, and an unknown order type are now loud errors, and the
 suite fails on any of them. No recorded battle moves.
 
+The same day CI's `ubuntu-latest` moved from Ubuntu 24.04 to 26.04, and its
+maths library moved 18 of the 44 Linux recordings with no change to the
+code. CI now runs on a pinned 24.04; a new image is a deliberate
+re-recording, like a balance change.
+
 ## Open
 
 - A better AI (line concentration, holding ground, a person-paced

@@ -21,7 +21,10 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: the recorded battles in tests/golden-linux.txt
+    # hold for one maths library, and a new image changes its last bits.
+    # Moving to a new image is a deliberate re-recording.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 

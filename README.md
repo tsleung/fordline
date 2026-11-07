@@ -72,7 +72,7 @@ prove the simulation deterministic, then fights the campaign, every quick
 scenario and the grand battles AI against AI, through the same loop the
 game uses (`scripts/battle_run.gd`). Each battle must come out exactly as
 recorded for the platform the suite runs on (`tests/golden-macos.txt`,
-`tests/golden-linux.txt`, which CI uses); after a deliberate change to how
+`tests/golden-linux.txt`, which CI uses on a pinned Ubuntu 24.04); after a deliberate change to how
 battles come out, `./test.sh --record` records them again for this
 platform, in the same commit. The other platform's file is then updated
 from CI's report of what it got: each line it fails on says what it was

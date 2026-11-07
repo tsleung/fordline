@@ -253,9 +253,13 @@ not loaded, the pack is left out of the menus and the suite says so.
   different battle: on 1 November 2026, 21 of 44 battles came out
   differently on CI's Linux than on macOS. So each platform keeps its own
   recording, and the studies, which measure many battles, are what holds
-  across platforms, including the web build players run. A change that moves any of them fails until the
-  file is updated in the same commit, so every balance change is a visible,
-  deliberate diff.
+  across platforms, including the web build players run. The platform
+  includes the system's maths library, so CI runs on a pinned image
+  (Ubuntu 24.04): on 7 November 2026 `ubuntu-latest` moved to 26.04 and 18
+  of the 44 came out differently with no change to the code. Moving to a
+  new image is a deliberate re-recording. A change that moves any of them
+  fails until the file is updated in the same commit, so every balance
+  change is a visible, deliberate diff.
 - **Modules don't leak.** A pack that lists a module whose data its
   scenarios don't use must fight exactly as the core does; and the packs
   that use several modules are recorded together, so modules are tested in
