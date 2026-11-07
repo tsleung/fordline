@@ -59,8 +59,9 @@ on a flag of their own now fight whatever comes within their reach, not
 only what crosses to them: against the AI of 1 November the AI wins 55% of
 416 battles from both ends, where it had been even, and 36 of the 44
 recorded battles moved (12 changed winner). Eleven other changes to the
-line's rules, and the AI at a person's pace at three speeds, measured within
-the noise and were not kept. The planner thinks between its looks on a
+line's rules, the AI at a person's pace at three speeds, and an attacker
+that keeps to its plan longer, measured within the noise and were not
+kept. The planner thinks between its looks on a
 budget; as the enemy it is barely harder than the AI. The suite now fails
 when a class name is taken by a stray copy: an old probe of the AI under
 `build/` had taken it, and the suite fought the probe.

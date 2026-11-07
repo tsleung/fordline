@@ -40,6 +40,7 @@ func _run() -> void:
 	_test_scenarios()
 	await _test_grand(quick)
 	_test_replay()
+	_test_first_looks()
 	_test_copy()
 	_test_plan_examples()
 	_test_battles(quick)
@@ -631,6 +632,19 @@ func _test_replay() -> void:
 	changed[0].orders.clear()
 	var other := BattleRun.replay(make, seats, changed, Fights.length(played.battle))
 	_check(not same.call(played.battle, other.battle), "the same log without the first orders fights another battle")
+
+
+## The dice set when each seat first looks: die 0 has both look at once,
+## and no two dice of the first think's-worth squared look at the same pair
+## of moments, so in a battle without guns each is a battle of its own.
+func _test_first_looks() -> void:
+	var steps := roundi(AI.THINK_EVERY / Battle.STEP)
+	var pairs := {}
+	for die in steps * steps:
+		var seats := Fights.seats(AI.PERSONAS.balanced, "standard", die)
+		pairs["%d,%d" % [roundi(seats[0].wait / Battle.STEP), roundi(seats[1].wait / Battle.STEP)]] = true
+	var first := Fights.seats(AI.PERSONAS.balanced, "standard", 0)
+	_check(first[0].wait == 0.0 and first[1].wait == 0.0 and pairs.size() == steps * steps, "the dice look at %d pairs of moments in %d" % [pairs.size(), steps * steps])
 
 
 ## A copy of a battle and its commanders (BattleRun.copy) fights on as the

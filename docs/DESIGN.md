@@ -397,7 +397,10 @@ studies' dice now also set when each commander first looks, a few steps
 into its think (`Fights.seats`). On the knife edge that is another battle:
 Hold the Fords, standard against its attacker, over eight such offsets is
 5 won and 3 lost. Die 0 is the old timing, so the recorded battles did not
-move. Everything in this section is measured this way, the old AI too.
+move. Everything in this section is measured this way, the old AI too. A
+think is 23 steps, so 23 dice on the first seat's moments come round again;
+each such lap shifts the player's first look a step more, so the dice past
+it fight other battles, not the same ones again (the suite checks 529).
 
 Every quick scenario and campaign battle, AI against AI through the game's
 own loop (`tests/luck_skill.gd`, reported by `tests/play.py`; `tests/studies.sh
@@ -480,7 +483,10 @@ Against the targets:
   (±5). Attacking a held crossing it does better; holding one, or
   commanding a campaign army, worse (with it as the enemy, the AI as the
   player wins 59% of the designed battles, against 41% when the enemy is
-  the AI itself).
+  the AI itself). Nor is it that an attacker should keep to its plan: the
+  AI thinking its line out only every 2 or 4 s while time is not on its
+  side, and at every look while it is, wins 51% and 49% of 416. What the
+  person-paced commander does better there is not yet known.
 - **Some battles got much harder for the player's side.** Riders at Dawn is
   won by no AI player but the person-paced one (38%) and the planner (50%):
   the enemy there is the AI at its strongest (the yardstick as the player wins
@@ -580,6 +586,8 @@ plan clock, 1 November, was weaker, 42% against 50%):
 | the AI at a person's pace: one order every 2 s | 46% | 41% |
 | one order a look | 49% | 46% |
 | two orders a look | 50% | 52% |
+| the line thought out every 4 s while time is not on its side, at every look while it is | 50% | 47% |
+| the same, every 2 s | 50% | 54% |
 
 None is better from both ends beyond the noise. Without the shooters',
 the facing or the idle horse's rule the AI is no weaker either; they stay
