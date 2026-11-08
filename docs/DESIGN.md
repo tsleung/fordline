@@ -523,7 +523,12 @@ Hold the Fords, standard against its attacker, over eight such offsets is
 move. Everything in this section is measured this way, the old AI too. A
 think is 23 steps, so 23 dice on the first seat's moments come round again;
 each such lap shifts the player's first look a step more, so the dice past
-it fight other battles, not the same ones again (the suite checks 529).
+it mostly fight other battles. Not all: a seat looks once its wait has run
+out, so a wait of one step looks at the first step as no wait does, and
+in the planner dataset 11 of 800 battles past the first lap repeat one
+(dice 32 and 55, 64 and 87). Putting each first look at an exact step would
+end it, and move dice 1 onward in every study, so it waits for the next
+re-measure.
 
 Every quick scenario and campaign battle, AI against AI through the game's
 own loop (`tests/luck_skill.gd`, reported by `tests/play.py`; `tests/studies.sh
