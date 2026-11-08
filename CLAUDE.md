@@ -47,3 +47,25 @@ the log is never committed here, and `test.sh` fails if it is tracked.
 - The design numbers in `docs/DESIGN.md` must match the code.
 - Scripts and probes never launch an installed browser; use Godot's own
   window, the Claude browser pane, or Playwright's bundled Chromium.
+- In `DESIGN.md`, a section headed "not built" holds proposals; its numbers
+  are not the code's yet. When you build one, make it the rule and move the
+  numbers.
+
+## Running things
+
+- **What's next:** `docs/HISTORY.md`, "Open".
+- **The suite can take over ten minutes** when other sessions load this
+  machine, so run it in the background. `./test.sh --quick` is the fast one.
+- **Read the suite's own exit code before committing.** Piping it through
+  `grep` hid a failure once, and a broken commit went out. macOS `sed` has no
+  `\b`.
+- **A failed recorded battle may not be your change.** Check first whether
+  the CI image or the platform moved; compare the runner image in the logs of
+  the last green run. See `docs/ARCHITECTURE.md`, "Staying stable", for how
+  recordings are made on each platform.
+- **`scripts/ai.gd` and the studies belong to the better-AI branch** until it
+  lands. Don't change them on main before then.
+- **In tests,** `root.push_input(e, true)` needs its `true` to use viewport
+  coordinates.
+- **A wrapped `Label`:** the ellipsis collapses wrapped lines in this Godot
+  version; limit it with `max_lines_visible` alone.

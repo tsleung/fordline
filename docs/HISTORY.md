@@ -66,10 +66,40 @@ maths library moved 18 of the 44 Linux recordings with no change to the
 code. CI now runs on a pinned 24.04; a new image is a deliberate
 re-recording, like a balance change.
 
+## 8 November: what play found, and the plan
+
+The owner played a siege and found the safest line was the only line and
+nothing threatened it, and saw that quick battles never picked up Rifles or
+Line. The diagnosis and the plan are in `DESIGN.md`, under "Next". He agreed
+the order below; nothing in it is built yet.
+
 ## Open
 
-- A better AI (line concentration, holding ground, a person-paced
-  commander, an in-battle planner): `tsleung/fordline` pull request 1.
-- The rest of the architecture's migration (kinds as data once the AI
+In the agreed order:
+
+1. **Two more eras:** Line and Square, Rifle and Gun. `DESIGN.md`, "Next: two
+   more eras".
+2. **A gun-line player** that measures the siege slog. `DESIGN.md`, "Next:
+   gates that matter", step 1.
+3. **Gate rules:** the gatehouse shoots the ram, battlements against
+   cannonballs, a gate that can be read. Step 2 there; measure again after.
+4. **The sally and the relief column,** once the better-AI branch lands.
+   Step 3 there.
+
+Alongside:
+
+- **The better AI:** `tsleung/fordline` pull request 1, branch
+  `claude/better-ai-e7639b`, worktree `.claude/worktrees/better-ai-e7639b`.
+  Main is merged into it at `11e4c15`; its suite passes (2,761 checks) and it
+  can merge. Its body has the numbers and what wasn't kept. Merging it moves
+  36 of the 44 recorded battles, and CI then fails until
+  `tests/golden-linux.txt` is updated from that run's report; deploy resumes
+  on the push after. Landing it before step 1 would save measuring the new
+  eras twice. Still open on it: the person-paced commander's lead in designed
+  battles has no known cause.
+- **The planner dataset:** generated on that branch by
+  `tests/plan_examples.gd`, for a language-model experiment outside this
+  repo. It has not been handed over.
+- **The rest of the architecture's migration** (kinds as data once the AI
   branch lands, the module contract, fortifications as the first module):
-  `ARCHITECTURE.md`, "Migration".
+  `ARCHITECTURE.md`, "Migration". Collaborative generals are its last step.

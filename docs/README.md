@@ -9,6 +9,7 @@ Start with the question you have.
 | know how it plays, measured | [`DESIGN.md`](DESIGN.md), "Play over time": the targets for each time horizon, what was measured, and the AI audit |
 | change the engine or add a mechanic | [`ARCHITECTURE.md`](ARCHITECTURE.md): one writer, the battle loop and seats, recorded battles, modules and packs, solving the game, worked examples for air and navies |
 | know what was built when, and why | [`HISTORY.md`](HISTORY.md) |
+| know what comes next | [`HISTORY.md`](HISTORY.md), "Open": the agreed order, and where the AI branch stands; [`DESIGN.md`](DESIGN.md), "Next": the plans in detail |
 | work on it as an agent | [`../CLAUDE.md`](../CLAUDE.md): the rules for editing, and the private paths |
 
 ## The code, by file

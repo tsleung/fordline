@@ -241,6 +241,13 @@ built, so a misspelt or unowned key is an error naming it, and its map
 kind must be a core one or one its modules provide. If a pack's module is
 not loaded, the pack is left out of the menus and the suite says so.
 
+To add an era: write `packs/<name>.gd` with a `class_name`, a `PACK` holding
+its `era` (id, name, the kinds a Skirmish draws) and its scenarios, and add it
+to `Packs.ALL`, oldest era first. `packs/registry.gd` documents every field;
+`packs/pike_shot.gd` is the one to copy. The tabs, the list, the map previews
+and the suite's scenario battles all read the registry, so no other code
+changes. Then record the new battles (below).
+
 ## Staying stable
 
 - **Recorded battles.** The suite fights fixed battles through the one
@@ -260,6 +267,15 @@ not loaded, the pack is left out of the menus and the suite says so.
   new image is a deliberate re-recording. A change that moves any of them
   fails until the file is updated in the same commit, so every balance
   change is a visible, deliberate diff.
+
+  Recording on macOS is `./test.sh --record`. Linux has no local run: CI
+  runs only on a push to main, and a change that moves battles fails the
+  publish job until `tests/golden-linux.txt` is updated from that run's
+  "now" lines, in a second push. Dispatching the workflow on a branch would
+  avoid that, but a run that passes also publishes to the live site. One
+  gap: `_compare_golden` prints no line for a battle not yet recorded, so
+  CI's report can't fill in a new scenario. Have it print the line when
+  adding the next one.
 - **Modules don't leak.** A pack that lists a module whose data its
   scenarios don't use must fight exactly as the core does; and the packs
   that use several modules are recorded together, so modules are tested in

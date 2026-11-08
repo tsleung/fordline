@@ -214,6 +214,132 @@ three stars. On a fixed map the AI players' results barely vary with the
 dice, so an army composition tends to be all or nothing for them; the
 stars, not the win rate, carry the difficulty.
 
+### Next: two more eras (not built)
+
+Quick battles don't cover every kind. Rifles appear only in Gettysburg, and
+Line infantry with its squares only in Waterloo. Agreed order: first after
+the docs (see `HISTORY.md`, "Open"). The scenarios below are a starting
+proposal; change them if play says so.
+
+**Line and Square** (draws Line, Line, Line, Cavalry, Cannons):
+
+| Scenario | Ground | Armies | Teaches |
+|---|---|---|---|
+| Skirmish | a new field each time | drawn, the same on both sides | squares against horse, on any field |
+| Receive Cavalry | the ridge | 5 Line, 1 Guns against 4 Cavalry, 2 Guns | stand to form square, then their guns find the square: when to break it |
+| Horse and Guns | roads | 3 Cavalry, 2 Guns, 2 Line against 5 Line, 1 Cavalry | threaten with horse to force squares, then shoot them: a square fires at half |
+| Line at the Fords | fords, deploy at the river | 4 Line, 1 Guns against 4 Line, 2 Cavalry; hold one at 3:00 | volleys on men wading |
+| The Bridge at Dawn | bridges, barrage | 4 Line, 2 Guns, 1 Cavalry against 4 Line, 1 Guns; hold both at 5:00 | forcing a crossing: horse over the water keeps them in square, firing at half |
+
+**Rifle and Gun** (draws Rifles, Rifles, Rifles, Cavalry, Cannons):
+
+| Scenario | Ground | Armies | Teaches |
+|---|---|---|---|
+| Skirmish | a new field each time | drawn, the same on both sides | long reach on any field |
+| Open Ground | the ridge | 6 Rifles against 4 Rifles, 2 Guns, dug in | crossing open ground kills; go round |
+| Into the Trees | woods | 4 Rifles, 1 Cavalry, 1 Guns against 5 Rifles | trees halve fire: fight for the woods |
+| Shoot the Gunners | roads | 4 Rifles, 1 Cavalry against 2 Rifles, 4 Guns | each battery is only twelve men; close to 230 and shoot them |
+| Hold the Creek | fords, deploy at the river | 4 Rifles, 1 Guns against 5 Rifles, 1 Cavalry; hold one at 3:00 | reach against men who must wade |
+
+What to know before building them:
+
+- **The stats are unmeasured here.** Rifles and Line were tuned for grand
+  battles, at `pace` 0.4. Quick battles run at pace 1. The one thing the
+  Rifle era needs from them is that a frontal charge into rifles is suicide,
+  and nothing has checked that. Changing a kind's stats moves the Gettysburg
+  and Waterloo recordings.
+- **Only forests give cover on generated maps.** `Terrain.cover` halves fire
+  in forests and towns, and towns exist only on hand-drawn fields. Nothing
+  blocks a line of sight, so a brief can't promise a reverse slope.
+- **The AI handles both kinds in `AI._rifle`**, not `_foot`. The better-AI
+  branch's rule that foot fight what comes in reach of a flag they hold is in
+  `_foot`, so check whether these kinds should have it too.
+- **Four era tabs must fit a phone.** The tabs are an `HBoxContainer` in
+  `show_scenarios` in `main.gd`. This section said earlier that a range slider is the
+  next step at four eras; check the tabs at phone width first, and only build
+  the slider if they don't fit.
+- **The target is the existing one:** three to five minutes; each scenario
+  won by some ways of playing and lost by others; no AI player averaging
+  three stars. Measure with the ladder, and add the rows to the tables above.
+- **Measure again after the better-AI branch lands.** It moves how battles
+  come out.
+
+How to add an era is in `ARCHITECTURE.md`, "Packs".
+
+### Next: gates that matter (not built)
+
+The owner played The Breach at Greyhold on 7 November 2026: the only thing
+to do was aim the guns at their guns, then shoot out their muskets. It felt
+like a slog with no threat, once their horse had died at the start. Reading
+the code (not yet measured) says why:
+
+- **Guns clear the walls for free.** Guns reach 430; muskets on the wall-walk
+  reach 212, with the height. Battlements stop 70% of arrows and shot
+  (`Terrain.cover`) and nothing of a cannonball (`Battle._blast`). The
+  garrison's gun outranges yours (537) but is one against three.
+- **The garrison never threatens you.** Its foot fight only what is inside
+  (`foot_foes` in `AI.decide`). Its horse is the only part that comes out, and
+  it comes alone and early.
+- **The gate is a health bar.** `Battle._ram` costs the ram nothing from the
+  gate itself, and `_hit_gate` does nothing but open the way.
+- **Nothing forces your hand.** Six minutes, no enemy coming, and flags that
+  don't drain in a siege. The safe line is always the best line.
+
+The direction, agreed on 8 November 2026: **make the gate a door both sides
+gamble on.** The steps are in order, and the numbers are starting values to
+tune by measuring.
+
+1. **Measure the slog first: a gun-line player.** A `Commander` in
+   `tests/fights.gd` that plays what the owner played. Guns stand inside 430
+   of the wall-walk's posts (`Terrain.posts`) and beyond the muskets' 212;
+   they shoot enemy guns, then shooters. Everyone else stands with the guns.
+   When no enemy shooter is left fighting, guns bombard the gate, foot ram it,
+   and then go for the flags. Fight `storm` and `breach` on eight dice and
+   report win, time, own losses, when the walls were clear and when the gate
+   fell. Expected today: it nearly always wins, cheaply. Target: after step 2
+   it costs more men or time than a mixed assault, and after step 3 it can
+   lose.
+2. **Rules only, no AI.**
+   - **The gatehouse shoots the ram.** While a gate stands, it fires on the
+     regiment `_ram` picks. It can't be silenced, and it stops when the gate
+     falls. Both gates do this. Start at about a third of a 48-man regiment
+     over a ram alone (about 156 s for the outer gate, at 0.04 per man per
+     second). Ramming becomes quick and bloody; guns stay safe and slow. Show
+     it with the existing arrows so it can be seen. The holder gets it in The
+     Last Keep too, so measure that one again.
+   - **Battlements take half of each cannonball** (and barrage shell) on the
+     wall-walk. `_blast` kills whole men, so halve the kills. If that takes a
+     random draw, draw only for men on the wall-walk, so open-field recordings
+     stay put.
+   - **The gate can be read.** A pure `Battle.gate_pressure(g)`, sharing its
+     choice of ram with `_ram`, gives what is battering the gate and how fast.
+     The bar in `units_view.gd` shows how long the gate has left. The briefs
+     and the help in `main.gd` say the rule in a line.
+3. **The garrison's answer, after the better-AI branch lands** (both rewrite
+   `ai.gd`).
+   - **Sally.** The garrison comes out through its own gate at guns left
+     unguarded, instead of its horse riding out alone. The gate is open while
+     the holder's men are in the gateway, and open to everyone: today
+     `Terrain.walled` lets only the holder through, whatever is happening. So
+     a sally risks the castle. The attacker has to guard the guns, and can
+     catch a sally and storm in behind it. There is no new control, and the
+     player gets the same gamble in The Last Keep. This moves the siege
+     recordings once.
+   - **A relief column at a stated time**, up the road behind the guns. A slow
+     siege runs out of time and the guns must face two ways. `Battle.arrivals`
+     already works on any battle, but `Scenarios.make_battle` reads
+     `arrivals` only for grand battles, in hours. `AI.decide` also makes the
+     whole holding side a garrison, so a relief force would just walk to the
+     gate; it needs orders of its own.
+
+An idea not in the agreed order: make the moment the gate falls count, with a
+shock to the garrison's resolve and its foot charging into the gateway.
+Consider it once the steps above have been measured.
+
+All of this belongs to the fortifications module when the migration gets
+there (`ARCHITECTURE.md`, step 7). Until then it goes in the core, kept
+together so it moves out whole.
+
 ## Grand battles
 
 The second way to play. Quick battles and the campaign are arcade: one
