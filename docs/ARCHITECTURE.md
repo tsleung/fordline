@@ -268,14 +268,16 @@ changes. Then record the new battles (below).
   fails until the file is updated in the same commit, so every balance
   change is a visible, deliberate diff.
 
-  Recording on macOS is `./test.sh --record`. Linux has no local run: CI
-  runs only on a push to main, and a change that moves battles fails the
-  publish job until `tests/golden-linux.txt` is updated from that run's
-  "now" lines, in a second push. Dispatching the workflow on a branch would
-  avoid that, but a run that passes also publishes to the live site. One
-  gap: `_compare_golden` prints no line for a battle not yet recorded, so
-  CI's report can't fill in a new scenario. Have it print the line when
-  adding the next one.
+  Recording on macOS is `./test.sh --record`. Linux has no local run, so
+  record it on CI before main moves: push the change to a branch and run
+  the workflow there (`gh workflow run pages.yml --ref <branch>`). Its Test
+  step fails with a "was" and a "now" line for each moved battle;
+  `tests/golden-linux.txt` takes the "now" lines. Take them only from a run
+  whose runner image matches the last green run on main. A branch run never
+  publishes: the Pages environment deploys from main alone. One gap:
+  `_compare_golden` prints no line for a battle not yet recorded, so CI's
+  report can't fill in a new scenario. Have it print the line when adding
+  the next one.
 - **Modules don't leak.** A pack that lists a module whose data its
   scenarios don't use must fight exactly as the core does; and the packs
   that use several modules are recorded together, so modules are tested in
@@ -295,8 +297,9 @@ them once, deliberately.
 
 Steps 1, 2 and 5 are done, with the small parts of step 4 that touch only
 the specs and the order dispatch (6 November 2026). Packs went ahead of
-kinds on purpose: the better-AI branch owns `ai.gd` and the studies, and
-kinds as data rewrite them, so steps 3 and the rest of 4 wait for it to land.
+kinds on purpose: kinds as data rewrite `ai.gd` and the studies, which the
+better-AI branch was rewriting too. It landed on 8 November 2026, so step 3
+and the rest of 4 can go ahead.
 
 1. **One clock and one loop.** The commander loop and seats in the core,
    stepping at `Battle.STEP`; the screen, the suite and the balance studies
@@ -330,41 +333,118 @@ files, so they run one after another in one session.
 ## Solving the game: search and learning
 
 The studies need many battles, and a stronger AI needs to try plans before
-it commits to one. What that costs today, and what would make it cheaper.
+it commits to one. What that costs, what was built to try it, and what it
+found (1 November 2026).
 
-**Today.** A quick battle is 3,000–6,000 steps of a third to one
-millisecond: one to five seconds of computer time. A plan search of forty
-plans on three dice takes about six minutes on one core; ten cores run ten.
-That is enough for searching plans and for studies of a few thousand
-battles. Reinforcement learning, which wants hundreds of thousands of
-battles at least, would take days per experiment.
+**The cost.** A quick battle is 3,000–6,000 steps of a third to one
+millisecond: one to five seconds of computer time on a free core. A plan
+search of thirty plans on three dice is about ninety battles. Studies of a
+few thousand battles fit in an afternoon on ten cores. Reinforcement
+learning, which wants hundreds of thousands of battles at least, would take
+days of computer per experiment.
 
-**What makes it cheaper, most value for least cost first:**
+**Built for it.**
 
-1. **Decisions as plans, at a person's pace.** The plan search already
-   shows the useful space: each block to a flag, held back, or on the
-   line, decided every so often rather than every 0.75 s. That shrinks
-   what a search or a learner must choose from to a few options per block,
-   and it is also how a person plays. Cost: low; the AI already executes
-   objectives.
-2. **Soldiers as a view, not the simulation.** Today each soldier is
+- **Copies.** `Battle.copy()` copies a battle as it stands, down to its
+  random numbers, and `BattleRun.copy()` copies its commanders with it:
+  fought on, the copy fights the same battle, which the suite checks 60 s
+  on, a castle's gates included. A copy takes a few milliseconds, so trying
+  a plan costs only the fighting. (Godot passes packed arrays by
+  reference; the copy duplicates them.)
+- **Plans as values.** A commander keeps a plan, where each block of its
+  line goes (block id to flag index), thinks it out with `AI.allot`, and
+  hands it to `AI.decide`, which carries it out; the AI stays a pure
+  function and the commander holds the one piece of state. A planner is a
+  commander that picks its plan another way. The plan can be thought out
+  at every look or more slowly (`rethink`): every 4 s stopped blocks going
+  back and forth when the battle wavered around a threshold, but cost more
+  in strength than it saved, so the AI thinks at every look.
+- **The planner.** `Commander.PlannerCommander`: every 20 s it tries the
+  AI's own allotment and the whole line sent to each flag, each on a copy
+  fought 30 s ahead, and keeps the one that leaves it furthest ahead. It
+  fights about seven battles' worth of steps per battle: fine for studies,
+  too slow to run live on a phone at 4×.
+
+**What it found.** On the quick scenarios, four dice each, the planner
+wins 69% (36 of 52) where the standard commander, the same AI without the
+look ahead, wins 41% (sharp 48%). It is nowhere worse, and it wins Riders
+at Dawn and the Great Battery, which no commander on the ladder wins once.
+The rollouts draw dice of their own (`Battle.reseed`): a copy keeps the
+battle's random numbers, and without the reseed the planner would see
+where the guns' shot was going to fall.
+
+How much look ahead it needs (2 November 2026, the thirteen quick
+scenarios on eight dice, 104 battles a column, standard on the same
+battles 44%): one rollout per choice wins 76%, two 70%, so one is enough;
+but a 10 s look ahead wins 44%, no better than none. The planner has to see
+about 30 s on, which is four rollouts of 900 steps every 20 s: some six
+rollout steps for each step of the battle, so the battle costs about seven
+times as much. On a desktop at 1× that is a few milliseconds a frame; on a
+phone at 4× it is too much. A `budget` spreads the search over every step of
+the battle (`Commander.between_looks`; the suite checks the same plans are
+tried from the same moment), so no frame carries it, and the choice lands as
+long after that moment as the search took: 10 s at twelve rollout steps a
+step, 20 s at six. Distilling the planner is the way to a phone.
+
+Whether it would make a harder enemy (7 November 2026, the designed battles
+and mirror Skirmishes, 208 battles a column, ±7): barely, and not once it
+fits a frame. The person-paced player wins 48% against the AI and 43%
+against the planner, the AI as the player 40% and 34%. On a budget it is no
+harder than the AI: 50% and 43% at twelve rollout steps a step, 53% and 37%
+at six. The same search is worth 30 points as the player (DESIGN.md, the AI
+audit); why so much less as the enemy is not measured. So the game keeps the
+AI as its enemy, and offers no planner as a hard setting; this is the current
+reading, open to what play shows.
+
+**What would make it cheaper**, most value for least cost first:
+
+1. **Soldiers as a view, not the simulation.** Today each soldier is
    simulated and his place matters: which men fall first, what a cannonball
    hits. Simulating each regiment as a whole (men as a count, a blast's
    toll from how much of the block it covers) would cut about a quarter of
-   each step, take away much of the knife edge (one dropped order flipping
-   a battle), and leave a state of a few numbers per regiment that a
-   search or a learner can read. The screen still draws every soldier.
-   Cost: moderate, and every recorded battle moves once.
-3. **A faster core.** Porting the battle step to native code would make it
+   each step, take away much of the knife edge, and leave a state of a few
+   numbers per regiment that a search or a learner can read. The screen
+   still draws every soldier. Cost: moderate, and every recorded battle
+   moves once.
+2. **A faster core.** Porting the battle step to native code would make it
    tens of times faster. The recorded battles would be its specification:
    the port is done when they all come out the same. Cost: high; worth it
    only if learning becomes the plan.
 
-**The recommendation.** No learning yet. Build a planner that searches
-plans during the battle (re-plan every twenty seconds, try a handful of
-plans a short way ahead from the current state, pick the best) once soldiers
-are a view and a battle can be copied cheaply. It is the stronger AI, the
-honest ceiling for balance, and the teacher a learner would need later.
+**The verdict on learning: not now.** Measured, three things stand against
+it:
+
+- **Cost.** A hundred thousand battles is four to six days of one core,
+  before a learner exists: GDScript has none, so it would be a Python
+  learner driving headless Godot over a pipe.
+- **The knife edge.** Changing when one commander first looks by a few
+  steps turns one battle of Hold the Fords into another (eight offsets: 5
+  won, 3 lost); taking one order out of a logged battle flips the winner a
+  third of the time. A learner's reward for a small change of policy is
+  mostly that noise, which multiplies the battles it needs.
+- **The gap is reachable without it.** The planner finds what there is
+  to find in where the line goes, 28 points of win rate over the AI it
+  is built on, with no learning: a search over a handful of plans with
+  the true rules. What it leaves is tactics (pikes against horse, the
+  general's place, the back-and-forth around thresholds), which are
+  cheaper to write and measure than to learn.
+
+What would change the verdict: soldiers as a view (cheaper battles, a
+smoother edge, a small state to learn from), and a planner that clearly
+beats the heuristics but is too slow to ship. Then learning has one job:
+distilling the planner into a policy fast enough for a phone, learned from
+the planner's choices rather than from wins and losses.
+
+The data for that job is written by `tests/plan_examples.gd`: a row per
+re-plan with 33 numbers for what the side sees (per flag: owner, capture
+progress, each side's strength there; then the clock, resolve and each
+arm's strength), the rollout score of each of the four choices, the one
+taken, and the outcome. Two scores fit it: per-decision regret (the best
+choice's rollout score minus the chosen one's), a pure function over the
+file; and the win rate with the learned chooser fought as a commander,
+which only the simulator can give. A learned chooser has to run in GDScript
+in a single-threaded web build, with the heuristic allotment as its
+fallback when it is unsure.
 
 ## Air: a worked example
 
