@@ -71,7 +71,8 @@ static func seats(enemy_persona: Dictionary, policy: String, die := 0) -> Array:
 ## into its think, by `die`. A think's worth of dice on, the first seat's
 ## moments come round again, so each lap shifts the later seats a step more:
 ## the dice below a lap time as they always did, and those past it fight
-## other battles rather than the same ones again.
+## other battles, but where one seat waits no step and the other one step:
+## both look at the first step.
 static func first_look(seat: BattleRun.Seat, index: int, die: int) -> void:
 	var steps := maxi(1, roundi(seat.every / Battle.STEP))
 	@warning_ignore("integer_division")
