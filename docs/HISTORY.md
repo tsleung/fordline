@@ -66,12 +66,35 @@ maths library moved 18 of the 44 Linux recordings with no change to the
 code. CI now runs on a pinned 24.04; a new image is a deliberate
 re-recording, like a balance change.
 
-## 8 November: what play found, and the plan
+## 7 November: a stronger line, and what the planner is worth
+
+The studies run from one command (`tests/studies.sh`), on eight dice. Foot
+on a flag of their own now fight whatever comes within their reach, not
+only what crosses to them: against the AI of 1 November the AI wins 55% of
+416 battles from both ends, where it had been even, and 36 of the 44
+recorded battles moved (12 changed winner). Eleven other changes to the
+line's rules, the AI at a person's pace at three speeds, and an attacker
+that keeps to its plan longer, measured within the noise and were not
+kept. The planner thinks between its looks on a budget; as the enemy it is
+barely harder than the AI. The suite now fails when a class name is taken
+by a stray copy: an old probe of the AI under `build/` had taken it, and
+the suite fought the probe.
+
+Decisions: a change to the AI is kept only when it beats the AI it would
+replace from both ends beyond the noise; a rule that measures as neither
+stays; the game's enemy stays the AI, not the planner.
+
+## 8 November: what play found, the plan, and the better AI lands
 
 The owner played a siege and found the safest line was the only line and
 nothing threatened it, and saw that quick battles never picked up Rifles or
 Line. The diagnosis and the plan are in `DESIGN.md`, under "Next". He agreed
-the order below; nothing in it is built yet.
+the order below.
+
+The better AI (`tsleung/fordline` pull request 1) merged first, so the new
+eras are measured once, against the AI they will ship with. Its 36 moved
+battles were re-recorded on Linux from a CI run on the pinned 24.04 before
+main moved, so main stayed green.
 
 ## Open
 
@@ -83,23 +106,16 @@ In the agreed order:
    gates that matter", step 1.
 3. **Gate rules:** the gatehouse shoots the ram, battlements against
    cannonballs, a gate that can be read. Step 2 there; measure again after.
-4. **The sally and the relief column,** once the better-AI branch lands.
-   Step 3 there.
+4. **The sally and the relief column.** Step 3 there.
 
 Alongside:
 
-- **The better AI:** `tsleung/fordline` pull request 1, branch
-  `claude/better-ai-e7639b`, worktree `.claude/worktrees/better-ai-e7639b`.
-  Main is merged into it at `11e4c15`; its suite passes (2,761 checks) and it
-  can merge. Its body has the numbers and what wasn't kept. Merging it moves
-  36 of the 44 recorded battles, and CI then fails until
-  `tests/golden-linux.txt` is updated from that run's report; deploy resumes
-  on the push after. Landing it before step 1 would save measuring the new
-  eras twice. Still open on it: the person-paced commander's lead in designed
-  battles has no known cause.
-- **The planner dataset:** generated on that branch by
-  `tests/plan_examples.gd`, for a language-model experiment outside this
-  repo. It has not been handed over.
-- **The rest of the architecture's migration** (kinds as data once the AI
-  branch lands, the module contract, fortifications as the first module):
-  `ARCHITECTURE.md`, "Migration". Collaborative generals are its last step.
+- **Why the person-paced commander leads in the designed battles.** Not its
+  pace and not plan commitment; the cause is not known. `DESIGN.md`, the AI
+  audit.
+- **The planner dataset:** written by `tests/plan_examples.gd` at `fa0a272`,
+  for a language-model experiment outside this repo. It has not been handed
+  over.
+- **The rest of the architecture's migration** (kinds as data, the module
+  contract, fortifications as the first module): `ARCHITECTURE.md`,
+  "Migration". Collaborative generals are its last step.

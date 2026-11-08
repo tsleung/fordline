@@ -9,7 +9,7 @@ Start with the question you have.
 | know how it plays, measured | [`DESIGN.md`](DESIGN.md), "Play over time": the targets for each time horizon, what was measured, and the AI audit |
 | change the engine or add a mechanic | [`ARCHITECTURE.md`](ARCHITECTURE.md): one writer, the battle loop and seats, recorded battles, modules and packs, solving the game, worked examples for air and navies |
 | know what was built when, and why | [`HISTORY.md`](HISTORY.md) |
-| know what comes next | [`HISTORY.md`](HISTORY.md), "Open": the agreed order, and where the AI branch stands; [`DESIGN.md`](DESIGN.md), "Next": the plans in detail |
+| know what comes next | [`HISTORY.md`](HISTORY.md), "Open": the agreed order, and what else is open; [`DESIGN.md`](DESIGN.md), "Next": the plans in detail |
 | work on it as an agent | [`../CLAUDE.md`](../CLAUDE.md): the rules for editing, and the private paths |
 
 ## The code, by file
@@ -18,7 +18,7 @@ Start with the question you have.
 |---|---|
 | `scripts/battle.gd` | The simulation; the one writer of battle state |
 | `scripts/battle_run.gd` | The one loop that advances every battle: seats, the order log, the trace |
-| `scripts/commander.gd` | What commands a seat: the AI with a persona, or no one |
+| `scripts/commander.gd` | What commands a seat: the AI with a persona, at a person's pace, or thinking ahead (the planner); or no one |
 | `scripts/ai.gd` | The AI: a pure decision, battle in, orders out |
 | `scripts/combat.gd` | The rules, as pure functions |
 | `scripts/campaign.gd` | The campaign: run state in, new run state out |
@@ -33,7 +33,9 @@ Start with the question you have.
 | `tests/run_tests.gd` | The suite: rules, maps, screens, replays, recorded battles, the step budget |
 | `tests/golden-macos.txt`, `tests/golden-linux.txt` | The recorded battles, one file per platform |
 | `tests/fights.gd`, `tests/measures.gd` | The commander ladder, and the measures of play |
-| `tests/luck_skill.gd`, `tests/luck_skill.py`, `tests/play.py`, `tests/plans.gd` | The studies |
+| `tests/studies.sh` | Runs the studies in parallel from a copy of the tree, into `build/studies` |
+| `tests/luck_skill.gd`, `tests/luck_skill.py`, `tests/play.py`, `tests/plans.gd`, `tests/versus.gd` | The studies; `tests/ai_baseline.gd` is the AI of 1 November, frozen, the yardstick `versus.gd` plays against |
+| `tests/planner_data.gd`, `tests/plan_examples.gd` | The planner's choices as a dataset |
 | `tests/shot.gd` | Screenshots from Godot's own window |
 
 ## Not in this repo

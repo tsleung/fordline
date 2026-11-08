@@ -19,7 +19,7 @@ import sys
 from collections import defaultdict
 from statistics import mean
 
-LADDER = ["idle", "slow", "standard", "sharp"]
+LADDER = ["idle", "person", "standard", "sharp"]
 NAMES = ["Millbrook Ford", "Ashwood", "Two Bridges", "Saltmarsh Road", "Marshal's Ridge"]
 
 
@@ -87,9 +87,9 @@ def main(paths):
     # With the idle commander in, "does giving orders matter" swamps
     # everything; without it, the split is about playing well.
     active = [p for p in ORDER if p != "idle"]
-    first_three = [p for p in ["slow", "standard", "sharp"] if p in ORDER]
+    first_three = [p for p in ["person", "standard", "sharp"] if p in ORDER]
     for title, keep in [("all commanders", ORDER), ("commanders who give orders", active),
-                        ("slow, standard and sharp", first_three)]:
+                        ("person, standard and sharp", first_three)]:
         if len(keep) < 2:
             continue
         total = defaultdict(float)

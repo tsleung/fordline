@@ -12,7 +12,8 @@ extends RefCounted
 ## A commander over some of a side's regiments. With no commander, the seat
 ## is a person's, whose orders come through give(). A seat for the whole
 ## side commands every regiment of it that no other seat has claimed;
-## otherwise it commands only its `ids` (a division on its own command).
+## otherwise it commands only its `ids` (a division on its own command),
+## and its commander decides for those alone.
 class Seat:
 	var team := 0
 	var commander: Commander
@@ -50,6 +51,22 @@ func _init(b: Battle) -> void:
 	trace.start(b)
 
 
+## A copy of the run as it stands, to fight on without changing this one:
+## the battle copied (Battle.copy) and each seat with a copy of its
+## commander, so it fights on as this run would. Its log and trace start
+## afresh.
+func copy() -> BattleRun:
+	var c := BattleRun.new(battle.copy())
+	for seat in seats:
+		var s := Seat.new(seat.team, seat.commander.copy() if seat.commander != null else null, seat.every, seat.whole_side)
+		s.ids = seat.ids.duplicate()
+		s.logged = seat.logged
+		s.wait = seat.wait
+		c.add_seat(s)
+	c.tick = tick
+	return c
+
+
 func add_seat(seat: Seat) -> int:
 	seats.append(seat)
 	return seats.size() - 1
@@ -78,9 +95,13 @@ func advance() -> void:
 			continue
 		seat.wait -= Battle.STEP
 		if seat.wait > 0.0:
+			seat.commander.between_looks(seat.team)
 			continue
 		seat.wait = seat.every
-		var orders := _claimed(i, seat.commander.decide(battle, seat.team))
+		var ids: Array[int] = []
+		if not seat.whole_side:
+			ids = seat.ids
+		var orders := _claimed(i, seat.commander.decide(battle, seat.team, ids))
 		trace.note_orders(seat.team, orders.size())
 		if seat.logged:
 			give(i, orders, true)
@@ -182,7 +203,7 @@ class Replayed extends Commander:
 		_run = weakref(of_run)
 		_turns = turns
 
-	func decide(_b: Battle, _team: int) -> Array:
+	func decide(_b: Battle, _team: int, _ids: Array[int] = []) -> Array:
 		var tick: int = _run.get_ref().tick
 		var out: Array = []
 		while _next < _turns.size() and _turns[_next].tick <= tick:
