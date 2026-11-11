@@ -116,6 +116,7 @@ static func make_battle(spec: Dictionary, dice: int) -> Battle:
 	b.hold_needed = spec.get("hold_needed", 1)
 	b.deadline_flags.assign(spec.get("deadline_flags", []))
 	b.flag_drain = spec.get("flag_drain", Battle.FLAG_DRAIN)
+	b.pace = era(spec.era).get("pace", 1.0)
 	_claim_flags(b, spec)
 	return b
 

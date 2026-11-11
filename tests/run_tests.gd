@@ -471,9 +471,11 @@ func _test_packs() -> void:
 			ids[spec.id] = true
 			_check(Scenarios.check(spec).is_empty(), "scenario %s is well formed: %s" % [spec.id, Scenarios.check(spec)])
 			_check(Scenarios.is_grand(spec) == (pack.menu == "grand"), "scenario %s is on the right list" % spec.id)
-	_check(Packs.eras().map(func(e): return e.id) == ["medieval", "pike_shot"], "the eras come oldest first")
+	_check(Packs.eras().map(func(e): return e.id) == ["medieval", "pike_shot", "line_square", "rifle_gun"], "the eras come oldest first")
 	_check(Scenarios.of_era("medieval").map(func(q): return q.id).slice(-2) == ["storm", "last_keep"], "a pack's scenarios join their era's list")
 	_check(Scenarios.grand().map(func(q): return q.id) == ["gettysburg", "waterloo"], "the grand battles are listed")
+	_check(Scenarios.make_battle(Scenarios.resolve("receive", 1), 1).pace == 0.4 and Scenarios.make_battle(Scenarios.resolve("skirmish_rifle", 1), 1).pace == 0.4, "a quick battle runs at its era's pace")
+	_check(Scenarios.make_battle(Scenarios.resolve("hold", 1), 1).pace == 1.0 and Scenarios.make_battle(Scenarios.resolve("breach", 1), 1).pace == 1.0, "an era with no pace runs at 1")
 	var misspelt := Scenarios.get_spec("hold").duplicate()
 	misspelt["hold_neded"] = 2
 	misspelt.map = "swamp"
@@ -931,7 +933,8 @@ func _compare_golden(record: bool) -> void:
 		print("  recorded %d battles" % _golden.size())
 		return
 	for key in _golden:
-		_check(known.has(key), "%s is recorded in %s (run ./test.sh --record)" % [key, _golden_path])
+		# The line it came out as, so a run on another platform can record it.
+		_check(known.has(key), "%s is recorded in %s (run ./test.sh --record):\n    now %s" % [key, _golden_path, _golden[key]])
 		if known.has(key) and known[key] != _golden[key]:
 			_check(false, "%s comes out as recorded:\n    was %s\n    now %s" % [key, known[key], _golden[key]])
 

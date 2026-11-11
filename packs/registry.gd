@@ -6,8 +6,9 @@ extends RefCounted
 ## needs, optionally an era of its own, and its scenarios.
 ##
 ## An era: id, name, and draw, the kinds a Skirmish of that era picks its
-## army from (a kind listed twice comes up twice as often). Eras are listed
-## oldest first.
+## army from (a kind listed twice comes up twice as often); optionally pace,
+## the Battle.pace its quick battles run at (1 if not given), for kinds made
+## for the grand battles' slower fights. Eras are listed oldest first.
 ##
 ## A scenario:
 ##   era: an era's id (a grand battle's names its period, for the record)
@@ -36,6 +37,8 @@ const ALL := [
 	PackMedieval.PACK,
 	PackPikeShot.PACK,
 	PackSieges.PACK,
+	PackLineSquare.PACK,
+	PackRifleGun.PACK,
 	Gettysburg.PACK,
 	Waterloo.PACK,
 ]

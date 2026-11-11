@@ -242,7 +242,8 @@ kind must be a core one or one its modules provide. If a pack's module is
 not loaded, the pack is left out of the menus and the suite says so.
 
 To add an era: write `packs/<name>.gd` with a `class_name`, a `PACK` holding
-its `era` (id, name, the kinds a Skirmish draws) and its scenarios, and add it
+its `era` (id, name, the kinds a Skirmish draws, and the pace its battles
+run at if not 1) and its scenarios, and add it
 to `Packs.ALL`, oldest era first. `packs/registry.gd` documents every field;
 `packs/pike_shot.gd` is the one to copy. The tabs, the list, the map previews
 and the suite's scenario battles all read the registry, so no other code

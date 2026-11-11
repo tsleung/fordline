@@ -83,7 +83,8 @@ var rout_scale := 1.0
 ## When the late drain starts (INF: never; a grand battle ends at its own
 ## dusk). pace: a grand battle stretches its fights to fit the day's clock,
 ## so volleys of arrows and shot do this share of their damage and nerve
-## comes back at this share of its rate. A volley's shock is not scaled:
+## comes back at this share of its rate; an era whose kinds were made for
+## those days runs its quick battles at the same pace. A volley's shock is not scaled:
 ## brigades break long before they are shot to pieces.
 var dusk_time := DUSK_TIME
 var pace := 1.0
