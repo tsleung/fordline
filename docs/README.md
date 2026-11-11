@@ -25,7 +25,7 @@ Start with the question you have.
 | `scripts/terrain.gd` | Maps (seeded, castles, hand-drawn) and the questions asked of them |
 | `scripts/scenarios.gd` | Looking a scenario up, checking it, building its battle |
 | `packs/registry.gd` | The content packs, and what a pack and a scenario hold |
-| `packs/medieval.gd`, `pike_shot.gd`, `sieges.gd`, `gettysburg.gd`, `waterloo.gd` | The packs: eras and scenarios, as data |
+| `packs/medieval.gd`, `pike_shot.gd`, `sieges.gd`, `line_square.gd`, `rifle_gun.gd`, `gettysburg.gd`, `waterloo.gd` | The packs: eras and scenarios, as data |
 | `scripts/unit_types.gd`, `scripts/regiment.gd` | Kinds of regiment and one regiment's state |
 | `scripts/telemetry.gd` | Read-only measures of a battle, and its trace |
 | `scripts/main.gd` | The menus |

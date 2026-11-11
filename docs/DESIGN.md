@@ -11,8 +11,8 @@ played and argued with.
 ## The thirty-second version
 
 You command a small army: swords, pikes, archers, cavalry, cannons and your
-general (in the Pike and Shot scenarios, muskets take the place of swords
-and bows). Each battle is on a new map with a river, woods and hills, and
+general (in the later eras' scenarios, muskets, line infantry or rifles
+take the place of swords and bows). Each battle is on a new map with a river, woods and hills, and
 three flags at the crossings. Holding more flags than the enemy drains their
 **resolve**; routing their regiments drains it faster. When one side's
 resolve hits zero, its whole army breaks and runs. After a win you keep your
@@ -163,7 +163,44 @@ above; Pike and Shot fights with pikes, muskets, horse and guns:
 In a siege the flags don't drain resolve (a castle's three would bleed
 the attacker dry before the gate fell); they decide at the deadline.
 
-A range slider is the next step once there are four or more eras.
+**Line and Square** fights with line infantry, horse and guns. Line that
+stands its ground forms square when enemy horse comes within 240, and keeps
+it until none is within 330 (`Battle._squares`). Horse hits a square at
+0.35, a charge doesn't land on it and it has no flank, but only one face
+fires: half a volley.
+
+| Scenario | Ground | Goal | Teaches |
+|---|---|---|---|
+| Skirmish | a new field each time | break them | the same, drawn from line, horse and guns |
+| Receive Cavalry | the ridge | break them | stand to form square, then their three batteries find the squares: when to break it |
+| Horse and Guns | roads | break them | threaten with horse to force squares, then shoot them |
+| Line at the Fords | fords, deploy at the river | hold one ford at 3:00 | volleys on men wading, with horse to make you form square |
+| The Bridge at Dawn | bridges, barrage | hold both bridges at 5:00 | forcing a crossing: horse over the water keeps their line in square |
+
+**Rifle and Gun** fights with rifles, horse and guns. Rifles reach 230
+where muskets reach 170, and trees halve the fire of whoever shoots into
+them (`Terrain.cover`).
+
+| Scenario | Ground | Goal | Teaches |
+|---|---|---|---|
+| Skirmish | a new field each time | break them | long reach on any field |
+| Open Ground | the ridge | break them | crossing open ground under rifles and guns |
+| Into the Trees | woods | break them | trees halve fire: fight for the woods |
+| Shoot the Gunners | roads | break them | each battery is twelve men: close inside 230 and shoot the gunners |
+| Hold the Creek | fords, deploy at the river | hold one crossing at 3:00 | reach against men who must wade |
+
+**Both eras run at pace 0.4.** Rifles and Line were made for the grand
+battles, which run at `pace` 0.4: volleys of shot and arrows do that share
+of their damage, and nerve comes back at that share of its rate, while a
+volley's shock and the guns' cannonballs are not scaled. At pace 1 a rifle
+volley killed a dozen of a regiment's forty: Open Ground, Shoot the Gunners
+and Hold the Creek were over in about a minute, and the Creek was lost by
+every commander in its first volleys. So an era can set the pace its quick battles run at (`pace` on the
+era in its pack; 1 if not given), and Medieval and Pike and Shot keep 1.
+Their kinds' stats are the grand battles', unchanged.
+
+Four era tabs fit a phone 360 pixels wide (`tests/shot.gd --scenarios`),
+so there is no range slider yet.
 
 Measured 2026-10-31, AI players of the luck study, wins (stars):
 
@@ -182,6 +219,56 @@ Sieges, measured the same day:
 | The Storming of Duskwatch | 0% | 50% | 100% | 83% (1.3) |
 | The Last Keep | 67% | 33% | 83% | 100% (3.0) |
 | The Breach at Greyhold | 0% | 83% | 50% | 83% (1.7) |
+
+The two later eras, measured 2026-11-11 with the ladder of 7 November
+(see "Play over time"): eight dice each, two draws of eight for the
+Skirmishes. Minutes are the standard commander's; stars are the average
+over every battle, won or lost.
+
+| Scenario | idle | person | standard | sharp | minutes | stars (person / standard / sharp) |
+|---|---|---|---|---|---|---|
+| Skirmish (Line and Square) | 0% | 38% | 56% | 88% | 2.7 | 0.4 / 1.1 / 1.3 |
+| Receive Cavalry | 25% | 100% | 100% | 100% | 1.8 | 2.0 / 2.0 / 2.0 |
+| Horse and Guns | 0% | 100% | 100% | 50% | 2.4 | 2.9 / 2.4 / 1.2 |
+| Line at the Fords | 100% | 75% | 50% | 88% | 2.7 | 1.2 / 0.8 / 1.8 |
+| The Bridge at Dawn | 0% | 88% | 100% | 100% | 2.5 | 2.1 / 2.0 / 2.0 |
+| Skirmish (Rifle and Gun) | 0% | 31% | 75% | 56% | 2.4 | 0.5 / 1.4 / 1.1 |
+| Open Ground | 0% | 0% | 100% | 100% | 1.7 | 0 / 2.0 / 2.0 |
+| Into the Trees | 0% | 100% | 50% | 100% | 2.8 | 2.5 / 0.6 / 1.8 |
+| Shoot the Gunners | 0% | 62% | 75% | 75% | 1.9 | 1.2 / 2.2 / 1.5 |
+| Hold the Creek | 0% | 62% | 50% | 100% | 1.8 | 1.2 / 1.0 / 2.0 |
+
+Every scenario is won by some ways of playing and lost by others, and no
+commander averages three stars. The armies differ from the first proposal
+where four dice of the ladder said so. Against too little, every commander
+but idle won, so the enemy got more: a third battery at Receive Cavalry
+(against two, the idle player's squares won too), a fifth line regiment at
+Line at the Fords, a fifth line regiment and a second battery at the Bridge
+at Dawn, horse at Into the Trees, and four rifles, not two, guarding the
+guns at Shoot the Gunners. In Horse and Guns standard and sharp lost every
+time, so the player got a third line regiment; at Hold the Creek every
+commander lost, so the player has five rifles, as many as the attacker.
+Open Ground is as proposed: a fifth rifle regiment on the ridge and every
+commander lost.
+
+Found measuring them, and open:
+
+- **A frontal assault into rifles.** The one thing the Rifle era needed was
+  that walking straight at rifles is suicide. In its Skirmish an AI player
+  that walks straight in, without holding or flanking, wins 2 of 16 and
+  loses 96% of its men, where the balanced one wins 11 of 16. On Open
+  Ground it still wins 7 of 8, losing 75% of its men to the balanced
+  player's 61%: six rifles against four and two guns is enough, and the
+  stars, not the win, carry the cost.
+- **The AI walks rifles and line onto fords it already holds.** `AI._rifle`
+  sends them to the flag itself once it advances, so they stand in the water
+  within reach of the far bank; the rule that foot on a flag of their own
+  fight what comes within their reach is in `AI._foot` only. A person
+  learns to stand back from the bank. Changing it would move the Gettysburg
+  and Waterloo recordings, so it waits for a versus measurement of its own.
+- **A passive line in square stalls Receive Cavalry.** The idle player's
+  squares outlast the horse, and the battle runs to nine minutes before the
+  late drain decides it, once in four for the idle player.
 
 A garrison that does nothing holds the Last Keep two times in three:
 standing in the bailey is a defence. Building them, three things were
@@ -213,56 +300,6 @@ forward; Riders at Dawn the other way round), and no AI player averages
 three stars. On a fixed map the AI players' results barely vary with the
 dice, so an army composition tends to be all or nothing for them; the
 stars, not the win rate, carry the difficulty.
-
-### Next: two more eras (not built)
-
-Quick battles don't cover every kind. Rifles appear only in Gettysburg, and
-Line infantry with its squares only in Waterloo. Agreed order: first after
-the docs (see `HISTORY.md`, "Open"). The scenarios below are a starting
-proposal; change them if play says so.
-
-**Line and Square** (draws Line, Line, Line, Cavalry, Cannons):
-
-| Scenario | Ground | Armies | Teaches |
-|---|---|---|---|
-| Skirmish | a new field each time | drawn, the same on both sides | squares against horse, on any field |
-| Receive Cavalry | the ridge | 5 Line, 1 Guns against 4 Cavalry, 2 Guns | stand to form square, then their guns find the square: when to break it |
-| Horse and Guns | roads | 3 Cavalry, 2 Guns, 2 Line against 5 Line, 1 Cavalry | threaten with horse to force squares, then shoot them: a square fires at half |
-| Line at the Fords | fords, deploy at the river | 4 Line, 1 Guns against 4 Line, 2 Cavalry; hold one at 3:00 | volleys on men wading |
-| The Bridge at Dawn | bridges, barrage | 4 Line, 2 Guns, 1 Cavalry against 4 Line, 1 Guns; hold both at 5:00 | forcing a crossing: horse over the water keeps them in square, firing at half |
-
-**Rifle and Gun** (draws Rifles, Rifles, Rifles, Cavalry, Cannons):
-
-| Scenario | Ground | Armies | Teaches |
-|---|---|---|---|
-| Skirmish | a new field each time | drawn, the same on both sides | long reach on any field |
-| Open Ground | the ridge | 6 Rifles against 4 Rifles, 2 Guns, dug in | crossing open ground kills; go round |
-| Into the Trees | woods | 4 Rifles, 1 Cavalry, 1 Guns against 5 Rifles | trees halve fire: fight for the woods |
-| Shoot the Gunners | roads | 4 Rifles, 1 Cavalry against 2 Rifles, 4 Guns | each battery is only twelve men; close to 230 and shoot them |
-| Hold the Creek | fords, deploy at the river | 4 Rifles, 1 Guns against 5 Rifles, 1 Cavalry; hold one at 3:00 | reach against men who must wade |
-
-What to know before building them:
-
-- **The stats are unmeasured here.** Rifles and Line were tuned for grand
-  battles, at `pace` 0.4. Quick battles run at pace 1. The one thing the
-  Rifle era needs from them is that a frontal charge into rifles is suicide,
-  and nothing has checked that. Changing a kind's stats moves the Gettysburg
-  and Waterloo recordings.
-- **Only forests give cover on generated maps.** `Terrain.cover` halves fire
-  in forests and towns, and towns exist only on hand-drawn fields. Nothing
-  blocks a line of sight, so a brief can't promise a reverse slope.
-- **The AI handles both kinds in `AI._rifle`**, not `_foot`. The rule that
-  foot fight what comes in reach of a flag they hold is in `_foot`, so check
-  whether these kinds should have it too.
-- **Four era tabs must fit a phone.** The tabs are an `HBoxContainer` in
-  `show_scenarios` in `main.gd`. This section said earlier that a range slider is the
-  next step at four eras; check the tabs at phone width first, and only build
-  the slider if they don't fit.
-- **The target is the existing one:** three to five minutes; each scenario
-  won by some ways of playing and lost by others; no AI player averaging
-  three stars. Measure with the ladder, and add the rows to the tables above.
-
-How to add an era is in `ARCHITECTURE.md`, "Packs".
 
 ### Next: gates that matter (not built)
 

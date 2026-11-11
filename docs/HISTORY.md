@@ -97,19 +97,35 @@ moved 42 of the 44 recorded battles on each platform, all but the two grand
 battles. The Linux ones were recorded from a CI run on a branch, on the
 pinned 24.04, before main moved, so main stayed green.
 
+## 11 November: Line and Square, Rifle and Gun
+
+Two more eras of quick battles, so Line and Rifles are no longer only in
+the grand battles: five scenarios each, as packs, and four era tabs, which
+fit a 360-pixel phone. Measured at the kinds' own stats, rifle volleys
+ended battles in a minute, so an era now sets the pace its quick battles
+run at, and both run at the grand battles' 0.4; no other battle moves. The
+armies were tuned on the ladder until every scenario is won by some ways of
+playing and lost by others. A battle not yet recorded now prints its line,
+so a CI run can record a new scenario on Linux.
+
+Decision: an era made of grand-battle kinds takes the grand battles' pace
+rather than new stats, so Gettysburg and Waterloo stay as recorded.
+
 ## Open
 
 In the agreed order:
 
-1. **Two more eras:** Line and Square, Rifle and Gun. `DESIGN.md`, "Next: two
-   more eras".
-2. **A gun-line player** that measures the siege slog. `DESIGN.md`, "Next:
+1. **A gun-line player** that measures the siege slog. `DESIGN.md`, "Next:
    gates that matter", step 1.
-3. **Gate rules:** the gatehouse shoots the ram, battlements against
+2. **Gate rules:** the gatehouse shoots the ram, battlements against
    cannonballs, a gate that can be read. Step 2 there; measure again after.
-4. **The sally and the relief column.** Step 3 there.
+3. **The sally and the relief column.** Step 3 there.
 
 Alongside:
+
+- **Rifles and line walk onto fords they already hold** and stand in the
+  water, within reach of the far bank. `DESIGN.md`, "Quick battle", found
+  measuring the new eras.
 
 - **Why the person-paced commander leads in the designed battles.** Not its
   pace and not plan commitment; the cause is not known. `DESIGN.md`, the AI

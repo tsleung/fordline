@@ -40,8 +40,8 @@ if [ -z "${TREE:-}" ]; then
 	"$GODOT" --headless --path "$TREE" --import >/dev/null 2>&1
 fi
 
-DESIGNED="hold hammer bridges riders storm last_keep push fords_shot cuirassiers battery breach"
-SKIRMISHES="skirmish skirmish_shot"
+DESIGNED="hold hammer bridges riders storm last_keep push fords_shot cuirassiers battery breach receive horse_guns fords_line bridge_dawn open_ground trees gunners creek"
+SKIRMISHES="skirmish skirmish_shot skirmish_line skirmish_rifle"
 LADDER="--policies=idle,person,standard,sharp"
 jobs() {
 	for study in "$@"; do
