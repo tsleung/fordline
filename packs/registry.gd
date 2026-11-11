@@ -14,7 +14,10 @@ extends RefCounted
 ##   era: an era's id (a grand battle's names its period, for the record)
 ##   name / brief / goal: the words on its card and briefing; goal when the
 ##     generic one won't do
-##   map / map_seed: the ground ("random" with no seed: Skirmish)
+##   map / map_seed: the ground, seeded ("random" with no seed: Skirmish);
+##     or plan: the ground drawn by hand (Terrain.from_plan lists a plan's
+##     keys), so that what the brief says of the ground is there. One or
+##     the other, never both.
 ##   player / enemy: [kind, stars] for each regiment beside the general
 ##   persona: how the enemy fights
 ##   abilities: the player's (Rally if not given)
@@ -28,10 +31,11 @@ extends RefCounted
 ##     within s seconds; {"losses": f} lose at most that share of your men;
 ##     {"flags": n} hold at least n flags at the end; {"hold": i, "noun",
 ##     "verb"} hold flag i at the end
-## A grand battle adds:
-##   plan: its hand-drawn field (Terrain.from_plan); view: where the camera
-##   opens; start_hour / hour: the day's clock; rout_scale, pace, veterancy:
-##   rule numbers; start / arrivals: who holds the field, who comes by road.
+## A grand battle always has a plan, and adds:
+##   start / arrivals: who holds the field, who comes by road (start is
+##   what makes it a grand battle: a quick battle's armies deploy
+##   themselves); view: where the camera opens; start_hour / hour: the day's
+##   clock; rout_scale, pace, veterancy: rule numbers.
 
 const ALL := [
 	PackMedieval.PACK,
