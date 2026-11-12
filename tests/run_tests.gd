@@ -4,6 +4,7 @@ extends SceneTree
 ##   godot --headless --path . -s tests/run_tests.gd [-- --quick]
 
 const K := UnitTypes.Kind
+const MapPreviewScript := preload("res://scripts/map_preview.gd")
 
 var _failures := 0
 ## Lead changes in the last battle _fight fought.
@@ -33,6 +34,7 @@ func _run() -> void:
 	_test_classes_come_from_the_source()
 	_test_combat()
 	_test_terrain()
+	await _test_drawn_fields()
 	_test_fortress()
 	_test_campaign()
 	await _test_routes()
@@ -340,6 +342,139 @@ func _test_screens() -> void:
 	_check(main._load("ui", "era", "") == "pike_shot", "the scenario list remembers its era")
 	main.free()
 	DirAccess.remove_absolute("user://test_screens.cfg")
+
+
+## A field drawn by hand for a quick battle: a plan with a river, fords and
+## a bridge reads as a seeded river map does, a plan's mistakes are named,
+## and every drawn scenario deploys, routes and shows as a seeded one.
+func _test_drawn_fields() -> void:
+	var plan := {
+		"id": "drawn",
+		"river": [Vector2(-10, 380), Vector2(400, 430), Vector2(900, 370), Vector2(1310, 420)],
+		"crossings": [{"x": 300.0}, {"x": 700.0, "bridge": true}],
+		"forests": [{"c": Vector2(200, 600), "r": 60.0}],
+		"flags": [{"name": "The Ford", "at": Vector2(300, 600)}, {"name": "The Bridge", "at": Vector2(700, 395)}, {"name": "The Farm", "at": Vector2(1000, 600)}],
+	}
+	_check(Terrain.check_plan(plan).is_empty(), "a plan with a river is well formed: %s" % [Terrain.check_plan(plan)])
+	var t := Terrain.from_plan(plan)
+	_check(t.size == Terrain.SIZE and t.has_river and t.flag_names.size() == 3, "a plan with no size is a quick battle's field, with its river and named flags")
+	_check(t.river[0].x < 0.0 and t.river[t.river.size() - 1].x > t.size.x, "a drawn river is kept from edge to edge")
+	_check(absf(t.river_y(-10.0) - 380.0) < 1.0 and absf(t.river_y(1310.0) - 420.0) < 1.0 and t.river_y(400.0) > 400.0 and t.river_y(900.0) < 400.0, "and runs where it was drawn")
+	_check(t.crossings[0].half == Terrain.FORD_HALF and t.crossings[1].half == Terrain.BRIDGE_HALF and t.crossings[1].bridge, "a ford and a bridge are as wide as a seeded map's")
+	_check(t.is_water(Vector2(500, t.river_y(500))) and not t.is_water(Vector2(300, t.river_y(300))) and not t.is_water(Vector2(700, t.river_y(700))), "a drawn river is water but for its crossings")
+	_check(t.speed_mult(Vector2(300, t.river_y(300))) == 0.5 and t.speed_mult(Vector2(700, t.river_y(700))) == 0.95, "a drawn ford halves speed and a bridge barely slows")
+	_check(t.side(Vector2(650, 700)) == 0 and t.side(Vector2(650, 100)) == 1, "its banks are the player's and the enemy's")
+	_check(not t.flags_on_crossings(), "a flag back from the water is not a crossing")
+	var from := Vector2(900, 720)
+	var way := t.path(from, Vector2(350, 100))
+	var dry := true
+	var banks := 0
+	var last := from
+	for w in way:
+		for i in 40:
+			dry = dry and not t.is_water(last.lerp(w, i / 40.0))
+		if t.side(last) != t.side(w):
+			banks += 1
+			_check(not t.crossing_at(last.x).is_empty(), "a drawn river is crossed at a crossing")
+		last = w
+	_check(dry and banks == 1 and way[way.size() - 1] == Vector2(350, 100), "a route over a drawn river crosses once and never wades")
+	var mistakes := {
+		"rivr": "unknown key: rivr",
+		"river": "left to right",
+		"crossings": "no crossing",
+		"flags": "in the water",
+	}
+	for key in mistakes:
+		var bad := plan.duplicate(true)
+		match key:
+			"rivr":
+				bad["rivr"] = []
+			"river":
+				bad.river = [Vector2(100, 400), Vector2(1310, 400)]
+			"crossings":
+				bad.crossings = []
+			"flags":
+				bad.flags[0].at = Vector2(500, t.river_y(500))
+		_check("; ".join(Terrain.check_plan(bad)).contains(mistakes[key]), "a plan's mistake is named: %s" % mistakes[key])
+	var no_river := plan.duplicate(true)
+	no_river.erase("river")
+	_check("; ".join(Terrain.check_plan(no_river)).contains("no river"), "crossings need a river")
+	var off := plan.duplicate(true)
+	off.crossings[0] = {"x": 5.0, "wide": true}
+	var off_wrong := "; ".join(Terrain.check_plan(off))
+	_check(off_wrong.contains("off the field") and off_wrong.contains("unknown key: wide"), "a crossing off the field or misspelt is named")
+
+	var seeded := Scenarios.get_spec("hold")
+	var spec := seeded.duplicate(true)
+	spec.erase("map")
+	spec.erase("map_seed")
+	spec.plan = plan
+	_check(Scenarios.check(spec).is_empty() and not Scenarios.is_grand(spec), "a quick scenario may carry a plan and is not a grand battle")
+	var b := Scenarios.make_battle(spec, 1)
+	_check(b.terrain.kind == "drawn" and b.flags.size() == 3 and b.flags_held(0) == 3 and b.terrain.deploy_depth[0] == seeded.deploy_depth, "its battle is fought on the drawn field, deployed as far forward as it says")
+	var front := INF
+	for r in b.regiments:
+		_check(not b.terrain.is_water(r.pos), "a drawn field deploys on dry ground")
+		_check(b.terrain.in_deploy(r.team, r.pos) or b.terrain.clamp_deploy(r.team, r.pos) == r.pos, "a drawn field deploys inside the zone")
+		if r.team == 0:
+			front = minf(front, r.pos.y)
+	_check(front < Terrain.SIZE.y - Terrain.DEPLOY_DEPTH and front > b.terrain.river_y(650.0), "the forward zone holds on a drawn field, short of the river")
+	var both := spec.duplicate(true)
+	both.map = "fords"
+	_check("; ".join(Scenarios.check(both)).contains("both a plan and a seeded map"), "a scenario with a plan and a map is named")
+	var misnumbered := spec.duplicate(true)
+	misnumbered.own_flags = [0, 3]
+	_check("; ".join(Scenarios.check(misnumbered)).contains("names flag 3 in own_flags"), "a flag the plan doesn't have is named")
+	var misdrawn := spec.duplicate(true)
+	misdrawn.plan["forrests"] = []
+	_check("; ".join(Scenarios.check(misdrawn)).contains("forrests"), "a misspelt key in a scenario's plan is named")
+	var unplanned: Dictionary = Scenarios.get_spec("gettysburg").duplicate()
+	unplanned.erase("plan")
+	_check("; ".join(Scenarios.check(unplanned)).contains("no plan"), "a grand battle needs its plan")
+
+	var drawn := Packs.scenarios("quick").filter(func(q): return q.has("plan"))
+	_check(drawn.map(func(q): return q.id) == ["receive", "horse_guns", "fords_line", "bridge_dawn", "open_ground", "trees", "gunners", "creek"], "the two newest eras' designed scenarios are drawn")
+	for q in drawn:
+		var field: Terrain = Scenarios.field(q)
+		_check(field.size == Terrain.SIZE and field.flag_names.size() == field.flags.size(), "%s is a quick battle's size, its flags named" % q.id)
+		_check(field.kind == q.id, "%s's plan is named for it" % q.id)
+		var battle := Scenarios.make_battle(q, 1)
+		for r in battle.regiments:
+			_check(field.in_deploy(r.team, r.pos) or field.clamp_deploy(r.team, r.pos) == r.pos, "%s deploys inside the zone" % q.id)
+		for f in field.flags:
+			_check(not field.in_deploy(0, f), "%s has no flag where the player deploys" % q.id)
+		if field.has_river:
+			var over := field.path(Vector2(650, 720), Vector2(650, 100))
+			var sides := 0
+			var at := Vector2(650, 720)
+			for w in over:
+				sides += 1 if field.side(at) != field.side(w) else 0
+				at = w
+			_check(sides == 1, "%s's river is crossed once on the way over" % q.id)
+	# The distances the fords' lessons rest on: a line on the flags is out
+	# of reach of the far bank, and of the horse that would call a square.
+	var bank := Terrain.RIVER_HALF + Terrain.BANK_CLEARANCE
+	for pair in [["creek", UnitTypes.stat(K.RIFLES, "range") * 1.1], ["fords_line", Battle.SQUARE_CALL]]:
+		var field: Terrain = Scenarios.field(Scenarios.get_spec(pair[0]))
+		for f in field.flags:
+			_check(f.y - (field.river_y(f.x) - bank) > pair[1], "%s: the far bank is more than %d from a line on the flags" % [pair[0], pair[1]])
+
+	# The briefing and the list draw a drawn field as they draw a seeded one.
+	var main: Node = load("res://scenes/main.tscn").instantiate()
+	main.save_path = "user://test_drawn.cfg"
+	root.add_child(main)
+	await process_frame
+	main.show_scenarios("rifle_gun")
+	await process_frame
+	var thumbs := main.find_children("*", "Control", true, false).filter(func(c): return c is MapPreviewScript)
+	_check(thumbs.size() == 5 and thumbs.any(func(c): return c._marks.battle.terrain.kind == "creek"), "the list shows each drawn field's thumbnail")
+	main.show_scenario("creek", 1)
+	await process_frame
+	await process_frame
+	var maps := main.find_children("*", "Control", true, false).filter(func(c): return c is MapPreviewScript and not c.is_queued_for_deletion())
+	_check(maps.size() == 1 and maps[0]._terrain.terrain.has_river and maps[0]._field == Terrain.SIZE, "the briefing shows the drawn field, river and all")
+	main.free()
+	DirAccess.remove_absolute("user://test_drawn.cfg")
 
 
 ## Napoleonic line infantry forms square against horse while it stands:

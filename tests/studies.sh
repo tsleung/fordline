@@ -2,9 +2,12 @@
 # The studies behind DESIGN.md's "Play over time" and "The AI audit", in
 # parallel, from a copy of the tree (editing doesn't disturb a long run), into
 # build/studies/NAME, reported by tests/play.py into its report.txt.
-#   tests/studies.sh NAME ladder plans versus planner siege
-# Pick any of the five. Set in the environment:
-#   DICE (8), DRAWS (2): the ladder's and the planner's dice, and how many
+#   tests/studies.sh NAME ladder plans versus planner siege lessons
+# Pick any of the six. siege fights the gun-line player against the
+# standard one at both sieges (tests/gun_line.gd); lessons fights each drawn
+# scenario under the naive play and the intended one (tests/lessons.gd). Set
+# in the environment:
+#   DICE (8), DRAWS (2): the ladder's, the planner's, the sieges' and the lessons' dice, and how many
 #     fields of each campaign battle and Skirmish the ladder fights
 #   TRIES (30): plans the plan search tries
 #   VERSUS: more for the versus study (--pairs=ai-plan --budget=12)
@@ -41,6 +44,7 @@ if [ -z "${TREE:-}" ]; then
 fi
 
 DESIGNED="hold hammer bridges riders storm last_keep push fords_shot cuirassiers battery breach receive horse_guns fords_line bridge_dawn open_ground trees gunners creek"
+DRAWN="receive horse_guns fords_line bridge_dawn open_ground trees gunners creek"
 SKIRMISHES="skirmish skirmish_shot skirmish_line skirmish_rifle"
 LADDER="--policies=idle,person,standard,sharp"
 jobs() {
@@ -89,6 +93,11 @@ jobs() {
 				echo "$OUT/planner_$s.txt tests/luck_skill.gd -- --scenario=$s --draws=1 --dice=$DICE --policies=planner"
 			done
 			;;
+		lessons)
+			for s in $DRAWN; do
+				echo "$OUT/lessons_$s.txt tests/lessons.gd -- --scenario=$s --dice=$DICE"
+			done
+			;;
 		*)
 			echo "unknown study: $study" >&2
 			exit 2
@@ -98,6 +107,7 @@ jobs() {
 }
 jobs "$@" | xargs -L 1 -P "$PAR" sh "$0" --job "$TREE"
 python3 "$ROOT/tests/play.py" "$OUT"/*.txt > "$OUT/report.txt"
+grep -h '^LESSON' "$OUT"/*.txt >> "$OUT/report.txt"
 cat "$OUT/report.txt"
 if grep -q 'SCRIPT ERROR' "$OUT"/*.txt; then
 	echo "FAILED: script errors in $OUT"

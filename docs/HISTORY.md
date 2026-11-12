@@ -121,6 +121,29 @@ Greyhold and 36% at Duskwatch, where the AI's all-out assault loses 84% and
 owner found. `tests/studies.sh NAME siege` fights it, for measuring again
 after the gate rules.
 
+## 12 November: drawn fields for the two newest eras
+
+A designed scenario's ground was a seeded field, so nobody had chosen where
+its woods and fords were, and two briefs promised what the ground didn't
+give (Open Ground, the fords). Now a quick scenario can carry a field drawn
+by hand, as the grand battles do, and a plan can draw a river with fords
+and bridges. The eight designed scenarios of Line and Square and of Rifle
+and Gun are drawn, each around its lesson in distances against reach, and
+`tests/lessons.gd` measures the lesson: the naive play against the intended
+one, on eight dice. The intended play wins 62 of 64 and the naive one 15.
+`DESIGN.md`, "Drawn fields", has each field's lesson, its measures, what
+was tried and dropped, and which older scenarios most need the same.
+
+Decisions, all provisional and open to play: what makes a grand battle is
+`start`, not `plan`; a plan puts its flags where it likes, and both ford
+scenarios put them back from the water; those two drain at 0.25 and no
+longer deploy at the river; Line at the Fords has two fords; Receive
+Cavalry has a fourth flag, their camp. No army changed, and no rule.
+
+It moved the sixteen recorded battles of those eight scenarios on each
+platform; the Linux ones were recorded from a CI run of the merge on a
+branch, as before.
+
 ## Open
 
 In the agreed order:
@@ -134,8 +157,14 @@ Alongside:
 
 - **Rifles and line walk onto fords they already hold** and stand in the
   water, within reach of the far bank. `DESIGN.md`, "Quick battle", found
-  measuring the new eras.
-
+  measuring the new eras. The drawn fields put those two scenarios' flags
+  back from the water, so it no longer shows there; it still does on any
+  seeded river map.
+- **Drawn fields for the older eras**, the Cuirassiers and the two fords
+  first. `DESIGN.md`, "Which older scenarios need one".
+- **Whether an era's flag drain should follow its pace.** At pace 0.4 the
+  flags end a battle before the shooting can. `DESIGN.md`, "Drawn fields",
+  found drawing them.
 - **Why the person-paced commander leads in the designed battles.** Not its
   pace and not plan commitment; the cause is not known. `DESIGN.md`, the AI
   audit.

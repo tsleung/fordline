@@ -249,6 +249,50 @@ to `Packs.ALL`, oldest era first. `packs/registry.gd` documents every field;
 and the suite's scenario battles all read the registry, so no other code
 changes. Then record the new battles (below).
 
+**A scenario's ground is seeded or drawn.** Seeded is `map` and `map_seed`:
+`Terrain.generate` lays out a field of that kind, and nobody chose where
+its woods and fords fell. Drawn is `plan`, a dictionary `Terrain.from_plan`
+reads; `Scenarios.field` returns whichever the scenario has. A grand battle
+is always drawn. What makes a scenario a grand battle is `start` (who holds
+the field when the day opens), not its plan, so a quick battle can carry a
+plan and stay a quick battle: its armies deploy themselves in the usual
+zones, and the list, the briefing and the suite treat it as any other.
+
+A plan's keys, all but `id` and `flags` optional:
+
+| Key | What it draws |
+|---|---|
+| `id` | its name (a quick battle's plan takes its scenario's id) |
+| `size` | the field's extent; a quick battle's 1300 × 820 if not given |
+| `ridges` | each `{"line", "r"}`: a crest line and how far its slopes reach |
+| `hills`, `forests` | each `{"c", "r"}`: a round hill, a round stand of trees |
+| `towns` | polygons of built-up ground |
+| `streams`, `roads` | lines: a creek anyone may wade, slowly; a road |
+| `river` | its centre line, left to right from one edge to the other |
+| `crossings` | each `{"x", "bridge"}`: a ford or a bridge where the river passes `x` |
+| `flags` | each `{"name", "at"}` |
+
+A drawn river is kept as a seeded one is (corners rounded, then a point
+every 40 across the field), and its fords and bridges are as wide as a
+seeded map's, so `path`, `side`, `is_water` and the painter read both the
+same way. Two things a plan decides that a seeded map doesn't: where the
+flags stand (a seeded river map puts them on the crossings; a plan may put
+a ford's flag 250 back from the water, which is how Hold the Creek keeps
+the far bank out of rifle reach), and which crossings there are (a plan may
+mix fords and bridges). `Terrain.check_plan` names a misspelt key, a river
+that doesn't span the field or has no crossing, a crossing off the field,
+and a flag in the water; `Scenarios.check` runs it, and also names a
+scenario with both a plan and a seeded map, or one whose `own_flags`,
+`their_flags` or `deadline_flags` name a flag its plan doesn't have. The screen calls a drawn
+field's flags by their names, and "crossings" only when every flag stands
+on one.
+
+A drawn field is tied to its scenario's lesson by distances (reach, the
+squares' 240, the guns' 430), written above each plan in its pack, and
+`tests/lessons.gd` measures that the lesson holds: it fights the scenario
+under the naive play and the intended one. Redraw a field and its plays
+there are redrawn with it.
+
 ## Staying stable
 
 - **Recorded battles.** The suite fights fixed battles through the one
