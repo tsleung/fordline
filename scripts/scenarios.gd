@@ -2,8 +2,9 @@ class_name Scenarios
 extends RefCounted
 ## Battles from the packs: looking a scenario up, checking it, and building
 ## its battle. A quick battle is one fight on a map fixed by design so it can
-## be learned, with up to three stars to earn; a grand battle is a historical
-## day. The data is in packs/; what a scenario holds, in packs/registry.gd.
+## be learned (seeded, or drawn by hand as a plan), with up to three stars to
+## earn; a grand battle is a historical day. The data is in packs/; what a
+## scenario holds, in packs/registry.gd.
 
 const K := UnitTypes.Kind
 
@@ -28,12 +29,22 @@ static func check(spec: Dictionary) -> PackedStringArray:
 	for key in spec:
 		if not key in KEYS:
 			wrong.append("scenario %s has an unknown key: %s" % [id, key])
-	if not is_grand(spec):
+	if spec.has("plan"):
+		wrong.append_array(Terrain.check_plan(spec.plan))
+		if spec.has("map") or spec.has("map_seed"):
+			wrong.append("scenario %s has both a plan and a seeded map" % id)
+		for key in ["own_flags", "their_flags", "deadline_flags"]:
+			for i in spec.get(key, []):
+				if i < 0 or i >= spec.plan.get("flags", []).size():
+					wrong.append("scenario %s names flag %d in %s, which its plan doesn't have" % [id, i, key])
+	elif is_grand(spec):
+		wrong.append("scenario %s is a grand battle with no plan" % id)
+	else:
 		var map: String = spec.get("map", "")
 		if not map in MAP_KINDS and not map in FIXED_MAP_KINDS:
 			wrong.append("scenario %s has an unknown map kind: %s" % [id, map])
-		if era(spec.get("era", "")).is_empty():
-			wrong.append("scenario %s has an unknown era: %s" % [id, spec.get("era", "")])
+	if not is_grand(spec) and era(spec.get("era", "")).is_empty():
+		wrong.append("scenario %s has an unknown era: %s" % [id, spec.get("era", "")])
 	return wrong
 
 
@@ -67,8 +78,19 @@ static func is_random(id: String) -> bool:
 	return get_spec(id).get("map", "") == "random"
 
 
+## A grand battle says who holds the field when the day starts; a quick
+## battle's armies deploy themselves. Either may be fought on a drawn field
+## (a plan).
 static func is_grand(spec: Dictionary) -> bool:
-	return spec.has("plan")
+	return spec.has("start")
+
+
+## The scenario's ground: its drawn field, or the seeded one.
+static func field(spec: Dictionary) -> Terrain:
+	if spec.has("plan"):
+		return Terrain.from_plan(spec.plan)
+	var map_seed: int = spec.map_seed
+	return Terrain.generate(spec.map, map_seed)
 
 
 ## The scenario as it will be fought with `seed_value`: a Skirmish draws
@@ -76,7 +98,7 @@ static func is_grand(spec: Dictionary) -> bool:
 ## the rest are fixed.
 static func resolve(id: String, seed_value: int) -> Dictionary:
 	var spec := get_spec(id).duplicate(true)
-	if is_grand(spec) or spec.map != "random":
+	if spec.get("map", "") != "random":
 		return spec
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
@@ -99,8 +121,7 @@ static func make_battle(spec: Dictionary, dice: int) -> Battle:
 		push_error(wrong)
 	if is_grand(spec):
 		return _make_grand(spec, dice)
-	var map_seed: int = spec.map_seed
-	var b := Battle.new(Terrain.generate(spec.map, map_seed), dice)
+	var b := Battle.new(field(spec), dice)
 	b.abilities.assign(spec.get("abilities", ["rally"]))
 	if spec.has("deploy_depth"):
 		b.terrain.deploy_depth[0] = spec.deploy_depth
@@ -133,7 +154,7 @@ static func _claim_flags(b: Battle, spec: Dictionary) -> void:
 ## everyone else on the road, due at the hour the spec gives.
 static func _make_grand(spec: Dictionary, dice: int) -> Battle:
 	var plan: Dictionary = spec.plan
-	var b := Battle.new(Terrain.from_plan(plan), dice)
+	var b := Battle.new(field(spec), dice)
 	b.abilities.assign(spec.get("abilities", ["rally"]))
 	var veterancy: Array = spec.get("veterancy", [0, 0])
 	var start_hour: float = spec.start_hour
@@ -187,7 +208,7 @@ static func goal_text(spec: Dictionary) -> String:
 		return "Break their army."
 	var t := _clock(spec.deadline)
 	var need: int = spec.get("hold_needed", 1)
-	var what := "one crossing" if need == 1 else ("both bridges" if spec.map == "bridges" and need == 2 else "%d crossings" % need)
+	var what := "one crossing" if need == 1 else ("both bridges" if spec.get("map", "") == "bridges" and need == 2 else "%d crossings" % need)
 	return "Hold %s when the clock reaches %s, or break their army first." % [what, t]
 
 

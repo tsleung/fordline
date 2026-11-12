@@ -12,7 +12,8 @@ extends Node
 ## title with How to play open.
 ## --scenario=<id> plays that quick battle instead of a campaign battle; a
 ## grand battle runs at 4× and saves the opening, a close look and the whole
-## field at GRAND_SHOTS instead.
+## field at GRAND_SHOTS instead. With --deploy it saves the field as deployed
+## and stops there.
 
 const BattleScreen := preload("res://scripts/battle_screen.gd")
 const Main := preload("res://scenes/main.tscn")
@@ -120,6 +121,10 @@ func _process(_delta: float) -> void:
 	if b.phase == "deploy":
 		if _frames == 20:
 			await _save(_out + "-deploy.png")
+			if "--deploy" in OS.get_cmdline_user_args():
+				set_process(false)
+				get_tree().quit()
+				return
 			_screen.begin_battle()
 			_screen.speed = 4.0
 		return

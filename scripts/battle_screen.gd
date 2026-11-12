@@ -267,16 +267,19 @@ func _send_to_flag(sp: Vector2) -> bool:
 	return false
 
 
-## What the flag at `index` is called: its name on a grand battle's field,
-## else a crossing on a river map, else a flag.
+## What the flag at `index` is called: its name on a drawn field, else a
+## crossing on a river map, else a flag.
 func _flag_word(index: int) -> String:
 	if index < battle.terrain.flag_names.size():
 		return battle.terrain.flag_names[index]
 	return "Crossing" if battle.terrain.has_river else "Flag"
 
 
+## A seeded river map's flags are its crossings; a drawn field's are only
+## when every one stands on a crossing.
 func _flag_noun(count: int) -> String:
-	var noun := "crossing" if battle.terrain.has_river else "flag"
+	var t := battle.terrain
+	var noun := "crossing" if t.has_river and (t.flag_names.is_empty() or t.flags_on_crossings()) else "flag"
 	return noun if count == 1 else noun + "s"
 
 

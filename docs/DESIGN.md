@@ -132,7 +132,8 @@ doctrine (longbows, iron shot, steel, warhorses, old banners, drill).
 ## Quick battle
 
 Scenarios for when there isn't time for a campaign: one battle each, on a
-map fixed by design so it can be learned, three to five minutes. A win is
+map fixed by design so it can be learned (seeded, or drawn by hand: see
+"Drawn fields" below), three to five minutes. A win is
 one star; each scenario names two more conditions (a fast win, light
 losses, crossings held at the end), and the best is kept on the device.
 
@@ -172,10 +173,10 @@ fires: half a volley.
 | Scenario | Ground | Goal | Teaches |
 |---|---|---|---|
 | Skirmish | a new field each time | break them | the same, drawn from line, horse and guns |
-| Receive Cavalry | the ridge | break them | stand to form square, then their three batteries find the squares: when to break it |
-| Horse and Guns | roads | break them | threaten with horse to force squares, then shoot them |
-| Line at the Fords | fords, deploy at the river | hold one ford at 3:00 | volleys on men wading, with horse to make you form square |
-| The Bridge at Dawn | bridges, barrage | hold both bridges at 5:00 | forcing a crossing: horse over the water keeps their line in square |
+| Receive Cavalry | drawn: a low ridge to start on, a crossroads, their camp | break them | stand to form square, then their three batteries find the squares: when to break it |
+| Horse and Guns | drawn: three flags on a lane, an inn at the middle one | break them | threaten with horse to force squares, then shoot them |
+| Line at the Fords | drawn: two fords, the flags 215 back from the water | hold one flag at 3:00 | stand back: their line must wade into your muskets, their horse must cross to force a square |
+| The Bridge at Dawn | drawn: two bridges, a ford upstream; barrage | hold both bridges at 5:00 | forcing a crossing: horse over the water keeps their line in square |
 
 **Rifle and Gun** fights with rifles, horse and guns. Rifles reach 230
 where muskets reach 170, and trees halve the fire of whoever shoots into
@@ -184,10 +185,10 @@ them (`Terrain.cover`).
 | Scenario | Ground | Goal | Teaches |
 |---|---|---|---|
 | Skirmish | a new field each time | break them | long reach on any field |
-| Open Ground | the ridge | break them | crossing open ground under rifles and guns |
-| Into the Trees | woods | break them | trees halve fire: fight for the woods |
-| Shoot the Gunners | roads | break them | each battery is twelve men: close inside 230 and shoot the gunners |
-| Hold the Creek | fords, deploy at the river | hold one crossing at 3:00 | reach against men who must wade |
+| Open Ground | drawn: houses along a ridge, a wood off its east end | break them | crossing open ground under rifles and guns: go round |
+| Into the Trees | drawn: three woods, a flag in each | break them | trees halve fire: be in the woods before they are |
+| Shoot the Gunners | drawn: four batteries on a hill over two roads | break them | each battery is twelve men: close inside 230 and shoot the gunners |
+| Hold the Creek | drawn: three fords, the flags 250 back from the water | hold one flag at 3:00 | reach against men who must wade |
 
 **Both eras run at pace 0.4.** Rifles and Line were made for the grand
 battles, which run at `pace` 0.4: volleys of shot and arrows do that share
@@ -220,9 +221,10 @@ Sieges, measured the same day:
 | The Last Keep | 67% | 33% | 83% | 100% (3.0) |
 | The Breach at Greyhold | 0% | 83% | 50% | 83% (1.7) |
 
-The two later eras, measured 2026-11-11 with the ladder of 7 November
-(see "Play over time"): eight dice each, two draws of eight for the
-Skirmishes. Minutes are the standard commander's; stars are the average
+The two later eras, measured 2026-11-11 on the seeded fields they then
+had, with the ladder of 7 November (see "Play over time"): eight dice each,
+two draws of eight for the Skirmishes. The designed scenarios' ladder on
+their drawn fields is under "Drawn fields" below; the Skirmishes' stands. Minutes are the standard commander's; stars are the average
 over every battle, won or lost.
 
 | Scenario | idle | person | standard | sharp | minutes | stars (person / standard / sharp) |
@@ -251,7 +253,216 @@ commander lost, so the player has five rifles, as many as the attacker.
 Open Ground is as proposed: a fifth rifle regiment on the ridge and every
 commander lost.
 
-Found measuring them, and open:
+### Drawn fields (12 November 2026)
+
+The eight designed scenarios of Line and Square and of Rifle and Gun are
+fought on fields drawn by hand (`plan` in their packs; `ARCHITECTURE.md`,
+"Packs"), not seeded ones. On a seeded field nobody chose where the woods,
+hills and fords fell, so a brief could promise what the ground didn't
+deliver, and any change to the generator would have redrawn every scenario.
+Two cases were measured on 11 November: Open Ground's brief said "go round"
+and a straight walk won 7 of 8; the fords' lesson is to stand back from the
+bank, and the seeded banks were inside each other's reach, with the flags
+on the crossings themselves. The older eras' scenarios are still seeded
+(see "Which older scenarios need one", below).
+
+Each field is drawn so its lesson is true in distances. The numbers they
+rest on: rifles reach 230, line and muskets 170, guns 430, each a quarter
+more from a crest; a regiment told to shoot closes to 0.95 of its reach and
+stands (218 for rifles, 161 for line); the AI attacks what comes within 1.1
+of its reach (253, 187); line forms square when horse is within 240; trees
+and houses halve arrow and shot, and stop no cannonball; the AI's guns
+unlimber 170 behind the flag it most wants, its line stands 50 short of a
+flag on its own side until the enemy is near, and it sends the whole line
+to whichever flag is threatened. Both armies deploy in the usual zones: the
+player's line at y 720, the enemy's at 100, on the usual 1300 × 820.
+
+| Scenario | Its lesson | What on the ground makes it true |
+|---|---|---|
+| Receive Cavalry | Receive their horse in square where their guns can't reach; then break square and go for the guns. | Their guns unlimber at y 235, 170 behind the Crossroads, and reach to 665. The line starts at 720, on a low ridge, 55 beyond. Their general keeps a fourth flag, Their Camp, so a line that never leaves the ridge bleeds to the flags. |
+| Horse and Guns | Horse within 240 holds their line in square, firing at half; then the guns kill it. | Three flags on a lane, 250 apart, with 400 of open ground beyond either end: horse can stand 240 from a block and outside its muskets' 170. The middle flag is among the Inn's houses, which halve your musketry and not your guns. |
+| Line at the Fords | Stand back from the water. | Two fords 640 apart, a flag 215 south of each. The far bank's edge, 37 back from the water, is 252 from a line on the flags: past the muskets' 170, and past the 240 at which horse calls a square. Line and horse must both cross first. |
+| The Bridge at Dawn | Get the horse over the water, by the ford, to hold their line in square while yours forces the bridges. | Two bridges 440 apart and 32 wide, with houses at their far ends that halve fire from the near bank. A ford 320 upstream of the west bridge, outside the 170 of the muskets there; horse across it is within 240 of them. |
+| Open Ground | Don't walk at the ridge: take the flag their guns can't cover. | Highfield's houses run 500 along the crest and halve fire from the slope below; their guns, 170 behind its flag, reach every way up from the south. East Wood's flag is 730 from the guns, inside trees that halve the fire of whoever comes to retake it. |
+| Into the Trees | Be inside the trees when the lines meet. | Three woods, each from y 420 to 630, a flag in each at 470. The lines start 620 apart and stop to fire 218 apart, the player's slowed by the trees it enters first: moving at once it stands near y 590, inside, and theirs between 340 and 400, short of the trees. Twelve seconds late, theirs is on the flags, inside, and the player's stops in the open. |
+| Shoot the Gunners | Shoot the gunners, not the rifles in front of them. | Four batteries on a hill, 170 behind Battery Hill's flag, reach 530: both road flags, 490 away and 380 either side of the way up the middle. A battery is twelve men, and two volleys break it. |
+| Hold the Creek | Stand back from the water. | Three fords 68 wide, a flag 250 south of each. The far bank's edge is 287 from a line on the flags, past the rifles' 230: to fire, they must cross, a regiment at a time at each ford. The Mill's houses halve fire at whoever holds it. |
+
+**Measured** with `tests/lessons.gd`, which fights a scenario under plays
+written down: a naive one and the one the brief asks for, against the
+scenario's own enemy, on eight dice. Won, then the share of its men the
+player lost. "Seeded" is the standard commander on the field of 11
+November, measured the same way.
+
+| Scenario | Seeded | The naive play | | The intended play | |
+|---|---|---|---|---|---|
+| Receive Cavalry | 8 of 8, 54% | advance at once (the standard commander) | 7 of 8, 71% | stand on the ridge until their horse is beaten, then advance | 8 of 8, 25% |
+| Horse and Guns | 8 of 8, 34% | keep the horse back | 5 of 8, 30% | stand the horse 225 off the ends of their line | 8 of 8, 28% |
+| Line at the Fords | 4 of 8, 67% | stand the line on the bank | 0 of 8, 47% | hold the flags (the standard commander) | 8 of 8, 50% |
+| The Bridge at Dawn | 8 of 8, 41% | keep the horse back | 0 of 8, 72% | send the horse over the ford | 8 of 8, 44% |
+| Open Ground | 8 of 8, 59% | the whole line at Highfield | 0 of 8, 65% | the whole line to East Wood first | 8 of 8, 66% |
+| Into the Trees | 4 of 8, 64% | wait twelve seconds, then advance | 3 of 8, 54% | advance at once (the standard commander) | 7 of 8, 43% |
+| Shoot the Gunners | 6 of 8, 42% | the whole line at Battery Hill, shooting whoever is nearest | 0 of 8, 81% | the whole line at the batteries, shooting the gunners first | 7 of 8, 48% |
+| Hold the Creek | 4 of 8, 76% | stand the rifles on the bank | 0 of 8, 98% | hold the flags (the standard commander) | 8 of 8, 48% |
+
+Every lesson holds. Over the eight, the intended play wins 62 of 64 and
+the naive one 15: seven of those at Receive Cavalry, where advancing at
+once wins too and loses 71% of its men to 25%, five at Horse and Guns, and
+three at Into the Trees.
+Two more measures of the fords, the same river with each flag moved onto
+its crossing, where a seeded map puts it: the standard commander then wins
+2 of 8 at Line at the Fords, losing 82% of its men (8 of 8 and 50% with the
+flags 215 back), and 4 of 8 at Hold the Creek, losing 72% (8 of 8 and 48%
+with them 250 back). The bridge has two ways over
+for the horse: by the ford it wins 8 of 8 with 2.5 stars, by the west
+bridge (where the AI's own horse goes) 6 of 8 with 1.5.
+
+The ladder on the drawn fields, eight dice each (`tests/luck_skill.gd`,
+reported by `tests/play.py`); minutes are the standard commander's, stars
+the average over every battle:
+
+| Scenario | idle | person | standard | sharp | minutes | stars (person / standard / sharp) |
+|---|---|---|---|---|---|---|
+| Receive Cavalry | 0% | 100% | 88% | 100% | 2.2 | 2.8 / 1.8 / 2.0 |
+| Horse and Guns | 0% | 100% | 62% | 100% | 2.0 | 2.8 / 1.5 / 2.4 |
+| Line at the Fords | 0% | 88% | 100% | 100% | 3.0 | 1.8 / 1.2 / 1.0 |
+| The Bridge at Dawn | 0% | 88% | 75% | 100% | 2.7 | 1.6 / 1.5 / 2.5 |
+| Open Ground | 0% | 12% | 88% | 62% | 3.0 | 0.1 / 1.8 / 1.2 |
+| Into the Trees | 0% | 25% | 88% | 62% | 2.5 | 0.2 / 1.9 / 1.2 |
+| Shoot the Gunners | 0% | 25% | 12% | 62% | 2.4 | 0.2 / 0.2 / 1.2 |
+| Hold the Creek | 38% | 62% | 100% | 100% | 2.7 | 0.6 / 2.1 / 2.0 |
+
+Against the bar: every scenario is won by some ways of playing and lost by
+others, no commander averages three stars, and the standard commander's
+battle runs 2.0 to 3.0 minutes (on the seeded fields, 1.7 to 2.8, four of
+the eight under 2). Three things to read with it. Horse and Guns' second
+star is now 25% of your men, not 35%: at 35% the person-paced commander
+averaged 3.0 on the drawn field (2.9 on the seeded one). Shoot the Gunners
+is hard for every commander on the ladder, because none of them picks its
+target: the play that does wins 7 of 8. And the person-paced commander
+loses Open Ground and Into the Trees, where being late or piecemeal is the
+mistake the field punishes.
+
+Changed besides the ground, and why:
+
+- **Line at the Fords and Hold the Creek no longer deploy at the river**
+  (`deploy_depth` is gone from both): the flags stand back from the water,
+  and a line that starts at 720 reaches them before the enemy is across.
+- **Their flags drain at 0.25, not 0.5.** They start the player's, and with
+  the flags back from the water the attacker can't contest one until it has
+  crossed: at 0.5 the standard commander's Creek was over in 1.3 minutes,
+  on the drain alone.
+- **Line at the Fords has two fords and two flags, not three.** Four line
+  regiments on three flags 400 apart support nobody: standing on them won
+  1 of 4, and a line that never left its start won 4 of 4.
+- **Their briefs** say where to stand, since "the crossings are yours" is
+  no longer what the flags are. The armies are as they were.
+- **Receive Cavalry has a fourth flag.** Without Their Camp a line that
+  stood in square all day won 4 of 4, in 9.4 minutes; with it, 0 of 8.
+
+Tried and dropped, four dice each:
+
+- **Open Ground, a farm on the crest and a wood beside the east flag.**
+  Marching into the wood and shooting from cover won 0 of 4, losing in 1.5
+  minutes: their whole line and then their guns come to the threatened
+  flag, and while they hold three flags the drain is 1.5 a second, which
+  ends the battle before fire from cover can. With the drain at 0.2 it won
+  2 of 4. So the flag went inside the wood: taking it is what turns them.
+- **Open Ground, a farm 150 wide.** The whole line straight at it won 3 of
+  4, with fewer men lost than going round: only two of their four
+  regiments fit inside. Hence houses 500 along the crest.
+- **Shoot the Gunners, a copse within 218 of the guns** on the hill's east
+  side. 0 and 1 of 4: their line stands across the way in. And the guns
+  further back, in their own deployment zone: 1 of 4.
+- **Hold the Creek, the creek bowed north in the middle** so that no flag
+  was within 253 of the player's start line. The standard commander won 1
+  of 4: their first regiments are over the middle ford before the line
+  reaches the Mill. With two fords, as the line era has: 1 of 4. With the
+  outer fords 400 from the Mill, not 470: a line that never moved won 4 of
+  4, because the enemy, having taken the outer flags, keeps regiments on
+  them against the nearest of the player's.
+- **The Bridge at Dawn, horse standing 220 from the bridge guard** to hold
+  it in square: 1 of 4, no better than no horse. Their guns kill a standing
+  horse.
+- **Line at the Fords, a line that walks to the flags and then stands
+  still**, two regiments on each or all four on one: 0 of 4 either way.
+  Their horse crosses and holds the squares, and their line shoots them.
+  The standard commander, on the same flags and free to move, won 8 of 8:
+  the ground puts the far bank out of reach, and holding it still takes a
+  commander.
+- **Into the Trees, woods from y 370.** As the lines met, three of their
+  five regiments were at the trees' north edge or under them. The edge
+  moved south to 420; waiting twelve seconds then won 3 of 8 where it had
+  won 1, since the late line now stops nearer the trees.
+- **Horse and Guns, no houses**: the standard commander averaged three
+  stars. **Houses at two flags**: it lost 4 of 4 inside a minute, to the
+  drain, shooting at half into both.
+
+Found drawing them, and open:
+
+- **The drain outruns the shooting in these two eras.** Three flags drain
+  a side in 67 seconds, and at pace 0.4 shooting does 0.4 of its damage:
+  the line that shot from the wood beside Open Ground's east flag lost in
+  90 seconds with over half its men standing. A plan that fires from good
+  ground without taking a flag loses to the clock, which is why every
+  lesson above had to be made true of the flags and not only of the fire. Whether an era's drain should
+  follow its pace is a rule for the owner's play to judge; it was not
+  changed.
+- **The standard commander doesn't play two of the lessons.** It shoots
+  whoever is nearest, so at Shoot the Gunners it shoots the rifles in front
+  of the guns; and its horse rides at the nearest shooter, so at Horse and
+  Guns it charges squares, which wins no more than keeping it back (5 of 8
+  each). `scripts/ai.gd` was not changed.
+- **A line that never moves still wins Hold the Creek 3 of 8** (with 0.4
+  stars). The enemy takes the outer flags and then keeps regiments on them.
+- **There is no scenery.** Every copse is cover and slow ground. The first
+  Creek had two copses, put there for looks, under the ends of the player's
+  start line, and the line that never moved won 5 of 8 from them; copses
+  beside the gunners' roads stood where an attack on the road flags stops
+  to fire. Trees that carry no lesson are now in the corners of the field.
+- **A drawn field's drills are written for it** (`PLAYS` in
+  `tests/lessons.gd`): redraw the field and they are redrawn with it.
+
+#### Which older scenarios need one
+
+Medieval and Pike and Shot are still seeded. Recommended, most needed
+first, from the fields as seeded (`tests/lessons.gd --field`) and the
+ladder of 7 November:
+
+1. **The Cuirassiers** (`roads`, seed 31). Its brief says to ride round
+   the pikes. A seeded roads map has a river, and all three flags are on
+   its crossings, two fords 68 wide and a bridge 32 wide: there is no way
+   round, and four regiments of horse cross where the pikes stand. Its
+   ladder was 0%, 75%, 25%, 62%.
+2. **Hold the Fords and Shot at the Fords** (`fords`, seeds 41 and 17).
+   The case the Creek was: every flag is on its crossing, and the player
+   deploys 113 to 213 from them. Archers reach 230 and muskets 170, so the
+   far bank shoots the defenders, and the AI stands its shooters in the
+   fords. Shot at the Fords has the widest gap between the person-paced
+   commander and the standard one of any battle (100% to 38%); Hold the
+   Fords is 38% and 25%. The measure to expect is the Creek's and the
+   line's: with the flags on the crossings the standard commander won 4
+   and 2 of 8, and with them drawn back 8 and 8.
+3. **Two Narrow Bridges** (`bridges`, seed 23). Lost by nearly every
+   commander (0%, 0%, 12%, 0%, and the planner 0%). The seeded field has
+   two bridges 32 wide and no other way over. The Bridge at Dawn is the
+   same battle a period later, and there a ford upstream is the difference
+   between 6 of 8 and 8 of 8, and horse over the water between 0 and 8.
+4. **The Great Battery** (`ridge`, seed 9). Its brief says to take the
+   guns from the side, and nothing on the seeded field makes a side: one
+   flag on the hill and two on flat ground 360 and 420 either way. 0%, 0%,
+   12%, 12%, and the planner 75%. Open Ground and Shoot the Gunners are
+   the model, and what they found about the AI's guns applies.
+5. **Push of Pike** (`roads`, seed 13). The river again: "before the pikes
+   meet" on a field where they can meet only at three crossings.
+
+Hammer and Anvil and Riders at Dawn are left: Hammer and Anvil's ladder
+rises through every rung, and neither brief names ground the seed doesn't
+give. Note that `roads` is a river map: Horse and Guns and Shoot the
+Gunners were on one until they were drawn.
+
+Found measuring the seeded fields on 11 November (the drawn fields answer
+the first two for these eras, and the third):
 
 - **A frontal assault into rifles.** The one thing the Rifle era needed was
   that walking straight at rifles is suicide. In its Skirmish an AI player
@@ -268,7 +479,9 @@ Found measuring them, and open:
   and Waterloo recordings, so it waits for a versus measurement of its own.
 - **A passive line in square stalls Receive Cavalry.** The idle player's
   squares outlast the horse, and the battle runs to nine minutes before the
-  late drain decides it, once in four for the idle player.
+  late drain decides it, once in four for the idle player. On the drawn
+  field their general keeps a flag, and the idle player loses in 3.4
+  minutes.
 
 A garrison that does nothing holds the Last Keep two times in three:
 standing in the bailey is a defence. Building them, three things were

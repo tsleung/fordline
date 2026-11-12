@@ -22,7 +22,7 @@ Start with the question you have.
 | `scripts/ai.gd` | The AI: a pure decision, battle in, orders out |
 | `scripts/combat.gd` | The rules, as pure functions |
 | `scripts/campaign.gd` | The campaign: run state in, new run state out |
-| `scripts/terrain.gd` | Maps (seeded, castles, hand-drawn) and the questions asked of them |
+| `scripts/terrain.gd` | Maps (seeded, castles, hand-drawn from a plan) and the questions asked of them |
 | `scripts/scenarios.gd` | Looking a scenario up, checking it, building its battle |
 | `packs/registry.gd` | The content packs, and what a pack and a scenario hold |
 | `packs/medieval.gd`, `pike_shot.gd`, `sieges.gd`, `line_square.gd`, `rifle_gun.gd`, `gettysburg.gd`, `waterloo.gd` | The packs: eras and scenarios, as data |
@@ -36,6 +36,7 @@ Start with the question you have.
 | `tests/studies.sh` | Runs the studies in parallel from a copy of the tree, into `build/studies` |
 | `tests/luck_skill.gd`, `tests/luck_skill.py`, `tests/play.py`, `tests/plans.gd`, `tests/versus.gd`, `tests/gun_line.gd` | The studies; `tests/ai_baseline.gd` is the AI of 1 November, frozen, the yardstick `versus.gd` plays against |
 | `tests/planner_data.gd`, `tests/plan_examples.gd` | The planner's choices as a dataset |
+| `tests/lessons.gd` | Whether a designed scenario's ground teaches its lesson: the naive play against the intended one |
 | `tests/shot.gd` | Screenshots from Godot's own window |
 
 ## Not in this repo

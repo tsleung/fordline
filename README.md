@@ -102,8 +102,14 @@ Studies, all fought through the game's loop:
   (`spec.json` and `examples.jsonl`, `tests/planner_data.gd`): at each
   re-plan, what its side could see, each choice's rollout score, the
   choice it took, and how the battle came out. Rerun, the same bytes.
+- `tests/lessons.gd` asks whether a drawn scenario's ground teaches its
+  lesson: it fights the scenario under plays written down, the naive one
+  and the one the brief asks for, and prints wins, men lost, stars and
+  minutes. `--field` prints the distances the lesson rests on;
+  `--on-crossings` fights a river field with its flags moved onto the
+  crossings, where a seeded map has them.
 
-`tests/studies.sh NAME ladder plans versus planner` runs any of these in
+`tests/studies.sh NAME ladder plans versus planner lessons` runs any of these in
 parallel, as DESIGN.md measures them, from a copy of the tree (so editing
 doesn't disturb a long run), into `build/studies/NAME`, with `tests/play.py`'s
 report and DESIGN.md's table in its `report.txt`.
