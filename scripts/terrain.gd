@@ -7,6 +7,11 @@ const SIZE := Vector2(1300.0, 820.0)
 const DEPLOY_DEPTH := 190.0
 const EDGE := 36.0
 const RIVER_HALF := 13.0
+## A crossing's half-width along the river, and how far apart the river's
+## centre line is sampled.
+const FORD_HALF := 34.0
+const BRIDGE_HALF := 16.0
+const RIVER_STEP := 40.0
 const BANK_CLEARANCE := 24.0
 const ROAD_HALF := 9.0
 ## Fortress walls: half their thickness; how far pathfinding keeps a
@@ -27,8 +32,8 @@ const GATE_HALF := 34.0
 const MOAT := Vector2(22.0, 50.0)
 
 var kind := ""
-## The field's extent. Quick battles and the campaign use SIZE; a grand
-## battle's plan sets its own.
+## The field's extent. Quick battles and the campaign use SIZE unless a
+## plan sets its own, as a grand battle's does.
 var size := SIZE
 var has_river := false
 ## River centre line, sampled left to right.
@@ -66,9 +71,9 @@ var posts := PackedVector2Array()
 var moat := PackedVector2Array()
 var _nav: AStarGrid2D
 
-## Grand battles only. towns: built-up ground, each a polygon; streams:
+## Drawn fields only. towns: built-up ground, each a polygon; streams:
 ## fordable creeks, each a centre line; flag_names: what each flag stands
-## for ("Cemetery Hill"), or empty on the arcade maps.
+## for ("Cemetery Hill"), or empty on a seeded map.
 var towns: Array[PackedVector2Array] = []
 var streams: Array[PackedVector2Array] = []
 var flag_names := PackedStringArray()
@@ -96,28 +101,124 @@ static func generate(map_kind: String, seed_value: int) -> Terrain:
 	return t
 
 
+## Every key a plan may use; anything else is a misspelling.
+const PLAN_KEYS := ["id", "size", "ridges", "hills", "forests", "towns", "streams", "roads", "river", "crossings", "flags"]
+
+
 ## A field drawn by hand from a plan rather than seeded: a grand battle's
-## historical ground. Plan keys: id, size, ridges (each {"line", "r"}: a
-## crest line and how far its slopes reach), hills and forests (each {"c",
-## "r"}), towns (polygons), streams and roads (lines), and flags (each
-## {"name", "at"}).
+## historical ground, or a quick battle's designed one. Plan keys:
+##   id: its name; size: its extent (SIZE if not given)
+##   ridges: each {"line", "r"}, a crest line and how far its slopes reach
+##   hills and forests: each {"c", "r"}
+##   towns: polygons; streams and roads: lines
+##   river: its centre line, drawn left to right from one edge of the field
+##     to the other; it can be crossed only at its crossings
+##   crossings: each {"x", "bridge"}, a ford (FORD_HALF to either side, half
+##     speed) or a bridge (BRIDGE_HALF) where the river passes x
+##   flags: each {"name", "at"}
+## The river follows the seeded maps' rules, so everything that asks about
+## a river (path, side, is_water, the painter) reads a drawn one the same
+## way. Unlike a seeded map, a plan puts its flags where it likes: a ford's
+## flag may stand back from the water. check_plan says what is wrong with
+## a plan.
 static func from_plan(plan: Dictionary) -> Terrain:
 	var t := Terrain.new()
 	t.kind = plan.id
-	t.size = plan.size
+	t.size = plan.get("size", SIZE)
 	for ridge in plan.get("ridges", []):
 		t.ridges.append({"line": PackedVector2Array(ridge.line), "r": ridge.r})
 	for hill in plan.get("hills", []):
 		t.hills.append({"c": hill.c, "r": hill.r})
 	for forest in plan.get("forests", []):
 		t.forests.append({"c": forest.c, "r": forest.r})
-	t.towns.assign(plan.get("towns", []))
-	t.streams.assign(plan.get("streams", []))
-	t.roads.assign(plan.get("roads", []))
+	t.towns.assign(plan.get("towns", []).map(func(town): return PackedVector2Array(town)))
+	t.streams.assign(plan.get("streams", []).map(func(line): return PackedVector2Array(line)))
+	t.roads.assign(plan.get("roads", []).map(func(line): return PackedVector2Array(line)))
+	if plan.has("river"):
+		t.has_river = true
+		t.river = _sampled(PackedVector2Array(plan.river), t.size.x)
+		for c in plan.get("crossings", []):
+			var bridge: bool = c.get("bridge", false)
+			t.crossings.append({"x": c.x, "half": BRIDGE_HALF if bridge else FORD_HALF, "bridge": bridge})
 	for f in plan.flags:
 		t.flags.append(f.at)
 		t.flag_names.append(f.name)
 	return t
+
+
+## `drawn`, left to right, as the river is kept: its corners rounded (each
+## cut twice, which keeps it running left to right), then a point every
+## RIVER_STEP from just off the left edge to just off the right, level
+## beyond the line's own ends.
+static func _sampled(drawn: PackedVector2Array, width: float) -> PackedVector2Array:
+	var line := drawn
+	for pass_i in 2:
+		var cut := PackedVector2Array([line[0]])
+		for k in line.size() - 1:
+			cut.append(line[k].lerp(line[k + 1], 0.25))
+			cut.append(line[k].lerp(line[k + 1], 0.75))
+		cut.append(line[line.size() - 1])
+		line = cut
+	var out := PackedVector2Array()
+	var i := 0
+	var x := -RIVER_STEP
+	while x <= width + RIVER_STEP:
+		while i < line.size() - 2 and line[i + 1].x < x:
+			i += 1
+		var a := line[i]
+		var b := line[i + 1]
+		out.append(Vector2(x, lerpf(a.y, b.y, clampf((x - a.x) / (b.x - a.x), 0.0, 1.0))))
+		x += RIVER_STEP
+	return out
+
+
+## What is wrong with a plan, as sentences: empty when nothing is.
+static func check_plan(plan: Dictionary) -> PackedStringArray:
+	var wrong := PackedStringArray()
+	var id: String = plan.get("id", "(no id)")
+	for key in plan:
+		if not key in PLAN_KEYS:
+			wrong.append("plan %s has an unknown key: %s" % [id, key])
+	for key in ["id", "flags"]:
+		if not plan.has(key):
+			wrong.append("plan %s has no %s" % [id, key])
+	var extent: Vector2 = plan.get("size", SIZE)
+	var line: Array = plan.get("river", [])
+	var fords: Array = plan.get("crossings", [])
+	if plan.has("river"):
+		var runs: bool = line.size() >= 2 and line[0].x <= 0.0 and line[line.size() - 1].x >= extent.x
+		for i in line.size() - 1:
+			runs = runs and line[i + 1].x > line[i].x
+		if not runs:
+			wrong.append("plan %s: the river must run left to right from one edge to the other" % id)
+		if fords.is_empty():
+			wrong.append("plan %s has a river and no crossing" % id)
+	elif not fords.is_empty():
+		wrong.append("plan %s has crossings and no river" % id)
+	for c in fords:
+		for key in c:
+			if not key in ["x", "bridge"]:
+				wrong.append("plan %s has a crossing with an unknown key: %s" % [id, key])
+		if not c.has("x") or c.x < EDGE or c.x > extent.x - EDGE:
+			wrong.append("plan %s has a crossing off the field" % id)
+	if not wrong.is_empty():
+		return wrong
+	var t := from_plan(plan)
+	for f in plan.flags:
+		if not t.in_bounds(f.at) or t.is_water(f.at):
+			wrong.append("plan %s: the flag %s is off the field or in the water" % [id, f.name])
+	return wrong
+
+
+## Whether every flag stands on a crossing, as on a seeded river map: then
+## the flags are the crossings, and are called so.
+func flags_on_crossings() -> bool:
+	if not has_river:
+		return false
+	for f in flags:
+		if not in_river_band(f) or crossing_at(f.x).is_empty():
+			return false
+	return true
 
 
 # --- queries ---------------------------------------------------------------
@@ -395,12 +496,12 @@ func _make_river(rng: RandomNumberGenerator) -> void:
 	var p1 := rng.randf_range(0.0, TAU)
 	var p2 := rng.randf_range(0.0, TAU)
 	var tilt := rng.randf_range(-0.05, 0.05)
-	var x := -40.0
-	while x <= size.x + 40.0:
+	var x := -RIVER_STEP
+	while x <= size.x + RIVER_STEP:
 		var y := size.y * 0.5 + a1 * sin(x * 0.0042 + p1) + a2 * sin(x * 0.013 + p2)
 		y += (x - size.x * 0.5) * tilt
 		river.append(Vector2(x, y))
-		x += 40.0
+		x += RIVER_STEP
 
 
 func _make_crossings(rng: RandomNumberGenerator) -> void:
@@ -418,7 +519,7 @@ func _make_crossings(rng: RandomNumberGenerator) -> void:
 			bridges = [false, true, false]
 	for i in spots.size():
 		var x: float = size.x * spots[i] + rng.randf_range(-70.0, 70.0)
-		crossings.append({"x": x, "half": 16.0 if bridges[i] else 34.0, "bridge": bridges[i]})
+		crossings.append({"x": x, "half": BRIDGE_HALF if bridges[i] else FORD_HALF, "bridge": bridges[i]})
 	if kind == "bridges":
 		var x := size.x * 0.5 + rng.randf_range(-40.0, 40.0)
 		flags.append(Vector2(x, river_y(x) + (60.0 if rng.randf() < 0.5 else -60.0)))
