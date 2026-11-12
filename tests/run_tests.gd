@@ -42,6 +42,7 @@ func _run() -> void:
 	await _test_screen_fixes()
 	_test_replay()
 	_test_first_looks()
+	_test_gun_line()
 	_test_copy()
 	_test_plan_examples()
 	_test_battles(quick)
@@ -786,6 +787,26 @@ func _test_replay() -> void:
 	changed[0].orders.clear()
 	var other := BattleRun.replay(make, seats, changed, Fights.length(played.battle))
 	_check(not same.call(played.battle, other.battle), "the same log without the first orders fights another battle")
+
+
+## The gun-line player's guns stand out of reach of the shot on the
+## wall-walk and within reach of it themselves, in both sieges.
+func _test_gun_line() -> void:
+	for id in ["storm", "breach"]:
+		var b := Scenarios.make_battle(Scenarios.resolve(id, 1), 1)
+		var guns := b.team_regiments(0).filter(func(r): return r.kind == K.CANNONS)
+		var foes := b.team_regiments(1)
+		var line := Fights.GunLineCommander.gun_line(b, guns, foes)
+		var nearest := INF
+		for p in b.terrain.posts:
+			nearest = minf(nearest, line.distance_to(p))
+		var shot := 0.0
+		for f in foes:
+			if UnitTypes.is_shot(f.kind) or f.kind == K.ARCHERS:
+				for p in b.terrain.posts:
+					shot = maxf(shot, f.fire_range * b.terrain.range_mult(p))
+		_check(nearest > shot and nearest < UnitTypes.stat(K.CANNONS, "range"), "%s: the gun line (%d from the wall-walk) is beyond its shot (%d) and within the guns' reach" % [id, int(nearest), int(shot)])
+		_check(b.terrain.in_bounds(line) and not b.terrain.is_blocked(line), "%s: the gun line is on open ground" % id)
 
 
 ## The dice set when each seat first looks: die 0 has both look at once,

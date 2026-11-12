@@ -111,15 +111,24 @@ so a CI run can record a new scenario on Linux.
 Decision: an era made of grand-battle kinds takes the grand battles' pace
 rather than new stats, so Gettysburg and Waterloo stay as recorded.
 
+## 12 November: the siege slog, measured
+
+A gun-line player that plays the siege the way the owner did: guns out of
+the wall-walk's reach clear it, then batter the gate while the foot ram.
+It wins all sixteen sieges on eight dice, losing 17% of its men at
+Greyhold and 36% at Duskwatch, where the AI's all-out assault loses 84% and
+95% and wins six of the sixteen. The safest line is the best line, as the
+owner found. `tests/studies.sh NAME siege` fights it, for measuring again
+after the gate rules.
+
 ## Open
 
 In the agreed order:
 
-1. **A gun-line player** that measures the siege slog. `DESIGN.md`, "Next:
-   gates that matter", step 1.
-2. **Gate rules:** the gatehouse shoots the ram, battlements against
-   cannonballs, a gate that can be read. Step 2 there; measure again after.
-3. **The sally and the relief column.** Step 3 there.
+1. **Gate rules:** the gatehouse shoots the ram, battlements against
+   cannonballs, a gate that can be read. `DESIGN.md`, "Next: gates that
+   matter", step 2; measure again with the gun-line player after.
+2. **The sally and the relief column.** Step 3 there.
 
 Alongside:
 

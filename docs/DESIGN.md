@@ -324,16 +324,30 @@ The direction, agreed on 8 November 2026: **make the gate a door both sides
 gamble on.** The steps are in order, and the numbers are starting values to
 tune by measuring.
 
-1. **Measure the slog first: a gun-line player.** A `Commander` in
-   `tests/fights.gd` that plays what the owner played. Guns stand inside 430
-   of the wall-walk's posts (`Terrain.posts`) and beyond the muskets' 212;
-   they shoot enemy guns, then shooters. Everyone else stands with the guns.
-   When no enemy shooter is left fighting, guns bombard the gate, foot ram it,
-   and then go for the flags. Fight `storm` and `breach` on eight dice and
-   report win, time, own losses, when the walls were clear and when the gate
-   fell. Expected today: it nearly always wins, cheaply. Target: after step 2
-   it costs more men or time than a mixed assault, and after step 3 it can
-   lose.
+1. **Measure the slog first: a gun-line player. Built and measured, 12
+   November 2026.** `Fights.GunLineCommander` plays what the owner played.
+   Its guns stand straight out from the gate, halfway between the reach of
+   the shot on the wall-walk (muskets 212, archers 287, with the height) and
+   their own 430, and shoot enemy guns, then shooters. Everyone else stands
+   behind them and fights only what comes within 200 of the guns. When no
+   enemy shooter is left fighting, the guns bombard the gate and the foot
+   ram it; once it falls, the AI takes the army on to the flags.
+   `tests/gun_line.gd` fights it and the standard AI player, which assaults
+   with everything, on the same eight dice (`tests/studies.sh NAME siege`):
+
+   | Siege | Player | won | minutes | men lost | walls clear | outer gate | keep gate |
+   |---|---|---|---|---|---|---|---|
+   | The Storming of Duskwatch | gun line | 8 of 8 | 4.5 | 36% | 2.0 (8 of 8) | 3.2 (8 of 8) | 4.5 (5 of 8) |
+   | The Storming of Duskwatch | standard | 2 of 8 | 3.8 | 95% | 2.8 (2 of 8) | 1.1 (8 of 8) | 5.6 (1 of 8) |
+   | The Breach at Greyhold | gun line | 8 of 8 | 3.5 | 17% | 1.4 (8 of 8) | 2.3 (8 of 8) | 3.1 (6 of 8) |
+   | The Breach at Greyhold | standard | 4 of 8 | 2.9 | 84% | 1.9 (4 of 8) | 0.8 (8 of 8) | 1.9 (3 of 8) |
+
+   Times are medians, in minutes, over the battles where it happened. What
+   the owner felt is measured: the gun line never loses, and it costs a
+   fifth to a third of the men an assault costs. The assault has the outer
+   gate down in about a minute, then loses most of its men with the walls
+   still manned. Target: after step 2 it costs more men or time than a mixed
+   assault, and after step 3 it can lose.
 2. **Rules only, no AI.**
    - **The gatehouse shoots the ram.** While a gate stands, it fires on the
      regiment `_ram` picks. It can't be silenced, and it stops when the gate

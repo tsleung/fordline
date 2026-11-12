@@ -2,8 +2,8 @@
 # The studies behind DESIGN.md's "Play over time" and "The AI audit", in
 # parallel, from a copy of the tree (editing doesn't disturb a long run), into
 # build/studies/NAME, reported by tests/play.py into its report.txt.
-#   tests/studies.sh NAME ladder plans versus planner
-# Pick any of the four. Set in the environment:
+#   tests/studies.sh NAME ladder plans versus planner siege
+# Pick any of the five. Set in the environment:
 #   DICE (8), DRAWS (2): the ladder's and the planner's dice, and how many
 #     fields of each campaign battle and Skirmish the ladder fights
 #   TRIES (30): plans the plan search tries
@@ -76,6 +76,12 @@ jobs() {
 				for first in 0 5 10 15; do
 					echo "$OUT/versus_${s}_$first.txt tests/versus.gd -- $VERSUS --job=scenario:$s --dice=2 --draws=5 --first=$first"
 				done
+			done
+			;;
+		siege)
+			# The siege slog: the gun-line player against the standard one.
+			for s in storm breach; do
+				echo "$OUT/siege_$s.txt tests/gun_line.gd -- --scenarios=$s --dice=$DICE"
 			done
 			;;
 		planner)

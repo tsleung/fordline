@@ -3,7 +3,8 @@
 ROW lines tests/luck_skill.gd prints and reports, per battle and commander,
 each horizon's measure, and the ladder as DESIGN.md's table; the VS lines
 tests/versus.gd prints, the AI against its yardstick from both ends; and the
-PLAN lines tests/plans.gd prints, the audit. tests/studies.sh runs them all.
+PLAN lines tests/plans.gd prints, the audit; and the SIEGE lines
+tests/gun_line.gd prints, the siege slog. tests/studies.sh runs them all.
 
     python3 tests/play.py build/studies/NAME/*.txt
 """
@@ -137,8 +138,26 @@ def report(rows):
                   f"growth {end / soon if soon > 0 else float('nan'):4.1f}")
 
 
+def siege(rows):
+    """The siege slog: per siege and player, wins, length, the share of its
+    men the player lost, and the median minute the walls were clear of
+    enemy shooters and each gate fell (in how many battles it happened)."""
+    def when(rs, key):
+        at = sorted(r[key] for r in rs if r[key] >= 0)
+        return f"{at[len(at) // 2] / 60:.1f} ({len(at)} of {len(rs)})" if at else "never"
+    print("| Siege | Player | won | minutes | men lost | walls clear | outer gate | keep gate |")
+    print("|---|---|---|---|---|---|---|---|")
+    by = defaultdict(list)
+    for r in rows:
+        by[(r["scenario"], r["policy"])].append(r)
+    for (scenario, policy), rs in sorted(by.items()):
+        print(f"| {scenario} | {policy} | {sum(r['won'] for r in rs)} of {len(rs)} | {mean(r['time'] for r in rs) / 60:.1f} | "
+              f"{mean(r['lost'] for r in rs):.0%} | {when(rs, 'walls_clear')} | {when(rs, 'gate_0')} | {when(rs, 'gate_1')} |")
+
+
 if __name__ == "__main__":
     rows, vs, tried = load(sys.argv[1:]), load(sys.argv[1:], "VS "), load(sys.argv[1:], "PLAN ")
+    sieges = load(sys.argv[1:], "SIEGE ")
     if rows:
         report(rows)
         print()
@@ -149,3 +168,6 @@ if __name__ == "__main__":
     if tried:
         print()
         plans(tried)
+    if sieges:
+        print()
+        siege(sieges)

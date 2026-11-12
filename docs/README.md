@@ -32,9 +32,9 @@ Start with the question you have.
 | `scripts/battle_screen.gd`, `hud.gd`, `units_view.gd`, `terrain_view.gd`, `minimap.gd`, `map_preview.gd` | The battle on screen; they read the battle and never write it |
 | `tests/run_tests.gd` | The suite: rules, maps, screens, replays, recorded battles, the step budget |
 | `tests/golden-macos.txt`, `tests/golden-linux.txt` | The recorded battles, one file per platform |
-| `tests/fights.gd`, `tests/measures.gd` | The commander ladder, and the measures of play |
+| `tests/fights.gd`, `tests/measures.gd` | The commander ladder and the gun-line player, and the measures of play |
 | `tests/studies.sh` | Runs the studies in parallel from a copy of the tree, into `build/studies` |
-| `tests/luck_skill.gd`, `tests/luck_skill.py`, `tests/play.py`, `tests/plans.gd`, `tests/versus.gd` | The studies; `tests/ai_baseline.gd` is the AI of 1 November, frozen, the yardstick `versus.gd` plays against |
+| `tests/luck_skill.gd`, `tests/luck_skill.py`, `tests/play.py`, `tests/plans.gd`, `tests/versus.gd`, `tests/gun_line.gd` | The studies; `tests/ai_baseline.gd` is the AI of 1 November, frozen, the yardstick `versus.gd` plays against |
 | `tests/planner_data.gd`, `tests/plan_examples.gd` | The planner's choices as a dataset |
 | `tests/shot.gd` | Screenshots from Godot's own window |
 
