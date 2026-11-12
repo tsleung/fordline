@@ -44,7 +44,7 @@ if [ -z "${TREE:-}" ]; then
 fi
 
 DESIGNED="hold hammer bridges riders storm last_keep push fords_shot cuirassiers battery breach receive horse_guns fords_line bridge_dawn open_ground trees gunners creek"
-DRAWN="receive horse_guns fords_line bridge_dawn open_ground trees gunners creek"
+DRAWN="hold bridges push fords_shot cuirassiers battery receive horse_guns fords_line bridge_dawn open_ground trees gunners creek"
 SKIRMISHES="skirmish skirmish_shot skirmish_line skirmish_rifle"
 LADDER="--policies=idle,person,standard,sharp"
 jobs() {

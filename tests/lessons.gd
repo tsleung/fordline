@@ -36,13 +36,63 @@ const GENERIC := ["stand", "straight", "balanced"]
 ##   until_gone: the drill ends when no enemy of this kind fights
 ##   until_clear: the drill ends when an enemy has come within this of a
 ##     regiment on its station and none is any longer
+##   until_near: the drill ends when an enemy comes within this of a
+##     regiment on its station
 ##   rest: "ai" (the default) leaves the other kinds to the AI; "stand"
 ##     gives them no orders
 ##   all_to: the AI sends the whole line to this flag, by index, until it
 ##     is taken; then the AI allots the line itself
+##   barrage: a point; whenever the player's barrage is ready it is called
+##     on the enemy nearest that point, if one is within BARRAGE_NEAR of it
 ##   persona: how the AI plays what it is handed (balanced if not given)
 ## When a drill ends, all its regiments are the AI's.
 const PLAYS := {
+	"cuirassiers": {
+		"front": {"stations": {K.CAVALRY: "here"}, "then": "stand", "hunt": K.MUSKETS},
+		"round": {
+			"stations": {K.CAVALRY: [Vector2(300, 130), Vector2(300, 200), Vector2(370, 130), Vector2(370, 200)]},
+			"via": [Vector2(110, 600), Vector2(110, 300)],
+		},
+	},
+	"hold": {
+		"forward": {
+			"stations": {K.SWORDS: [Vector2(590, 320), Vector2(710, 320)], K.PIKES: [Vector2(650, 320)]},
+		},
+		"stay": {
+			"stations": {
+				K.SWORDS: [Vector2(200, 427), Vector2(1100, 427)], K.PIKES: [Vector2(650, 427)],
+				K.ARCHERS: [Vector2(425, 480), Vector2(875, 480)],
+			},
+			"then": "stand",
+		},
+	},
+	"fords_shot": {
+		"bank": {
+			"stations": {
+				K.PIKES: [Vector2(200, 377), Vector2(650, 377), Vector2(1100, 377)],
+				K.MUSKETS: [Vector2(200, 430), Vector2(650, 430), Vector2(1100, 430)],
+			},
+			"then": "stand",
+		},
+	},
+	"bridges": {
+		"east": {"all_to": 2, "barrage": Vector2(870, 350)},
+		"west": {"all_to": 1, "barrage": Vector2(430, 350)},
+	},
+	"battery": {
+		"front": {"all_to": 1},
+	},
+	"push": {
+		"charge": {"stations": {K.PIKES: [Vector2(530, 300), Vector2(650, 300), Vector2(770, 300)]}},
+		"rise": {
+			"stations": {
+				K.PIKES: [Vector2(470, 540), Vector2(650, 540), Vector2(830, 540)],
+				K.MUSKETS: [Vector2(560, 540), Vector2(740, 540), Vector2(920, 540)],
+				K.CANNONS: [Vector2(380, 540)],
+			},
+			"then": "stand", "until_near": 90.0,
+		},
+	},
 	"open_ground": {
 		"front": {"all_to": 0},
 		"round": {"all_to": 1},
@@ -212,6 +262,9 @@ func _print_field(spec: Dictionary) -> void:
 ## route, and then stand there, hunt one kind of enemy, or are handed to the
 ## AI. See PLAYS.
 class Drill extends Commander:
+	## How near its point an enemy must be for the barrage to be called.
+	const BARRAGE_NEAR := 150.0
+
 	var play: Dictionary
 	var persona: Dictionary
 	## Each regiment still under the drill, by id, to its station.
@@ -237,6 +290,14 @@ class Drill extends Commander:
 		for f in b.team_regiments(1 - team):
 			if f.fighting():
 				foes.append(f)
+		if team == 0 and play.has("barrage") and "barrage" in b.abilities and b.cooldowns.barrage <= 0.0:
+			var mark: Regiment = null
+			for f in foes:
+				var d: float = f.pos.distance_to(play.barrage)
+				if d < BARRAGE_NEAR and (mark == null or d < mark.pos.distance_to(play.barrage)):
+					mark = f
+			if mark != null:
+				orders.append({"type": "barrage", "pos": mark.pos})
 		if _over(b, foes):
 			_station.clear()
 		var wake: float = play.get("wake", 0.0)
@@ -283,6 +344,12 @@ class Drill extends Commander:
 		for key in ["until_gone", "hunt"]:
 			if play.has(key) and not foes.any(func(f): return f.kind == play[key]):
 				return true
+		if play.has("until_near"):
+			var near_to: float = play.until_near
+			for id in _station:
+				var r := b.get_regiment(id)
+				if r.fighting() and _arrived(r) and foes.any(func(f): return f.pos.distance_to(r.pos) < near_to):
+					return true
 		if not play.has("until_clear"):
 			return false
 		var standing := _station.keys().map(func(id): return b.get_regiment(id)).filter(func(r): return r.fighting() and _arrived(r))

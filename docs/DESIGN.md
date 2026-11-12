@@ -140,9 +140,9 @@ losses, crossings held at the end), and the best is kept on the device.
 | Scenario | Ground | Goal | Teaches |
 |---|---|---|---|
 | Skirmish | a new field each time | break them | two armies made the same; only play differs |
-| Hold the Fords | fords, deploy at the river | hold one ford at 3:00 | standing on ground you already own |
+| Hold the Fords | drawn: three fords, a flag on each | hold one ford at 3:00 | standing on ground you already own |
 | Hammer and Anvil | open woods | break them | pin with foot, ride round with horse |
-| Two Narrow Bridges | bridges | hold both bridges at 5:00 | forcing a crossing with guns and a barrage |
+| Two Narrow Bridges | drawn: two bridges, a gun hill behind the west one; barrage | hold both bridges at 5:00 | forcing a crossing with guns and a barrage: the bridge the guns cover first |
 | Riders at Dawn | the ridge | break them | pikes against a cavalry army |
 | The Storming of Duskwatch | a castle | hold two of its three flags at 6:00 | a siege: guns and a ram on the gate, then the keep |
 | The Last Keep | your castle | hold one flag at 5:00 | holding the walls, then the gateway |
@@ -155,10 +155,10 @@ above; Pike and Shot fights with pikes, muskets, horse and guns:
 | Scenario | Ground | Goal | Teaches |
 |---|---|---|---|
 | Skirmish | a new field each time | break them | the same, drawn from pike, shot, horse and guns |
-| Push of Pike | roads | break them | let the shot thin their blocks before the pikes meet |
-| Shot at the Fords | fords, deploy at the river | hold one ford at 3:00 | muskets on ground that makes the enemy wade |
-| The Cuirassiers | roads | break them | ride round the pikes into the shot behind them |
-| The Great Battery | the ridge | break them | cross open ground under three batteries |
+| Push of Pike | drawn: three flags on a lane, a rise 140 behind them | break them | let the shot thin their blocks before the pikes meet |
+| Shot at the Fords | drawn: three fords, the flags 170 back from the water | hold one flag at 3:00 | muskets on ground that makes the enemy wade |
+| The Cuirassiers | drawn: their flag behind the middle ford, a ford 540 off either side | break them | ride round the pikes into the shot behind them |
+| The Great Battery | drawn: a hill for the guns, a lane flag at either edge | break them | cross open ground under three batteries: at once, all together |
 | The Breach at Greyhold | a castle | hold two of its three flags at 6:00 | great guns against walls built for bows |
 
 In a siege the flags don't drain resolve (a castle's three would bleed
@@ -263,8 +263,8 @@ deliver, and any change to the generator would have redrawn every scenario.
 Two cases were measured on 11 November: Open Ground's brief said "go round"
 and a straight walk won 7 of 8; the fords' lesson is to stand back from the
 bank, and the seeded banks were inside each other's reach, with the flags
-on the crossings themselves. The older eras' scenarios are still seeded
-(see "Which older scenarios need one", below).
+on the crossings themselves. Six scenarios of the older eras were drawn the
+next day (see "The older eras", below).
 
 Each field is drawn so its lesson is true in distances. The numbers they
 rest on: rifles reach 230, line and muskets 170, guns 430, each a quarter
@@ -423,43 +423,216 @@ Found drawing them, and open:
 - **A drawn field's drills are written for it** (`PLAYS` in
   `tests/lessons.gd`): redraw the field and they are redrawn with it.
 
-#### Which older scenarios need one
+#### The older eras (13 November 2026)
 
-Medieval and Pike and Shot are still seeded. Recommended, most needed
-first, from the fields as seeded (`tests/lessons.gd --field`) and the
-ladder of 7 November:
+Six designed scenarios of Medieval and of Pike and Shot are drawn the same
+way: Hold the Fords and Two Narrow Bridges; Push of Pike, Shot at the
+Fords, The Cuirassiers and The Great Battery. Hammer and Anvil and Riders
+at Dawn stay seeded.
 
-1. **The Cuirassiers** (`roads`, seed 31). Its brief says to ride round
-   the pikes. A seeded roads map has a river, and all three flags are on
-   its crossings, two fords 68 wide and a bridge 32 wide: there is no way
-   round, and four regiments of horse cross where the pikes stand. Its
-   ladder was 0%, 75%, 25%, 62%.
-2. **Hold the Fords and Shot at the Fords** (`fords`, seeds 41 and 17).
-   The case the Creek was: every flag is on its crossing, and the player
-   deploys 113 to 213 from them. Archers reach 230 and muskets 170, so the
-   far bank shoots the defenders, and the AI stands its shooters in the
-   fords. Shot at the Fords has the widest gap between the person-paced
-   commander and the standard one of any battle (100% to 38%); Hold the
-   Fords is 38% and 25%. The measure to expect is the Creek's and the
-   line's: with the flags on the crossings the standard commander won 4
-   and 2 of 8, and with them drawn back 8 and 8.
-3. **Two Narrow Bridges** (`bridges`, seed 23). Lost by nearly every
-   commander (0%, 0%, 12%, 0%, and the planner 0%). The seeded field has
-   two bridges 32 wide and no other way over. The Bridge at Dawn is the
-   same battle a period later, and there a ford upstream is the difference
-   between 6 of 8 and 8 of 8, and horse over the water between 0 and 8.
-4. **The Great Battery** (`ridge`, seed 9). Its brief says to take the
-   guns from the side, and nothing on the seeded field makes a side: one
-   flag on the hill and two on flat ground 360 and 420 either way. 0%, 0%,
-   12%, 12%, and the planner 75%. Open Ground and Shoot the Gunners are
-   the model, and what they found about the AI's guns applies.
-5. **Push of Pike** (`roads`, seed 13). The river again: "before the pikes
-   meet" on a field where they can meet only at three crossings.
+**These eras run at pace 1, and that changes what ground can do.** A
+volley does its full damage, and a meeting of pike or sword blocks is
+decided in ten to twenty seconds. Bows are weak (a volley from thirty-six
+archers kills about three of forty-eight swords), muskets are not (six or
+seven of forty-eight, and they shake them), and a battery kills a few men a
+salvo. Nothing on a field changes melee but a river: houses and a crest
+take a tenth off a blow. So these lessons rest on reach where the kind has
+it, and otherwise on who meets whom, and when. The numbers besides those
+above: bows reach 230 and muskets 170, each a quarter more from a crest
+(287, 212); pikes go for anything within 220, and for horse first; the AI
+stands its bows and shot 75 behind its foot, and sends one block of foot to
+each flag it has no reason to mass on. Foot deploys at y 670, shot and bows
+at 720; theirs at 150 and 100.
 
-Hammer and Anvil and Riders at Dawn are left: Hammer and Anvil's ladder
-rises through every rung, and neither brief names ground the seed doesn't
-give. Note that `roads` is a river map: Horse and Guns and Shoot the
-Gunners were on one until they were drawn.
+| Scenario | Its lesson | What on the ground makes it true |
+|---|---|---|
+| The Cuirassiers | Ride round the pikes, by a ford they can't reach, onto the shot and guns behind them. | One flag 180 north of the middle ford, so their three pike blocks stand side by side across it, shot 75 behind, guns 170 behind the flag. The middle ford comes out 143 from the flag, inside the pikes' 220 and the guns' 430. The outer fords are 540 either side: 643 from the guns, 440 from the nearest pikes. |
+| Hold the Fords | Put a block on each ford and keep it there. | Three fords 68 wide and 450 apart, a flag on each, the player's from the start. The river is 230 from their foot's start line and 290 from the player's, so a block sent to each ford is on its flag as they wade. A flag changes hands only when one side stands on it alone; a block is 15 seconds from the next ford. |
+| Shot at the Fords | Stand a musket's reach back from the water. | Three fords 450 apart, a flag 170 south of each: shot on the flags reaches the middle of the ford, and shot on the far bank is 207 from the flags. To fire, theirs must wade. |
+| Two Narrow Bridges | Force the bridge your guns cover, with the barrage on its guard; then the other. | Two bridges 440 apart, houses at their far ends that halve arrows and stop no cannonball. Gun Hill is 170 south of the west bridge, where the guns unlimber: from it they reach 537, their gun 474 away and the west guard. The east bridge has no hill: guns behind it reach 430, and their gun is 472 away. |
+| The Great Battery | Cross the open ground at once and all together, at the guns. | The guns stand on a hill 170 behind the battery's flag and reach 537, 3 short of the pikes' start line. A lane flag at either edge, 658 from the guns and 574 from the battery's flag. Their general sends a pike block to each flag: one stands before the guns, and the other two are 21 seconds' march away. The battery's flag is 370 from the start line, 14 seconds. |
+| Push of Pike | Stand on the rise and let the shot work as their blocks climb; then push. | Three flags on a lane, the same march from both lines, and a rise 140 behind them. Shot on its crest reaches 212, 72 past the flags. Their shot, 75 behind pikes on the flags, is 215 from the crest and reaches 170. Their pikes, within 220 of shot on the crest, leave the flags and climb at it. |
+
+**Measured** as the newer eras were, eight dice. "Seeded" is the standard
+commander on the seeded field, measured the same day.
+
+| Scenario | Seeded | The naive play | | The intended play | |
+|---|---|---|---|---|---|
+| The Cuirassiers | 2 of 8, 55% | the horse straight at their shot, over the middle ford | 0 of 8, 72% | the horse round by the west ford, the foot over the middle | 8 of 8, 31% |
+| Hold the Fords | 2 of 8, 46% | send the foot over the middle ford to meet them | 1 of 8, 42% | a block on each ford, bows behind, never moving | 8 of 8, 47% |
+| Shot at the Fords | 3 of 8, 46% | stand the line at the water | 1 of 8, 42% | hold the flags (the standard commander) | 7 of 8, 44% |
+| Two Narrow Bridges | 1 of 8, 51% | the whole line at the east bridge, with the barrage | 0 of 8, 75% | the whole line at the west bridge, with the barrage | 5 of 8, 65% |
+| The Great Battery | 1 of 8, 68% | take the lanes first (the standard commander) | 2 of 8, 73% | the whole line at the battery's flag | 5 of 8, 61% |
+| Push of Pike | 4 of 8, 55% | march the pikes 100 past the flags | 1 of 8, 60% | pike, shot and gun on the crest until their pikes are within 90 | 8 of 8, 31% |
+
+Over the six, the intended play wins 41 of 48 and the naive one 5. The
+lessons are not equally strong. The Cuirassiers, Hold the Fords and Push
+of Pike are as clear as any of the newer eight. The bridges and the
+battery are won five times in eight by the play the field asks for, and
+stay hard.
+
+Other plays measured on the final fields: the standard commander at The
+Cuirassiers wins 5 of 8 over the middle ford and loses 61% of its men; at
+the bridges it attacks both and wins 2 of 8; at Push of Pike it meets them
+on the flags and wins 4 of 8. A commander that walks straight in wins 2 of
+8 at The Cuirassiers (8 of 8 with three stars on the seeded field), 3 at
+the bridges, 1 at the battery, 3 at Push of Pike. At Hold the Fords the
+standard commander wins 7 of 8, losing 55%, and the one that walks
+straight in 8 of 8. Shot at the Fords with each flag moved onto its
+crossing: the standard commander wins 7 of 8, losing 54% (7 of 8 and 44%
+with them 170 back).
+
+The ladder, eight dice each, beside the ladder of 7 November on the seeded
+fields:
+
+| Scenario | idle | person | standard | sharp | minutes | stars (person / standard / sharp) | 7 November | its minutes |
+|---|---|---|---|---|---|---|---|---|
+| Hold the Fords | 0% | 25% | 88% | 100% | 2.2 | 0.4 / 1.9 / 2.0 | 0, 38, 25, 38% | 2.2 |
+| Two Narrow Bridges | 0% | 0% | 25% | 75% | 2.2 | 0 / 0.5 / 1.1 | 0, 0, 12, 0% | 1.4 |
+| Push of Pike | 0% | 38% | 50% | 62% | 1.2 | 0.9 / 1.4 / 1.9 | 0, 75, 50, 75% | 1.9 |
+| Shot at the Fords | 0% | 88% | 88% | 100% | 2.4 | 2.2 / 2.0 / 2.4 | 0, 100, 38, 62% | 2.1 |
+| The Cuirassiers | 0% | 12% | 62% | 50% | 2.0 | 0.1 / 1.2 / 0.9 | 0, 75, 25, 62% | 1.6 |
+| The Great Battery | 0% | 0% | 25% | 12% | 2.4 | 0 / 0.5 / 0.2 | 0, 0, 12, 12% | 1.6 |
+
+Against the bar: every scenario is won by some ways of playing and lost by
+others, and no commander averages three stars. The standard commander's
+battle runs 2.0 to 2.4 minutes in five of the six. Push of Pike's is 1.2:
+two lines of pike that meet on the flags settle it in half a minute, and at
+a drain of 0.25 it still ran 1.3. That one does not meet the bar.
+
+Changed besides the ground, and why:
+
+- **Hold the Fords and Shot at the Fords no longer deploy at the river**
+  (`deploy_depth` is gone from both). Shot at the Fords' flags stand back
+  from the water, and a line that starts at 670 is on them first. Hold the
+  Fords' river is drawn 290 from the player's foot and 230 from theirs, so
+  the usual zone is near enough. Both keep the drain of 0.5: at 0.25 Hold
+  the Fords came out the same (7 of 8, and 8 of 8 for the blocks that
+  stay), and Shot at the Fords ran 2.7 minutes for 2.4.
+- **Two Narrow Bridges drains at 0.3.** At 0.5 the standard commander's
+  battle was 1.7 minutes; at 0.3 it is 2.2. The wins did not move: 2 of 8,
+  the west bridge 5 of 8 and the east 0 at either.
+- **Briefs.** All six say where to stand or which way to go, since each
+  field now has such a place. The Great Battery's no longer says "take the
+  guns from the side": a gun's reach is the same all round and it turns at
+  once, so a side is no safer than the front (measured below). Shot at the
+  Fords' goal and stars say "flags", not "crossings", and the bridges' goal
+  is written out. Hold the Fords keeps its brief and adds how: a block on
+  each ford, and stay.
+- No army changed, and no rule.
+
+Tried and dropped, four dice each unless it says eight:
+
+- **The Cuirassiers on open ground,** one flag at a crossroads with 500
+  clear off either end of their pikes. The standard commander won 3 of 4
+  from the front, once with three stars in half a minute. Horse round the
+  flank with the foot going in at once won 2 of 4; with the foot held back
+  nine seconds, so that both arrive together, 4 of 4; alone, 0 of 4. Their
+  shot stands 75 from their pikes, which turn on horse within 220: riding
+  round gains nothing unless the pikes are pinned at that moment, and
+  nothing in open ground makes the front cost more. A river does both.
+- **The Cuirassiers, the river 110 from the flag** (the ford comes out 73
+  from it): the standard commander 0 of 4, round 3 of 4. **250 from it**
+  (out at 213): the standard commander 4 of 4 with two stars, round 4 of 4
+  with three. At 180 it is 5 of 8 and 8 of 8.
+- **The Cuirassiers, the horse round and the foot never moving:** 5 of 8
+  (eight dice), losing 30%. The horse alone nearly does it.
+- **Hold the Fords, the flags back from the water on a ridge,** as the
+  Creek's are back from it. First drawn that way: the crest 240 south of
+  the river, so that bows on it reach the far bank (277 of 287) and are not
+  reached, the flags on its slope 140 from the water. Eight dice: the
+  standard commander 5 of 8; a line at the water that never moves 0 of 8;
+  the same line on the flags and crest, never moving, 2 of 8; each of
+  those two handed to the AI when the enemy is within 90, 0 of 8 and 0 of
+  8; and the standard commander with the flags moved onto the crossings 7
+  of 8. The ridge did not beat the bank on equal terms, so the field was
+  not teaching it. Bows don't decide a Medieval battle: a volley kills
+  three men, and standing back buys one or two.
+- **Hold the Fords, other ground behind the fords** (eight dice, the
+  standard commander and the one that walks straight in, which differ only
+  in their first eight seconds). Flags an archer's reach back, no ridge: 3
+  and 7 of 8. Two fords: 3 and 5. Three fords 320 apart: 5 and 4. A ridge
+  under flags 230 back: 3 and 1. Flags 140 back and no ridge: 5 and 6. A
+  crest 260 back: 8 and 6. Nothing separates them.
+- **Hold the Fords, the flags on the fords and the river elsewhere.** 150
+  from their foot and 370 from the player's (eight dice): they are on the
+  fords first, the blocks that stay win 0 of 8 and the standard commander
+  6. 300 from theirs and 220 from the player's (four dice): the blocks that
+  stay win 4 of 4, the standard commander 0 of 4, and all the foot massed
+  at the middle ford 0 of 4. At 230 and 290, as drawn, both win.
+- **Two Narrow Bridges on the Bridge at Dawn's field** (a ford 320
+  upstream, a rise behind both bridges; eight dice). Two sword blocks over
+  the ford won 3 of 8 where the standard commander won 4: foot is half a
+  minute wading round, and is not horse when it arrives. So the ford
+  went, and the bridges are again the only way over.
+- **Two Narrow Bridges, Gun Hill as a fourth flag** the player starts
+  with, to slow the drain (eight dice): the standard commander 1 of 8, the
+  west bridge 1 of 8.
+- **Two Narrow Bridges, the west bridge without the barrage:** 4 of 8
+  (eight dice); the standard commander with the barrage on the west guard,
+  2 of 8.
+- **The Great Battery, the lanes level with the battery** (566 from the
+  guns): the whole line at the battery won 1 of 4, by the edge of the
+  field to a lane 0 of 4, straight to a lane 0 of 4. Their whole line, and
+  then their guns, come to the lane, and the march there costs 37 resolve
+  to three flags' drain.
+- **The Great Battery laid out as Open Ground is,** the battery to the west
+  and two flags to the east: the whole line at the battery won 4 of 4,
+  losing 36%, because their line marched east to the free flags and their
+  guns, which deploy in the middle, were still limbered 250 from the hill.
+  The battery has to be where their guns already are.
+- **The Great Battery, every flag theirs from the start,** so their line
+  stays before the guns: 0 of 4 for every play, the frontal one in 0.9
+  minutes. **Two flags, the battery and a mill in houses beyond the guns:**
+  0 of 4 for every play; their line and guns come to the mill, and it is an
+  even fight the standard commander loses.
+- **The Great Battery, the barrage on the battery's guard:** 5 of 8 (eight
+  dice), as without it.
+- **Push of Pike, the three flags on the crest:** the standard commander 4
+  of 4 with three stars in 1.1 minutes. **One flag at the crossroads:** 8
+  of 8 with three stars in 0.9 (eight dice). The flags have to be where
+  marching to them gives up the rise.
+
+Found drawing them, and open:
+
+- **Hold the Fords teaches staying, not where to stand.** What separates
+  the plays is leaving the fords (1 of 8) from keeping a block on each (8
+  of 8); the standard commander, which moves its blocks as the attack
+  shifts, wins 7. Nothing was found for a Medieval defender in reach or
+  height. And where the river lies decides it as much as the play does
+  (above): 80 further from the player and the blocks that stay lose every
+  time.
+- **No commander on the ladder rides round at The Cuirassiers.** A
+  regiment crosses by the ford nearest its way (`Terrain.path`), which for
+  everything aimed at their line is the middle one. The drill rides round;
+  the ladder's 62% is the frontal crossing.
+- **No AI commander calls the barrage,** so at the bridges only the drill
+  does. And the standard commander attacks both bridges at once.
+- **The standard commander spreads at The Great Battery,** a block to each
+  flag nobody threatens (`AI._allot`), which is the naive play there.
+- **Their guns leave the hill.** The AI's guns go 170 behind the flag it
+  most wants, and a flag it doesn't hold comes first: when a lane is not
+  theirs and nobody is in reach, the batteries limber up and set off for
+  it, at 16 a second.
+- **The bridges and the battery are hard:** the standard commander wins a
+  quarter of each, and the person-paced one none.
+- **Push of Pike is short,** and no field tried lengthens it with the
+  lesson intact (four dice each; the standard commander's minutes, then
+  the rise and the charge). Three streams across their approach: 1.4, and
+  the charge wins 3 of 4 where it won 1 of 8. The flags 70 nearer the
+  player and the rise with them: 1.4, charge 4 of 4, rise 2 of 4. The rise
+  170 behind the flags: 1.3, rise 4 of 4, charge 1 of 4. 185 behind: 1.1.
+  200 behind: 2.2, but the rise wins 1 of 4, its shot reaching 12 past the
+  flags. The flags 400 apart, not 250: 1.8, charge 4 of 4, rise 0 of 4.
+  The approach is 13 seconds whatever is drawn on it, and the meeting
+  settles it.
+
+#### Which older scenarios are left
+
+Hammer and Anvil and Riders at Dawn are still seeded: Hammer and Anvil's
+ladder rises through every rung, and neither brief names ground the seed
+doesn't give. The three sieges are fought on the castle. Note that `roads`
+is a river map: no designed scenario is on one now.
 
 Found measuring the seeded fields on 11 November (the drawn fields answer
 the first two for these eras, and the third):
@@ -503,8 +676,9 @@ Every briefing (and each card in the scenario list) shows the field as it
 will be fought, both armies deployed: the battle's own map, drawn small.
 
 A scenario may give the player abilities, start them holding every flag,
-let them deploy further forward, and end on the flags at a deadline. They
-are data in `scripts/scenarios.gd`.
+let them deploy further forward (`deploy_depth`; no scenario does since the
+fords were drawn), and end on the flags at a deadline. They are data in the
+packs.
 
 Measured 2026-10-30 against the AI players of the luck study: every
 scenario is won by some ways of playing and lost by others (Hold the Fords

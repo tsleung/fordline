@@ -404,14 +404,12 @@ func _test_drawn_fields() -> void:
 	var off_wrong := "; ".join(Terrain.check_plan(off))
 	_check(off_wrong.contains("off the field") and off_wrong.contains("unknown key: wide"), "a crossing off the field or misspelt is named")
 
-	var seeded := Scenarios.get_spec("hold")
-	var spec := seeded.duplicate(true)
-	spec.erase("map")
-	spec.erase("map_seed")
+	var spec := Scenarios.get_spec("hold").duplicate(true)
 	spec.plan = plan
+	spec.deploy_depth = 370.0
 	_check(Scenarios.check(spec).is_empty() and not Scenarios.is_grand(spec), "a quick scenario may carry a plan and is not a grand battle")
 	var b := Scenarios.make_battle(spec, 1)
-	_check(b.terrain.kind == "drawn" and b.flags.size() == 3 and b.flags_held(0) == 3 and b.terrain.deploy_depth[0] == seeded.deploy_depth, "its battle is fought on the drawn field, deployed as far forward as it says")
+	_check(b.terrain.kind == "drawn" and b.flags.size() == 3 and b.flags_held(0) == 3 and b.terrain.deploy_depth[0] == spec.deploy_depth, "its battle is fought on the drawn field, deployed as far forward as it says")
 	var front := INF
 	for r in b.regiments:
 		_check(not b.terrain.is_water(r.pos), "a drawn field deploys on dry ground")
@@ -433,7 +431,7 @@ func _test_drawn_fields() -> void:
 	_check("; ".join(Scenarios.check(unplanned)).contains("no plan"), "a grand battle needs its plan")
 
 	var drawn := Packs.scenarios("quick").filter(func(q): return q.has("plan"))
-	_check(drawn.map(func(q): return q.id) == ["receive", "horse_guns", "fords_line", "bridge_dawn", "open_ground", "trees", "gunners", "creek"], "the two newest eras' designed scenarios are drawn")
+	_check(drawn.map(func(q): return q.id) == ["hold", "bridges", "push", "fords_shot", "cuirassiers", "battery", "receive", "horse_guns", "fords_line", "bridge_dawn", "open_ground", "trees", "gunners", "creek"], "the designed scenarios are drawn, all but Hammer and Anvil, Riders at Dawn and the sieges")
 	for q in drawn:
 		var field: Terrain = Scenarios.field(q)
 		_check(field.size == Terrain.SIZE and field.flag_names.size() == field.flags.size(), "%s is a quick battle's size, its flags named" % q.id)
@@ -454,10 +452,49 @@ func _test_drawn_fields() -> void:
 	# The distances the fords' lessons rest on: a line on the flags is out
 	# of reach of the far bank, and of the horse that would call a square.
 	var bank := Terrain.RIVER_HALF + Terrain.BANK_CLEARANCE
-	for pair in [["creek", UnitTypes.stat(K.RIFLES, "range") * 1.1], ["fords_line", Battle.SQUARE_CALL]]:
+	for pair in [["creek", UnitTypes.stat(K.RIFLES, "range") * 1.1], ["fords_line", Battle.SQUARE_CALL], ["fords_shot", UnitTypes.stat(K.MUSKETS, "range") * 1.1]]:
 		var field: Terrain = Scenarios.field(Scenarios.get_spec(pair[0]))
 		for f in field.flags:
 			_check(f.y - (field.river_y(f.x) - bank) > pair[1], "%s: the far bank is more than %d from a line on the flags" % [pair[0], pair[1]])
+	# Hold the Fords: a flag on each ford, and the player's foot starts
+	# no more than two seconds' march further from them than theirs.
+	var fords_field: Terrain = Scenarios.field(Scenarios.get_spec("hold"))
+	_check(fords_field.flags_on_crossings(), "hold: every flag is on its ford")
+	var river_at: float = fords_field.river_y(650.0)
+	_check((670.0 - river_at) - (river_at - 150.0) <= 2.0 * float(UnitTypes.stat(K.SWORDS, "speed")), "hold: the player's foot reaches the fords within two seconds of theirs")
+	# The Cuirassiers: the middle ford comes out inside the 220 at which
+	# their pikes go for what is near, and the outer fords are beyond their
+	# guns, 170 behind the flag.
+	var gun_reach: float = UnitTypes.stat(K.CANNONS, "range")
+	var behind := Vector2(0.0, AI.BATTERY_BACK)
+	var round_field: Terrain = Scenarios.field(Scenarios.get_spec("cuirassiers"))
+	for c in round_field.crossings:
+		var landing := Vector2(c.x, round_field.river_y(c.x) - bank)
+		if is_equal_approx(c.x, round_field.flags[0].x):
+			_check(landing.distance_to(round_field.flags[0]) < 220.0, "cuirassiers: the middle ford comes out within their pikes' reach of the flag")
+		else:
+			_check(landing.distance_to(round_field.flags[0] - behind) > gun_reach and landing.distance_to(round_field.flags[0]) > 220.0 + AI.DIVISION_GAP, "cuirassiers: an outer ford is beyond their guns and their pikes")
+	# The Great Battery: guns on the hill reach neither lane flag nor the
+	# pikes' start line.
+	var hill_field: Terrain = Scenarios.field(Scenarios.get_spec("battery"))
+	var battery := hill_field.flags[1] - behind
+	var hill_reach := gun_reach * hill_field.range_mult(battery)
+	_check(hill_reach > gun_reach * 1.2, "battery: their guns unlimber on the hill")
+	for at in [hill_field.flags[0], hill_field.flags[2], Vector2(650.0, 670.0)]:
+		_check(at.distance_to(battery) > hill_reach, "battery: %s is beyond the guns' %d" % [at, hill_reach])
+	# Push of Pike: shot on the crest reaches past the flags, and their
+	# shot, 75 behind pikes on the flags, doesn't reach the crest.
+	var rise_field: Terrain = Scenarios.field(Scenarios.get_spec("push"))
+	var shot: float = UnitTypes.stat(K.MUSKETS, "range")
+	for f in rise_field.flags:
+		var crest := Vector2(f.x, rise_field.ridges[0].line[0].y)
+		_check(crest.y - f.y < shot * rise_field.range_mult(crest) and crest.y - (f.y - 75.0) > shot, "push: shot on the crest reaches the flag at %s, and shot behind it doesn't reach the crest" % f)
+	# Two Narrow Bridges: guns on the hill reach their gun, 170 behind the
+	# Meadow, and it doesn't reach the hill.
+	var bridge_field: Terrain = Scenarios.field(Scenarios.get_spec("bridges"))
+	var gun_hill: Vector2 = bridge_field.hills[0].c
+	var their_gun := bridge_field.flags[0] - behind
+	_check(gun_hill.distance_to(their_gun) > gun_reach and gun_hill.distance_to(their_gun) < gun_reach * bridge_field.range_mult(gun_hill), "bridges: guns on the hill reach their gun, and it doesn't reach the hill")
 
 	# The briefing and the list draw a drawn field as they draw a seeded one.
 	var main: Node = load("res://scenes/main.tscn").instantiate()
@@ -573,8 +610,13 @@ func _test_screen_fixes() -> void:
 		{"type": "deadline", "held": 1},
 	])
 	screen.free()
-	for pair in [["hold", "Crossing", "crossings"], ["storm", "Flag", "flags"]]:
-		var quick_spec := Scenarios.resolve(pair[0], 1)
+	# A seeded river map's flags are its crossings; a castle's are flags.
+	var on_fords := Scenarios.resolve("hold", 1)
+	on_fords.erase("plan")
+	on_fords.map = "fords"
+	on_fords.map_seed = 41
+	for pair in [["hold on a seeded river", "Crossing", "crossings", on_fords], ["storm", "Flag", "flags", Scenarios.resolve("storm", 1)]]:
+		var quick_spec: Dictionary = pair[3]
 		var other = preload("res://scripts/battle_screen.gd").new()
 		other.setup(Scenarios.make_battle(quick_spec, 1), quick_spec.persona, quick_spec.name)
 		_check(other._flag_word(0) == pair[1] and other._flag_noun(2) == pair[2], "on %s a flag is a %s" % [pair[0], pair[1]])
@@ -612,7 +654,7 @@ func _test_packs() -> void:
 	_check(Scenarios.grand().map(func(q): return q.id) == ["gettysburg", "waterloo"], "the grand battles are listed")
 	_check(Scenarios.make_battle(Scenarios.resolve("receive", 1), 1).pace == 0.4 and Scenarios.make_battle(Scenarios.resolve("skirmish_rifle", 1), 1).pace == 0.4, "a quick battle runs at its era's pace")
 	_check(Scenarios.make_battle(Scenarios.resolve("hold", 1), 1).pace == 1.0 and Scenarios.make_battle(Scenarios.resolve("breach", 1), 1).pace == 1.0, "an era with no pace runs at 1")
-	var misspelt := Scenarios.get_spec("hold").duplicate()
+	var misspelt := Scenarios.get_spec("hammer").duplicate()
 	misspelt["hold_neded"] = 2
 	misspelt.map = "swamp"
 	misspelt.era = "bronze"
@@ -759,10 +801,8 @@ func _test_scenarios() -> void:
 	_check(sk1.player == sk1.enemy, "a skirmish's armies are the same")
 	var held := Scenarios.make_battle(Scenarios.resolve("hold", 1), 1)
 	_check(held.flags_held(0) == 3, "hold starts with every ford ours")
-	var front := INF
 	for r in held.team_regiments(0):
-		front = minf(front, r.pos.y)
-	_check(front < Terrain.SIZE.y - Terrain.DEPLOY_DEPTH, "hold deploys forward of the usual zone")
+		_check(r.pos.y > Terrain.SIZE.y - Terrain.DEPLOY_DEPTH, "hold deploys in the usual zone, not at the river")
 	held.begin()
 	while held.phase == "battle":
 		held.step(Battle.STEP)

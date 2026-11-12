@@ -144,6 +144,54 @@ It moved the sixteen recorded battles of those eight scenarios on each
 platform; the Linux ones were recorded from a CI run of the merge on a
 branch, as before.
 
+## 13 November: drawn fields for the older eras
+
+Six designed scenarios of Medieval and of Pike and Shot are drawn, in the
+order `DESIGN.md` gave: The Cuirassiers, the two fords, Two Narrow Bridges,
+The Great Battery, Push of Pike. Each was measured on its seeded field
+first, then drawn and measured again, the naive play against the intended
+one on eight dice: the intended play wins 41 of 48 and the naive one 5.
+Hammer and Anvil and Riders at Dawn stay seeded.
+
+These eras run at pace 1, where a volley does its full damage and two
+lines of foot settle it in seconds, so the newer eras' findings did not
+all carry over, and three fields came out other than expected:
+
+- **The Cuirassiers has a river after all.** In open ground riding round
+  gained nothing: their shot stands 75 from their pikes. Now their line is
+  behind the middle ford and there is a ford 540 off either side, beyond
+  their guns and pikes: horse round by one wins 8 of 8, horse straight over
+  the middle 0.
+- **Hold the Fords has its flags on the fords, as it always had.** It was
+  first drawn as the Creek is, flags back from the water on a ridge whose
+  crest outreaches the far bank. On equal terms the ridge did not beat the
+  bank (2 and 0 of 8 for lines that never move), and with the flags on the
+  crossings the standard commander won more. Bows don't decide a Medieval
+  battle. What the field now teaches is its old brief: a block on each
+  ford that stays wins 8 of 8, the foot sent over the river 1.
+- **The Great Battery's brief no longer says "from the side".** A gun's
+  reach is the same all round. What the field teaches is the other half of
+  the old brief: cross at once and all together, while their pikes are
+  spread to the lanes.
+
+Decisions, all provisional and open to play: the two fords no longer
+deploy at the river; Two Narrow Bridges drains at 0.3, to bring the
+standard commander's battle past two minutes; five briefs changed and
+Hold the Fords' gained a clause; the bridges have no ford (foot by the
+Bridge at Dawn's ford won no more). No army changed, and no rule. The
+drills gained two verbs: one calls the barrage, since no AI commander
+does, and one ends a drill when the enemy comes near.
+
+Push of Pike does not meet the ladder's bar: the standard commander's
+battle is 1.2 minutes, and six more fields tried (streams, the flags
+nearer or wider, the rise further back) either left it there or lost the
+lesson. `DESIGN.md`, "The older eras", has every field's distances, the
+measures, what was tried and dropped, and what is open.
+
+It moved the twelve recorded battles of those six scenarios. macOS is
+recorded; the Linux recording still holds the seeded battles, and is to be
+recorded from a CI run of the merge, as before.
+
 ## Open
 
 In the agreed order:
@@ -160,8 +208,14 @@ Alongside:
   measuring the new eras. The drawn fields put those two scenarios' flags
   back from the water, so it no longer shows there; it still does on any
   seeded river map.
-- **Drawn fields for the older eras**, the Cuirassiers and the two fords
-  first. `DESIGN.md`, "Which older scenarios need one".
+- **The Linux recording of the six older drawn scenarios** (twelve
+  battles), from a CI run.
+- **Push of Pike's length**, 1.2 minutes, and **Hold the Fords' river**:
+  80 further from the player and the blocks that stay lose every time.
+  `DESIGN.md`, "The older eras", found and open.
+- **The commanders can't play three of the older lessons:** none rides
+  round by a far ford, none calls the barrage, and the standard one
+  spreads its line at The Great Battery. Same place.
 - **Whether an era's flag drain should follow its pace.** At pace 0.4 the
   flags end a battle before the shooting can. `DESIGN.md`, "Drawn fields",
   found drawing them.
